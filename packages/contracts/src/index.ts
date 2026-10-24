@@ -15,6 +15,9 @@ import type {
   TaskStatus,
   Criterion,
   CrewEvent,
+  DelegateTaskArgs,
+  PublishNoteArgs,
+  ReportBlockerArgs,
 } from './generated/runtime.ts';
 
 export * from './generated/runtime.ts';
@@ -176,6 +179,69 @@ export interface Actor {
   generation: number;
 }
 
+export type Delegation = DelegateTaskArgs & {
+  id: string;
+  run_id: string;
+  status: 'queued' | 'claimed';
+  attempt_id: string | null;
+  created_at: string;
+};
+
+export type TaskNote = PublishNoteArgs & {
+  id: string;
+  run_id: string;
+  actor_id: string;
+  created_at: string;
+};
+
+export type TaskBlocker = ReportBlockerArgs & {
+  id: string;
+  run_id: string;
+  actor_id: string;
+  created_at: string;
+};
+
+export interface CoordinationQuestion {
+  id: string;
+  run_id: string;
+  question: string;
+  options: string[];
+  affects_task_ids: string[];
+  blocking: boolean;
+  status: 'open' | 'answered';
+  requested_by: string;
+  response_id: string | null;
+  created_at: string;
+}
+
+export interface UserResponse {
+  id: string;
+  run_id: string;
+  question_id: string;
+  answer: string;
+  user_actor_id: string;
+  source_id: string;
+  created_at: string;
+}
+
+export interface DecisionProvenance {
+  basis: 'technical_judgment' | 'user_response';
+  user_response_id: string | null;
+}
+
+export interface DeliveryAcceptance {
+  id: string;
+  run_id: string;
+  task_id: string;
+  handoff_id: string;
+  accepted_revision: string;
+  review_ids: string[];
+  verification_ids: string[];
+  artifact_ids: string[];
+  accepted_by: string;
+  created_at: string;
+}
+
 export interface ProviderRequest {
   cwd: string;
   prompt: string;
@@ -185,7 +251,12 @@ export interface ProviderRequest {
     sandbox: 'read-only' | 'workspace-write';
     approval: 'never' | 'on-request';
   };
-  bridge?: { command: string; args: string[]; env: Record<string, string> };
+  bridge?: {
+    command: string;
+    args: string[];
+    env: Record<string, string>;
+    approved_tools?: string[];
+  };
 }
 
 export interface ProviderEvent {
