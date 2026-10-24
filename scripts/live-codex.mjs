@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, writeFile, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { resolve, isAbsolute } from 'node:path';
+import { basename, dirname, resolve, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   CodexProvider,
@@ -29,6 +29,7 @@ const audit = resolve(cwd, 'mcp-audit.jsonl');
 const token = randomUUID();
 const marker = randomUUID();
 const records = [];
+const artifacts = [];
 const report = {
   mode,
   checked_at: new Date().toISOString(),
@@ -41,8 +42,24 @@ const report = {
   cwd,
   capabilities: await provider.probe(),
   records,
+  artifacts,
   success: false,
 };
+async function archive(name, content) {
+  const path = resolve(
+    dirname(reportPath),
+    `${basename(reportPath, '.json')}-${name}`,
+  );
+  await writeFile(path, content, { mode: 0o600 });
+  const sha256 = createHash('sha256').update(content).digest('hex');
+  assert.equal(
+    createHash('sha256')
+      .update(await readFile(path))
+      .digest('hex'),
+    sha256,
+  );
+  artifacts.push({ path, sha256 });
+}
 const request = (prompt, sandbox = 'workspace-write') => ({
   cwd,
   prompt: `Authorized disposable integration test. Work only in the current directory. Do not start other agents, browse, change settings, or use git.\n${prompt}`,
@@ -166,6 +183,7 @@ async function verifyPermission() {
     !audited.some((event) => event.method === 'tools/call'),
     'Denied ping must not reach the bridge',
   );
+  await archive('permission-audit.jsonl', await readFile(permissionAudit));
 }
 try {
   if (mode === 'single') {
@@ -181,9 +199,11 @@ try {
       await readFile(resolve(cwd, 'proof.txt'), 'utf8'),
       `ONE_${marker}\n`,
     );
+    await archive('proof-first.txt', await readFile(resolve(cwd, 'proof.txt')));
     const auditText = await readFile(audit, 'utf8');
     assert.match(auditText, /tools\/call/);
     assert.match(auditText, /ping/);
+    await archive('mcp-audit.jsonl', auditText);
     const resumed = await run(
       'resume-new-note',
       request(
@@ -199,6 +219,10 @@ try {
     assert.equal(
       await readFile(resolve(cwd, 'proof.txt'), 'utf8'),
       `ONE_${marker}\nTWO_${marker}\n`,
+    );
+    await archive(
+      'proof-resumed.txt',
+      await readFile(resolve(cwd, 'proof.txt')),
     );
     const interrupted = await run(
       'interrupt',
@@ -227,6 +251,10 @@ try {
     assert.equal(
       await readFile(resolve(cwd, 'recovered.txt'), 'utf8'),
       'RECOVERED\n',
+    );
+    await archive(
+      'recovered.txt',
+      await readFile(resolve(cwd, 'recovered.txt')),
     );
     await verifyPermission();
   } else if (mode === 'permission') {
