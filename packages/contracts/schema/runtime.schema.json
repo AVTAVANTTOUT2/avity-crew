@@ -713,6 +713,20 @@
         "supersedes": {
           "type": ["string", "null"]
         },
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "basis": {
+              "type": "string",
+              "enum": ["technical_judgment", "user_response"]
+            },
+            "user_response_id": {
+              "type": ["string", "null"]
+            }
+          },
+          "required": ["basis", "user_response_id"],
+          "additionalProperties": false
+        },
         "created_at": {
           "type": "string",
           "format": "date-time"

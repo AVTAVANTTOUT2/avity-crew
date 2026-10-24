@@ -98,6 +98,10 @@ sont libérées. `recordDecision` accepte un cinquième argument
 `{basis, user_response_id}` ; le mode `user_response` exige cette réponse réelle,
 sa source et sa portée, avec l'approbateur utilisateur conservé. Le jugement
 technique garde l'approbateur authentifié du chef ou de l'utilisateur.
+La décision persistée conserve cette provenance dans son champ optionnel
+`provenance` : le schéma strict et le compilateur de contexte l'acceptent sans
+la supprimer. Les anciens enregistrements sans ce champ restent valides ;
+les liens et l'autorité d'une réponse utilisateur restent contrôlés par Store.
 La réponse d'une décision `user_response` est exactement celle enregistrée ;
 une reformulation du modèle n'est pas attribuée à l'utilisateur. Le service
 peut conserver le cwd réellement lancé via `updateSession(..., {cwd, ...})`,
