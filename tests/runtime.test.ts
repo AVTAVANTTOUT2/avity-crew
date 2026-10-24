@@ -1470,3 +1470,48 @@ test(
     );
   },
 );
+
+test(
+  'acknowledged pause fences a chief still awaiting provider probe before any native turn can start',
+  { timeout: 10_000 },
+  async (t) => {
+    let entered!: () => void, release!: () => void;
+    const probing = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    class ProbeGateProvider extends ScriptedProvider {
+      override async probe(): Promise<ProviderCapabilities> {
+        entered();
+        await gate;
+        return super.probe();
+      }
+    }
+    const provider = new ProbeGateProvider(async () => {
+      assert.fail(
+        'A provider turn cannot start after pause has been acknowledged',
+      );
+    });
+    const f = await fixture(t, provider);
+    const run = await f.create();
+    await probing;
+    assert.equal(provider.turns.length, 0);
+    const paused = (await f.owner.admin({
+      method: 'pause',
+      arguments: { run_id: run.id },
+    })) as Run;
+    assert.equal(paused.status, 'paused');
+    assert.equal(provider.turns.length, 0);
+    release();
+    await f.runtime.scheduler.idle();
+    assert.equal(
+      provider.turns.length,
+      0,
+      'Releasing an awaited probe cannot cross the acknowledged pause fence',
+    );
+    assert.equal(f.store.getRun(run.id).status, 'paused');
+    assert.deepEqual(provider.failures, []);
+  },
+);
