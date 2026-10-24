@@ -37,6 +37,7 @@ const transport = await startTransport({
   registry: runtime.registry,
   api: runtime.coordinator,
 });
+runtime.initialize();
 async function close(): Promise<void> {
   if (closing) return;
   closing = true;

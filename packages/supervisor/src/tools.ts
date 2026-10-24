@@ -97,7 +97,12 @@ export function toolsFor(principal: Principal): CrewTool[] {
   return toolSchemas
     .filter(({ name }) => {
       if (principal.kind === 'user' || principal.actor.role === 'chief')
-      return !['submit_review', 'submit_handoff', 'publish_note', 'report_blocker'].includes(name);
+        return ![
+          'submit_review',
+          'submit_handoff',
+          'publish_note',
+          'report_blocker',
+        ].includes(name);
       return (
         worker.has(name) ||
         (name === 'submit_review' && principal.actor.role === 'reviewer')

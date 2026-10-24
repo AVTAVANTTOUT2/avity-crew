@@ -39,6 +39,8 @@ import {
 import type { AdminRequest } from './protocol.ts';
 import { TurnScheduler } from './scheduler.ts';
 import { toolsFor } from './tools.ts';
+import { observeProcess, stopOwnedProcess } from './reconciliation.ts';
+import type { ProcessIdentity } from './reconciliation.ts';
 
 type ActiveTurn = {
   run_id: string;
@@ -74,7 +76,100 @@ export class SupervisorRuntime {
   private readonly pumping = new Set<string>();
   private readonly workerQueued = new Set<string>();
   private readonly chiefQueued = new Set<string>();
+  private readonly cancellation = new Map<string, number>();
   private closing = false;
+
+  initialize(): void {
+    for (const run of this.store.listRuns()) {
+      if (terminal(run)) continue;
+      const uncertain = this.store
+        .uncertainOperations(run.id)
+        .filter((operation) => operation.kind === 'provider.turn');
+      if (!uncertain.length) continue;
+      const user = serviceActor(this.store, run.id);
+      this.store.observation(user, 'recovery.required', {
+        operation_ids: uncertain.map((operation) => operation.id),
+        reason: 'Prior process ownership must be reconciled before resume',
+      });
+      if (run.status === 'running')
+        this.store.updateRunStatus(
+          user,
+          'waiting_provider',
+          ident('recovery-wait'),
+          this.version(run.id),
+        );
+    }
+  }
+
+  private async reconcile(runId: string, chiefOnly = false): Promise<void> {
+    const user = serviceActor(this.store, runId);
+    for (const operation of this.store
+      .uncertainOperations(runId)
+      .filter((item) => item.kind === 'provider.turn')) {
+      if (
+        [...this.active.values()].some(
+          (turn) => turn.operation.id === operation.id,
+        )
+      )
+        continue;
+      const recorded = operation.result as {
+        actor?: Actor;
+        identity?: ProcessIdentity | null;
+        pid?: number | null;
+      } | null;
+      const actor = recorded?.actor;
+      if (chiefOnly && actor?.role !== 'chief') continue;
+      if (
+        !actor ||
+        actor.run_id !== runId ||
+        actor.project_id !== this.store.project.id ||
+        !recorded?.identity
+      )
+        throw new CrewError(
+          'RECONCILIATION_REQUIRED',
+          `Turn ${operation.id} has no verified recorded process identity; inspect it before retrying`,
+        );
+      const outcome = await stopOwnedProcess(recorded.identity);
+      if (actor.attempt_id) {
+        const attempt = this.store.getAttempt(actor.attempt_id);
+        if (!['exited', 'interrupted'].includes(attempt.status))
+          this.store.observeAttempt(
+            user,
+            attempt.id,
+            {
+              status: 'interrupted',
+              pid: recorded.pid ?? null,
+              exit_code: null,
+            },
+            requestId(operation.id, 'recovered-attempt'),
+            this.version(runId),
+          );
+        const task = this.store.getTask(attempt.task_id);
+        if (task.status === 'running')
+          this.store.setTaskWait(
+            user,
+            task.id,
+            'waiting_provider',
+            'Previous process stopped during explicit recovery',
+            requestId(operation.id, 'recovered-task'),
+            this.version(runId),
+          );
+      }
+      this.store.observeOperation(
+        user,
+        operation.id,
+        'completed',
+        { ...recorded, recovery: outcome, business_success: false },
+        requestId(operation.id, 'recovered'),
+        this.version(runId),
+      );
+      this.store.observation(user, 'recovery.observed', {
+        operation_id: operation.id,
+        process_outcome: outcome,
+        business_success: false,
+      });
+    }
+  }
 
   constructor(
     readonly store: Store,
@@ -135,7 +230,18 @@ export class SupervisorRuntime {
       const delegations = this.store
         .records<Delegation>(runId, 'delegation')
         .filter((item) => item.status === 'queued');
+      const questions = this.store
+        .records<CoordinationQuestion>(runId, 'question')
+        .filter((question) => question.blocking && question.status === 'open');
       for (const delegation of delegations) {
+        if (
+          questions.some(
+            (question) =>
+              !question.affects_task_ids.length ||
+              question.affects_task_ids.includes(delegation.task_id),
+          )
+        )
+          continue;
         if (
           run.delivery_mode === 'documentation' &&
           [...this.workerQueued].some(
@@ -255,6 +361,53 @@ export class SupervisorRuntime {
       user = serviceActor(this.store, runId);
     let task = this.store.getTask(delegation.task_id);
     if (terminal(run) || run.status !== 'running') return;
+    if (
+      this.store
+        .records<CoordinationQuestion>(runId, 'question')
+        .some(
+          (question) =>
+            question.blocking &&
+            question.status === 'open' &&
+            (!question.affects_task_ids.length ||
+              question.affects_task_ids.includes(task.id)),
+        )
+    )
+      return;
+    const manager = new WorkspaceManager(this.store, user);
+    let recoveryBase: string | null = null;
+    let nativeSession: AgentSession | undefined;
+    if (task.active_attempt_id) {
+      const previous = this.store.getAttempt(task.active_attempt_id);
+      nativeSession = this.store.getRecord<AgentSession>(
+        runId,
+        'session',
+        previous.session_id,
+      );
+      const oldWorkspace = this.store
+        .records<Operation>(runId, 'operation')
+        .find(
+          (operation) =>
+            operation.kind === 'workspace.create' &&
+            operation.status === 'completed' &&
+            (operation.result as WorkspaceHandle).attemptId === previous.id,
+        );
+      if (run.delivery_mode === 'code' && oldWorkspace) {
+        const snapshot = await manager.collectDelivery(
+          oldWorkspace.id,
+          {
+            writePaths: task.spec.scope.write_paths,
+            excludedPaths: task.spec.scope.excluded_paths,
+          },
+          requestId(delegation.id, 'recovery-snapshot'),
+        );
+        recoveryBase = snapshot.sourceRevision;
+        this.store.observation(user, 'recovery.snapshot', {
+          task_id: task.id,
+          revision: recoveryBase,
+          business_success: false,
+        });
+      }
+    }
     if (task.active_attempt_id)
       task = this.store.reassignTask(
         user,
@@ -269,7 +422,10 @@ export class SupervisorRuntime {
       task_id: task.id,
       provider: delegation.provider,
       model: delegation.model,
-      native_session_id: null,
+      native_session_id:
+        nativeSession?.provider === delegation.provider
+          ? nativeSession.native_session_id
+          : null,
       cli_version: null,
       cwd: this.store.project.root,
       capabilities: null,
@@ -290,7 +446,6 @@ export class SupervisorRuntime {
       attempt_id: attempt.id,
       generation: attempt.generation,
     };
-    const manager = new WorkspaceManager(this.store, user);
     try {
       const previous = this.store
         .records<Handoff>(runId, 'handoff')
@@ -311,7 +466,9 @@ export class SupervisorRuntime {
                   : 'documentation',
             baseRevision:
               run.delivery_mode === 'code'
-                ? (previous?.source_revision ?? task.spec.base_revision)
+                ? (recoveryBase ??
+                  previous?.source_revision ??
+                  task.spec.base_revision)
                 : null,
             resources,
           },
@@ -358,6 +515,8 @@ export class SupervisorRuntime {
     session: AgentSession,
     workspace: WorkspaceHandle | null,
   ): Promise<void> {
+    const fence = run.id + ':' + (actor.task_id ?? 'chief');
+    const cancellation = this.cancellation.get(fence) ?? 0;
     const adapter = this.providers.get(session.provider);
     if (!adapter)
       throw new CrewError(
@@ -373,7 +532,59 @@ export class SupervisorRuntime {
       invocation,
       this.version(run.id),
     );
+    const mayStart = () => {
+      const current = this.store.getRun(run.id);
+      return (
+        !this.closing &&
+        current.status === 'running' &&
+        (actor.role !== 'chief' || current.generation === run.generation) &&
+        (this.cancellation.get(fence) ?? 0) === cancellation &&
+        (!actor.task_id ||
+          this.store.getTask(actor.task_id).status === 'running')
+      );
+    };
+    const cancelPreparation = () => {
+      this.store.observeOperation(
+        user,
+        operation.id,
+        'failed',
+        { cancelled_before_start: true, business_success: false },
+        requestId(invocation, 'cancelled'),
+        this.version(run.id),
+      );
+      if (
+        actor.attempt_id &&
+        !['exited', 'interrupted'].includes(
+          this.store.getAttempt(actor.attempt_id).status,
+        )
+      ) {
+        this.store.observeAttempt(
+          user,
+          actor.attempt_id,
+          { status: 'interrupted', pid: null, exit_code: null },
+          requestId(invocation, 'cancelled-attempt'),
+          this.version(run.id),
+        );
+        if (this.store.getTask(actor.task_id!).status === 'running')
+          this.store.setTaskWait(
+            user,
+            actor.task_id!,
+            'waiting_provider',
+            'Turn preparation was cancelled before launch',
+            requestId(invocation, 'cancelled-task'),
+            this.version(run.id),
+          );
+      }
+    };
+    if (!mayStart()) {
+      cancelPreparation();
+      return;
+    }
     const capability = await adapter.probe();
+    if (!mayStart()) {
+      cancelPreparation();
+      return;
+    }
     if (capability.structured_events.status !== 'supported')
       throw new CrewError(
         'UNSUPPORTED',
@@ -396,7 +607,11 @@ export class SupervisorRuntime {
       : undefined;
     const project = await inspectProject(session.cwd);
     const selection = task
-      ? await selectTaskSources(project, task)
+      ? await selectTaskSources(
+          project,
+          task,
+          this.store.records<SourceRef>(run.id, 'source'),
+        )
       : await selectTaskSources(project, {
           schema_version: 1,
           id: 'context:chief-selection',
@@ -574,6 +789,10 @@ export class SupervisorRuntime {
         },
       },
     };
+    if (!mayStart()) {
+      cancelPreparation();
+      return;
+    }
     const native =
       session.native_session_id &&
       capability.native_resume.status === 'supported'
@@ -590,6 +809,26 @@ export class SupervisorRuntime {
       process: native,
       operation,
     });
+    let identity: ProcessIdentity | null = null;
+    if (native.pid) {
+      try {
+        identity = await observeProcess(native.pid);
+      } catch {
+        this.store.observation(user, 'recovery.unverified', {
+          turn_id: invocation,
+          reason:
+            'Process identity could not be observed; crash recovery requires inspection',
+        });
+      }
+    }
+    this.active.set(invocation, {
+      run_id: run.id,
+      role: actor.role === 'chief' ? 'chief' : 'worker',
+      actor,
+      session,
+      process: native,
+      operation,
+    });
     this.store.observeOperation(
       user,
       operation.id,
@@ -598,6 +837,7 @@ export class SupervisorRuntime {
         pid: native.pid,
         session_id: session.id,
         actor,
+        identity,
         native_session_id: session.native_session_id,
       },
       requestId(invocation, 'running'),
@@ -654,6 +894,27 @@ export class SupervisorRuntime {
                 attempt_id: actor.attempt_id,
                 generation: actor.generation,
               },
+            );
+            if (native.pid) {
+              try {
+                identity = await observeProcess(native.pid);
+              } catch {
+                /* Preserve the previous observation. */
+              }
+            }
+            this.store.observeOperation(
+              user,
+              operation.id,
+              'running',
+              {
+                pid: native.pid,
+                identity,
+                actor,
+                session_id: session.id,
+                native_session_id: event.native_session_id,
+              },
+              requestId(invocation + event.native_session_id, 'identity'),
+              this.version(run.id),
             );
           }
         } catch (error) {
@@ -935,19 +1196,43 @@ export class SupervisorRuntime {
         const after = Number(args['after_seq'] ?? 0),
           limit = Number(args['limit'] ?? 100);
         const events = this.store.events(runId, after, limit);
+        const contexts = this.store.records<ContextBundle>(runId, 'context');
         return {
           project: this.store.project,
           run,
-          tasks: this.store.tasks(runId),
+          tasks: this.store.tasks(runId).slice(0, limit),
           events,
           next_seq: events.at(-1)?.seq ?? after,
-          sessions: this.store.records(runId, 'session'),
-          questions: this.store.records(runId, 'question'),
+          sessions: this.store.records(runId, 'session').slice(-limit),
+          questions: this.store.records(runId, 'question').slice(-limit),
           activity: this.scheduler.snapshot(),
-          verifications: this.store.records(runId, 'verification'),
-          contexts: this.store.records(runId, 'context'),
-          decisions: this.store.records(runId, 'decision'),
-          blockers: this.store.records(runId, 'blocker'),
+          verifications: this.store
+            .records(runId, 'verification')
+            .slice(-limit),
+          contexts: contexts
+            .slice(-20)
+            .map(
+              ({
+                id,
+                subject_id,
+                subject_kind,
+                version,
+                budget,
+                content_sha256,
+                created_at,
+              }) => ({
+                id,
+                subject_id,
+                subject_kind,
+                version,
+                budget,
+                content_sha256,
+                created_at,
+              }),
+            ),
+          context_count: contexts.length,
+          decisions: this.store.records(runId, 'decision').slice(-limit),
+          blockers: this.store.records(runId, 'blocker').slice(-limit),
         };
       }
       case 'answer': {
@@ -991,6 +1276,7 @@ export class SupervisorRuntime {
       case 'resume': {
         if (terminal(run))
           throw new CrewError('TERMINAL_RUN', 'A terminal run cannot resume');
+        await this.reconcile(runId);
         if (run.status !== 'running')
           this.store.updateRunStatus(
             user,
@@ -998,6 +1284,30 @@ export class SupervisorRuntime {
             ident('resume'),
             this.version(runId),
           );
+        for (const task of this.store.tasks(runId)) {
+          if (
+            !task.active_attempt_id ||
+            !['waiting_provider', 'blocked', 'ready'].includes(task.status)
+          )
+            continue;
+          const attempt = this.store.getAttempt(task.active_attempt_id);
+          if (!['exited', 'interrupted'].includes(attempt.status)) continue;
+          const session = this.store.getRecord<AgentSession>(
+            runId,
+            'session',
+            attempt.session_id,
+          );
+          this.store.delegateTask(
+            user,
+            {
+              task_id: task.id,
+              provider: session.provider,
+              model: session.model,
+            },
+            ident('resume-task'),
+            this.version(runId),
+          );
+        }
         this.wake(runId);
         return this.store.getRun(runId);
       }
@@ -1007,6 +1317,7 @@ export class SupervisorRuntime {
         if (!this.providers.has(provider))
           throw new CrewError('PROVIDER_UNAVAILABLE', 'Provider unavailable');
         await this.interrupt(runId, 'chief');
+        await this.reconcile(runId, true);
         const changed = this.store.replaceChief(
           user,
           provider,
@@ -1083,6 +1394,16 @@ export class SupervisorRuntime {
     role?: ActiveTurn['role'],
     taskId?: string,
   ): Promise<void> {
+    const fences = taskId
+      ? [runId + ':' + taskId]
+      : role === 'chief'
+        ? [runId + ':chief']
+        : [
+            runId + ':chief',
+            ...this.store.tasks(runId).map((task) => runId + ':' + task.id),
+          ];
+    for (const fence of fences)
+      this.cancellation.set(fence, (this.cancellation.get(fence) ?? 0) + 1);
     const turns = [...this.active.values()].filter(
       (turn) =>
         turn.run_id === runId &&
