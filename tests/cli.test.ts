@@ -572,7 +572,7 @@ test('internal mcp remains pure JSON-RPC over the same capability-backed call', 
 test('watch detaches without controlling the service and reconnects with its cursor', async (t) => {
   const f = await fixture(t);
   const viewing = child(
-    ['watch', '--run', 'run:test', '--json', '--timeout', '1400'],
+    ['watch', '--json', '--timeout', '1400'],
     f.root,
     f.dataHome,
   );
@@ -604,6 +604,12 @@ test('watch detaches without controlling the service and reconnects with its cur
   assert.equal(f.calls('create_run').length, 0);
   assert.equal(f.calls('stop').length, 0);
   assert.equal(f.calls('shutdown').length, 0);
+  assert.ok(
+    f
+      .calls('status')
+      .slice(1)
+      .every((args) => args.run_id === 'run:test'),
+  );
   assert.equal((await child(['status', '--json'], f.root, f.dataHome)).code, 0);
 });
 
@@ -710,6 +716,47 @@ test('terminal rendering escapes agent controls and keeps Unicode clipping valid
   assert.ok(!view.includes('\u001b]52'));
   assert.ok(!view.includes('%'));
   assert.match(view, /usage réel : indisponible|Contexte/);
+  const conversation = renderSnapshot(
+    {
+      project: { root: '/project' },
+      run: { id: 'run:test', objective: 'Conversation', status: 'running' },
+      activity: {
+        active: [{ run_id: 'run:test' }],
+        queued: [{ run_id: 'run:other' }],
+      },
+      tasks: [],
+      sessions: [],
+      contexts: [],
+      events: [
+        {
+          seq: 1,
+          type: 'provider.text',
+          session_id: 'session:chief',
+          payload: {
+            text: 'Réponse du chef é🧪\nLigne suivante',
+            provenance: 'live',
+          },
+        },
+        {
+          seq: 2,
+          type: 'provider.usage',
+          payload: {
+            provenance: 'live',
+            usage: { input_tokens: 12, output_tokens: 5 },
+          },
+        },
+      ],
+    },
+    100,
+    60,
+  );
+  assert.match(conversation, /Tours actifs : 1 \| Tours en file : 0/);
+  assert.match(conversation, /Conversation :/);
+  assert.match(conversation, /^Réponse du chef é🧪/m);
+  assert.match(
+    conversation,
+    /usage déclaré du dernier tour : entrée 12, sortie 5/,
+  );
 });
 
 const ptyAvailable =

@@ -72,12 +72,35 @@ export function renderSnapshot(
   width = 100,
   height = 40,
 ): string {
+  width = Math.max(1, width);
   const data = record(snapshot),
     run = record(data.run),
     tasks = items(data.tasks),
     sessions = items(data.sessions),
     questions = items(data.questions),
     contexts = items(data.contexts);
+  const activity = record(data.activity);
+  const activeTurns = Array.isArray(activity.active)
+    ? items(activity.active).filter((turn) => turn.run_id === run.id).length
+    : null;
+  const queuedTurns = Array.isArray(activity.queued)
+    ? items(activity.queued).filter((turn) => turn.run_id === run.id).length
+    : null;
+  const conversation = items(data.viewer_messages ?? data.events).filter(
+    (event) =>
+      event.type === 'provider.text' &&
+      typeof record(event.payload).text === 'string',
+  );
+  const usageEvent =
+    data.viewer_usage ??
+    items(data.events)
+      .filter((event) => event.type === 'provider.usage')
+      .at(-1)?.payload;
+  const usage = record(record(usageEvent).usage);
+  const liveUsage =
+    record(usageEvent).provenance === 'live' &&
+    (typeof usage.input_tokens === 'number' ||
+      typeof usage.output_tokens === 'number');
   const lines = [
     'Avity Crew — état observé du projet',
     `Projet : ${text(record(data.project).root ?? record(data.project).id)}`,
@@ -85,9 +108,51 @@ export function renderSnapshot(
     `Objectif : ${text(run.id)}`,
     text(run.objective),
     `Tâches : ${tasks.length} | Sessions connues : ${sessions.length} | Capacité configurée : ${text(run.max_active_agents)}`,
-    'Une session, un tour et une tâche sont distincts ; aucun pourcentage de progression supposé.',
-    'Tâches / attentes :',
+    `Tours actifs : ${text(activeTurns)} | Tours en file : ${text(queuedTurns)} (distincts des sessions et tâches)`,
   ];
+  if (conversation.length) {
+    lines.push('Conversation :');
+    for (const event of conversation.slice(-2)) {
+      const payload = record(event.payload);
+      lines.push(
+        `#${text(event.seq)} ${text(event.session_id ?? event.actor_id)}${payload.provenance === 'simulated' ? ' (simulation)' : ''}`,
+      );
+      const message = cleanText(String(payload.text), true).replaceAll(
+        '\t',
+        '    ',
+      );
+      const parts = [
+        ...new Intl.Segmenter('fr', { granularity: 'grapheme' }).segment(
+          message,
+        ),
+      ].map((part) => part.segment);
+      let line = '',
+        columns = 0,
+        displayed = 0;
+      for (const part of parts) {
+        const size =
+          /[\p{Extended_Pictographic}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(
+            part,
+          )
+            ? 2
+            : 1;
+        if (part === '\n' || columns + size > width) {
+          lines.push(line);
+          line = '';
+          columns = 0;
+          if (++displayed === 3) break;
+        }
+        if (part !== '\n') {
+          line += part;
+          columns += size;
+        }
+      }
+      if (line) lines.push(line);
+      if (displayed === 3)
+        lines.push('Message résumé ; texte complet dans export.');
+    }
+  }
+  lines.push('Tâches / attentes :');
   for (const task of tasks.slice(0, 12))
     lines.push(
       `${text(task.id)} [${states[text(task.status)] ?? text(task.status)}] ${text(record(task.spec).title)}${task.wait_reason ? ' — ' + text(task.wait_reason) : ''}`,
@@ -115,7 +180,7 @@ export function renderSnapshot(
             .slice(-2)
             .join(' ; ')
         : 'estimation indisponible'
-    } ; usage réel : indisponible.`,
+    } ; ${liveUsage ? `usage déclaré du dernier tour : entrée ${text(usage.input_tokens)}, sortie ${text(usage.output_tokens)}` : 'usage réel : indisponible'}.`,
   );
   lines.push(
     `Questions : ${questions.length} | Décisions : ${items(data.decisions).length} | Vérifications : ${items(data.verifications).length}`,
@@ -132,7 +197,9 @@ export function renderSnapshot(
         (typeof blocker === 'string' ? blocker : JSON.stringify(blocker)),
     );
   lines.push('Événements nouveaux :');
-  for (const event of items(data.events).slice(-6))
+  for (const event of items(data.events)
+    .filter((event) => event.type !== 'provider.text')
+    .slice(-6))
     lines.push(
       `#${text(event.seq)} ${text(event.type)} ${JSON.stringify(event.payload ?? {})}`,
     );
@@ -176,6 +243,9 @@ export async function watchRun(
     done = false,
     interrupted = false,
     busy = false;
+  let activeRun = command.run;
+  const conversation = new Map<number, Record<string, unknown>>();
+  let latestUsage: unknown = null;
   const started = Date.now();
   const interactive = Boolean(
     process.stdin.isTTY &&
@@ -209,7 +279,13 @@ export async function watchRun(
     else
       process.stdout.write(
         renderSnapshot(
-          last,
+          interactive
+            ? {
+                ...record(last),
+                viewer_messages: [...conversation.values()],
+                viewer_usage: latestUsage,
+              }
+            : last,
           process.stdout.columns ?? 100,
           interactive ? Math.max(5, (process.stdout.rows ?? 30) - 3) : 100,
         ) + '\n',
@@ -271,7 +347,7 @@ export async function watchRun(
       }
       busy = true;
       try {
-        const runId = command.run ?? text(record(record(last).run).id);
+        const runId = activeRun ?? text(record(record(last).run).id);
         if (line.startsWith('/answer ')) {
           const match = /^\/answer\s+(\S+)\s+([\s\S]+)$/.exec(line);
           if (!match)
@@ -296,15 +372,25 @@ export async function watchRun(
         const snapshot = await client.admin({
           method: 'status',
           arguments: {
-            ...(command.run ? { run_id: command.run } : {}),
+            ...(activeRun ? { run_id: activeRun } : {}),
             after_seq: cursor,
             limit: command.limit,
           },
         });
         const data = record(snapshot);
+        const observedRun = record(data.run).id;
+        if (!activeRun && typeof observedRun === 'string')
+          activeRun = observedRun;
         const fresh = items(data.events).filter(
           (event) => typeof event.seq === 'number' && event.seq > cursor,
         );
+        for (const event of fresh) {
+          if (event.type === 'provider.text')
+            conversation.set(Number(event.seq), event);
+          if (event.type === 'provider.usage') latestUsage = event.payload;
+        }
+        while (conversation.size > 20)
+          conversation.delete(conversation.keys().next().value!);
         last = { ...data, events: fresh, viewer_after_seq: cursor };
         render();
         const state = runExit(last);
