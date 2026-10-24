@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { mkdtemp, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
@@ -36,6 +37,29 @@ const collect = async (run: ProviderProcess) => {
   await consuming;
   return { events, result };
 };
+
+test('MCP ping declares its diagnostic read-only policy over the real local protocol', () => {
+  const bridge = fileURLToPath(
+    new URL('../../../tests/fixtures/providers/mcp-ping.mjs', import.meta.url),
+  );
+  const processResult = spawnSync(process.execPath, [bridge], {
+    input: `${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' })}\n`,
+    encoding: 'utf8',
+    timeout: 5000,
+  });
+  assert.equal(processResult.status, 0);
+  const response = JSON.parse(processResult.stdout) as {
+    result: { tools: { name: string; annotations: unknown }[] };
+  };
+  assert.deepEqual(
+    response.result.tools.find((tool) => tool.name === 'ping')?.annotations,
+    {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
+  );
+});
 
 test('Codex normalizes session, tool IDs, text, usage and completion', () => {
   assert.deepEqual(
@@ -152,6 +176,25 @@ test('Codex preserves unknown diagnostics and classifies provider errors', () =>
     recoverable.map((event) => event.type),
     ['tool'],
   );
+  const mcpDenied = decodeCodexEvent({
+    type: 'item.completed',
+    item: {
+      id: 'item_1',
+      type: 'mcp_tool_call',
+      server: 'crew',
+      tool: 'ping',
+      status: 'failed',
+      error: {
+        message:
+          'MCP tool call requires approval, but approval policy is never',
+      },
+    },
+  });
+  assert.ok(mcpDenied.some((event) => event.type === 'permission'));
+  assert.equal(
+    mcpDenied.find((event) => event.type === 'error')?.error?.kind,
+    'permission',
+  );
 });
 
 test('Codex probe is bounded and reports unsupported interactive operations', async () => {
@@ -252,7 +295,7 @@ test('Codex sessions remain isolated and resume only the requested UUID with new
 });
 
 test('Codex process rejects truncation, errors, bad exits and unsupported updates', async () => {
-  for (const scenario of ['truncated', 'failure', 'bad-exit']) {
+  for (const scenario of ['truncated', 'failure', 'bad-exit', 'mcp-denied']) {
     const { result } = await collect(
       provider.start(
         request({ scenario, id: first, message: 'Usage limit reached' }),
@@ -260,6 +303,8 @@ test('Codex process rejects truncation, errors, bad exits and unsupported update
     );
     assert.equal(result.success, false, scenario);
     assert.ok(result.error, scenario);
+    if (scenario === 'mcp-denied')
+      assert.equal(result.error.kind, 'permission');
   }
   const unknown = await collect(
     provider.start(

@@ -126,6 +126,15 @@ export function decodeCodexEvent(value: unknown): ProviderEvent[] {
       )
     )
       normalized.push(...failure(text(item.aggregated_output)));
+    const mcpError = text(object(item.error)?.message);
+    if (
+      completed &&
+      itemType === 'mcp_tool_call' &&
+      /requires approval|approval (?:required|denied|policy)|permission denied|operation not permitted/i.test(
+        mcpError,
+      )
+    )
+      normalized.push(...failure(mcpError, 'permission'));
     return normalized;
   }
   return [

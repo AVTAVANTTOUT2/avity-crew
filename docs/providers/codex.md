@@ -35,7 +35,7 @@ La découverte de lancement et reprise s'appuie sur l'aide locale. MCP et usage 
 
 `thread.started` donne immédiatement `native_session_id`. Le texte final provient des `agent_message` terminés, sans doubler le résultat de tour. Commandes (identifiant, état, code de sortie, sortie), changements de fichiers, appels MCP, recherches et plans deviennent des événements `tool` lisibles. Les tokens de `turn.completed` deviennent `usage`, puis un résultat natif réussi. Les champs non disponibles ne sont pas fabriqués.
 
-`turn.failed`, `error` et les erreurs d'items deviennent des erreurs classées : quota, authentification, réseau, permission ou protocole. Un refus terminal de commande est explicite. Un code non nul d'une commande récupérable reste un événement outil : Codex peut le corriger dans le même tour. Le runner garde stderr séparé, borne JSONL et les diagnostics, masque les valeurs sensibles du bridge, et exige résultat natif réussi **et** sortie processus 0, sans erreur ni interruption.
+`turn.failed`, `error` et les erreurs d'items deviennent des erreurs classées : quota, authentification, réseau, permission ou protocole. Un refus terminal de commande ou un refus d'approbation d'un outil MCP est explicite et interdit un résultat réussi, même si Codex termine son tour avec un code 0. Un code non nul d'une commande récupérable reste un événement outil : Codex peut le corriger dans le même tour. Le runner garde stderr séparé, borne JSONL et les diagnostics, masque les valeurs sensibles du bridge, et exige résultat natif réussi **et** sortie processus 0, sans erreur ni interruption.
 
 Le consommateur doit lire `events` pendant qu'il attend `result`. Le runner applique une contre-pression bornée ; attendre le résultat sans consommer les événements peut suspendre volontairement un gros flux.
 
@@ -44,6 +44,8 @@ Le consommateur doit lire `events` pendant qu'il attend `result`. Le runner appl
 `request.bridge` fournit commande, arguments et environnement. L'adaptateur transmet `mcp_servers.crew.command`, `.args`, `.required=true` et `.env_vars` via `-c`. `env_vars` contient uniquement les **noms** des variables. Les valeurs `bridge.env` sont transmises à l'environnement du processus par le runner ; elles ne sont placées ni dans les arguments, ni dans le prompt, ni dans les diagnostics normalisés.
 
 La fixture `tests/fixtures/providers/mcp-ping.mjs` est un serveur de recette, distinct du bridge produit L07. `scripts/live-codex.mjs` vérifie son appel réel à `crew.ping` et une modification de fichier dans un dépôt jetable. Il conserve un rapport JSON au chemin absolu demandé, sans valeur de capacité du bridge.
+
+Le ping diagnostique déclare honnêtement `readOnlyHint: true`, `destructiveHint: false` et `openWorldHint: false` ; seul son journal de recette est ajouté. Aucun auto-approve global n'est configuré. Lors du premier essai réel, l'absence de ces annotations a entraîné un refus natif d'approbation et aucun appel `tools/call` : cette preuve négative a déclenché une régression du décodeur. Pour L07, les outils de coordination qui modifient un état demanderont une politique native par outil étroite, explicitement autorisée, et les ACL du service.
 
 ## Validation
 

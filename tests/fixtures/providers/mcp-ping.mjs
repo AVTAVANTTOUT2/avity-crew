@@ -31,6 +31,11 @@ for await (const line of createInterface({ input: process.stdin })) {
       tools: [
         {
           name: 'ping',
+          annotations: {
+            readOnlyHint: true,
+            destructiveHint: false,
+            openWorldHint: false,
+          },
           description:
             'Return a harmless pong to prove the real MCP bridge was called',
           inputSchema: {

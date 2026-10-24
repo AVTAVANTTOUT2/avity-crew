@@ -25,6 +25,20 @@ if (args.includes('--version')) {
   } else if (input.scenario === 'truncated') {
     process.stdout.write('{"type":"turn.completed"');
   } else {
+    if (input.scenario === 'mcp-denied')
+      emit({
+        type: 'item.completed',
+        item: {
+          type: 'mcp_tool_call',
+          server: 'crew',
+          tool: 'ping',
+          status: 'failed',
+          error: {
+            message:
+              'MCP tool call requires approval, but approval policy is never',
+          },
+        },
+      });
     if (input.scenario === 'unknown')
       emit({ type: 'future.notification', data: 42 });
     const response =
