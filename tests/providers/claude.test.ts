@@ -9,6 +9,7 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import type { ProviderRequest } from '../../packages/contracts/src/index.ts';
 import { validate } from '../../packages/contracts/src/index.ts';
@@ -16,6 +17,110 @@ import {
   ClaudeProvider,
   decodeClaudeEvent,
 } from '../../packages/providers/src/claude.ts';
+
+test('Claude limits supplied crew approvals to canonical tools and keeps native denial fatal', async () => {
+  const binary = fileURLToPath(
+    new URL(
+      '../../../tests/fixtures/providers/claude-cli.mjs',
+      import.meta.url,
+    ),
+  );
+  const provider = new ClaudeProvider(binary);
+  const bridge = { command: 'node', args: ['bridge.mjs'], env: {} };
+  const request: ProviderRequest = {
+    cwd: resolve('.'),
+    prompt: 'capture',
+    model: null,
+    role: 'chief',
+    permissions: { sandbox: 'workspace-write', approval: 'never' },
+    bridge,
+  };
+  const cases: [string[] | undefined, string[]][] = [
+    [undefined, ['mcp__crew__*']],
+    [[], []],
+    [
+      ['create_task', 'publish_note'],
+      ['mcp__crew__create_task', 'mcp__crew__publish_note'],
+    ],
+  ];
+  for (const [approved, expected] of cases) {
+    const configured =
+      approved === undefined ? bridge : { ...bridge, approved_tools: approved };
+    const child = provider.resume({
+      ...request,
+      bridge: configured,
+      native_session_id: '11111111-1111-4111-8111-111111111111',
+    });
+    for await (const _event of child.events) {
+      /* Drain. */
+    }
+    const result = await child.result;
+    assert.equal(result.success, true);
+    const { args } = JSON.parse(result.text) as { args: string[] };
+    const index = args.indexOf('--allowedTools');
+    const tools =
+      index < 0
+        ? []
+        : args.slice(index + 1).filter((arg) => arg.startsWith('mcp__'));
+    assert.deepEqual(tools, expected);
+    assert.ok(!args.includes('--dangerously-skip-permissions'));
+    assert.ok(!args.includes('bypassPermissions'));
+    assert.ok(args.includes('acceptEdits'));
+  }
+  const child = provider.start({
+    ...request,
+    prompt: 'fixture-denied',
+    bridge: { ...bridge, ...{ approved_tools: ['create_task'] } },
+  });
+  for await (const _event of child.events) {
+    /* Drain. */
+  }
+  const denied = await child.result;
+  assert.equal(denied.success, false);
+  assert.equal(denied.error?.kind, 'permission');
+});
+
+test('Claude rejects invalid crew approval lists before spawning', () => {
+  const provider = new ClaudeProvider('/nonexistent/should-not-start');
+  for (const approved_tools of [
+    null,
+    {},
+    'create_task',
+    new Array(1),
+    ['create_task', 'create_task'],
+    ['*'],
+    ['mcp__crew__create_task'],
+    ['mcp__other__create_task'],
+    ['crew.create_task'],
+    ['create_task.approval_mode'],
+    ['create_task\"=\"approve'],
+    ['create_task,publish_note'],
+    ['create_task\napproval_policy=\"never\"'],
+    [' create_task'],
+    ['--dangerously-skip-permissions'],
+    ['ping'],
+    [''],
+    [1],
+  ]) {
+    const request = {
+      cwd: resolve('.'),
+      prompt: 'unused',
+      model: null,
+      role: 'chief',
+      permissions: { sandbox: 'workspace-write', approval: 'never' },
+      bridge: { command: 'node', args: [], env: {}, approved_tools },
+    } as unknown as ProviderRequest;
+    assert.throws(() => provider.start(request), { code: 'INVALID_INPUT' });
+    assert.throws(
+      () =>
+        provider.resume({
+          ...request,
+          native_session_id: '11111111-1111-4111-8111-111111111111',
+        }),
+      { code: 'INVALID_INPUT' },
+    );
+  }
+});
 
 test('Claude fixture normalizes session, messages, tools, usage and success without rate-limit false failure', async () => {
   const fixture = await readFile(

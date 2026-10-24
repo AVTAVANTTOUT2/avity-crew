@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { isAbsolute } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
 import { setTimeout as delay } from 'node:timers/promises';
-import { CrewError } from '../../contracts/src/index.ts';
+import { CrewError, runtimeSchema } from '../../contracts/src/index.ts';
 import type {
   ProviderEvent,
   ProviderProcess,
@@ -16,6 +16,11 @@ const MAX_LINE = 1024 * 1024;
 const MAX_TEXT = 2 * MAX_LINE;
 const MAX_DIAGNOSTIC = 16 * 1024;
 const MAX_QUEUE = 128;
+const crewMethods = new Set<string>(
+  runtimeSchema.$defs.ToolCall.oneOf.map(
+    (entry) => entry.properties.method.const,
+  ),
+);
 
 export function validateProviderRequest(request: ProviderRequest): void {
   const valid =
@@ -42,6 +47,19 @@ export function validateProviderRequest(request: ProviderRequest): void {
         )));
   if (!valid)
     throw new CrewError('INVALID_INPUT', 'Invalid native provider request');
+  const approved = request.bridge?.approved_tools;
+  if (
+    approved !== undefined &&
+    (!Array.isArray(approved) ||
+      new Set(approved).size !== approved.length ||
+      [...approved].some(
+        (method) => typeof method !== 'string' || !crewMethods.has(method),
+      ))
+  )
+    throw new CrewError(
+      'INVALID_INPUT',
+      'Bridge approved_tools must list distinct canonical crew methods',
+    );
 }
 
 export function classifyNativeError(

@@ -257,7 +257,12 @@ export class ClaudeProvider implements ProviderAdapter {
     ];
     if (request.permissions.sandbox === 'read-only')
       args.push('--tools', 'Read,Glob,Grep');
-    if (request.bridge) args.push('--allowedTools', 'mcp__crew__*');
+    if (request.bridge) {
+      const tools = request.bridge.approved_tools?.map(
+        (method) => `mcp__crew__${method}`,
+      ) ?? ['mcp__crew__*'];
+      if (tools.length) args.push('--allowedTools', ...tools);
+    }
     if (request.model !== null) args.push('--model', request.model);
     if (nativeSessionId) args.push('--resume', nativeSessionId);
     return runNative(this.id, this.binary, args, request, decodeClaudeEvent);

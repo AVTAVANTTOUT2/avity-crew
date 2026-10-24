@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import {
   CodexProvider,
+  codexArguments,
   decodeCodexEvent,
 } from '../../packages/providers/src/codex.ts';
 import type {
@@ -37,6 +38,81 @@ const collect = async (run: ProviderProcess) => {
   await consuming;
   return { events, result };
 };
+
+test('Codex grants only supplied canonical crew tools without changing global approvals', async () => {
+  for (const approved of [undefined, [], ['create_task', 'publish_note']]) {
+    const bridge = {
+      command: 'node',
+      args: ['bridge.mjs'],
+      env: {},
+      ...(approved === undefined ? {} : { approved_tools: approved }),
+    };
+    const req = { ...request({ scenario: 'capture', id: first }), bridge };
+    for (const session of [undefined, first]) {
+      const args = codexArguments(fixture, req, session);
+      assert.deepEqual(
+        args.filter((arg) => arg.startsWith('mcp_servers.crew.tools.')),
+        (approved ?? []).map(
+          (name) => `mcp_servers.crew.tools.${name}.approval_mode="approve"`,
+        ),
+      );
+      assert.ok(args.includes('approval_policy="never"'));
+      assert.ok(args.includes('sandbox_mode="workspace-write"'));
+      assert.ok(
+        !args.some((arg) => arg.includes('default_tools_approval_mode')),
+      );
+      assert.ok(!args.includes('--dangerously-bypass-approvals-and-sandbox'));
+    }
+  }
+  const bridge = {
+    command: 'node',
+    args: [],
+    env: {},
+    approved_tools: ['create_task'],
+  };
+  const denied = await collect(
+    provider.start({
+      ...request({ scenario: 'mcp-denied', id: first, tool: 'create_task' }),
+      bridge,
+    }),
+  );
+  assert.equal(denied.result.success, false);
+  assert.equal(denied.result.error?.kind, 'permission');
+});
+
+test('Codex rejects invalid crew approval lists before native configuration inspection', () => {
+  for (const approved_tools of [
+    null,
+    {},
+    'create_task',
+    new Array(1),
+    ['create_task', 'create_task'],
+    ['*'],
+    ['mcp__crew__create_task'],
+    ['mcp__other__create_task'],
+    ['crew.create_task'],
+    ['create_task.approval_mode'],
+    ['create_task\"=\"approve'],
+    ['create_task,publish_note'],
+    ['create_task\napproval_policy=\"never\"'],
+    [' create_task'],
+    ['--config'],
+    ['ping'],
+    [''],
+    [1],
+  ]) {
+    const req = {
+      ...request('unused'),
+      bridge: { command: 'node', args: [], env: {}, approved_tools },
+    } as unknown as ProviderRequest;
+    const unavailable = new CodexProvider('/nonexistent/should-not-start');
+    assert.throws(() => unavailable.start(req), { code: 'INVALID_INPUT' });
+    assert.throws(
+      () => unavailable.resume({ ...req, native_session_id: first }),
+      { code: 'INVALID_INPUT' },
+    );
+  }
+});
 
 test('MCP ping declares its diagnostic read-only policy over the real local protocol', () => {
   const bridge = fileURLToPath(

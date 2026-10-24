@@ -61,7 +61,7 @@ if (args.includes('--version')) {
         item: {
           type: 'mcp_tool_call',
           server: 'crew',
-          tool: 'ping',
+          tool: input.tool ?? 'ping',
           status: 'failed',
           error: {
             message:

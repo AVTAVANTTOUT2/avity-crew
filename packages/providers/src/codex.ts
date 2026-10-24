@@ -244,6 +244,11 @@ export function codexArguments(
       required: true,
     }))
       args.push('-c', `mcp_servers.crew.${key}=${JSON.stringify(value)}`);
+    for (const method of bridge.approved_tools ?? [])
+      args.push(
+        '-c',
+        `mcp_servers.crew.tools.${method}.approval_mode="approve"`,
+      );
   }
   if (sessionId) args.push(sessionId);
   args.push('-');
