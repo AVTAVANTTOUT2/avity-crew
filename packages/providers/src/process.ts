@@ -75,14 +75,16 @@ export function runNative(
 ): ProviderProcess {
   validateProviderRequest(request);
   const env = { ...process.env, ...request.bridge?.env };
-  const secrets = Object.entries(env)
-    .filter(([key]) =>
-      /TOKEN|SECRET|PASSWORD|PASSWD|API_KEY|PRIVATE|CAPABILITY|AUTH(?:ORIZATION|_SOCK)?$/i.test(
-        key,
-      ),
-    )
-    .map(([, value]) => value)
-    .filter((value): value is string => Boolean(value));
+  const secrets = [
+    ...Object.entries(env)
+      .filter(([key]) =>
+        /TOKEN|SECRET|PASSWORD|PASSWD|API_KEY|PRIVATE|CAPABILITY|AUTH(?:ORIZATION|_SOCK)?$/i.test(
+          key,
+        ),
+      )
+      .map(([, value]) => value),
+    ...Object.values(request.bridge?.env ?? {}),
+  ].filter((value): value is string => Boolean(value));
   const redact = (value: string): string => {
     let clean = value;
     for (const secret of secrets)

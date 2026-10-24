@@ -52,7 +52,7 @@ test('native requests reject malformed runtime input before process launch', () 
   assert.doesNotThrow(() => validateProviderRequest(request()));
 });
 
-test('nonsecret bridge settings do not corrupt native identities while capabilities remain redacted', async () => {
+test('private bridge settings do not corrupt native identities and stay redacted in text', async () => {
   const child = runNative(
     'codex',
     process.execPath,
@@ -76,9 +76,34 @@ test('nonsecret bridge settings do not corrupt native identities while capabilit
   const events = await collect(child);
   const result = await child.result;
   assert.equal(result.native_session_id, 'session-1');
-  assert.equal(result.text, 'port=1 capability=[REDACTED]');
+  assert.equal(result.text, 'port=[REDACTED] capability=[REDACTED]');
   assert.ok(events.every((event) => event.native_session_id === 'session-1'));
   assert.doesNotMatch(JSON.stringify(events), /private-capability-sentinel/);
+});
+
+test('opaque bridge environment values are private even without a credential-like key name', async () => {
+  const child = runNative(
+    'codex',
+    process.execPath,
+    [
+      '-e',
+      `${emit} emit({type:'session',native_session_id:'opaque-session'});emit({type:'text',text:process.env.CREW_HANDLE});emit({type:'result',success:true});`,
+    ],
+    {
+      ...request(),
+      bridge: {
+        command: process.execPath,
+        args: [],
+        env: { CREW_HANDLE: 'opaque-bridge-sentinel' },
+      },
+    },
+    decode,
+  );
+  const events = await collect(child);
+  const result = await child.result;
+  assert.equal(result.native_session_id, 'opaque-session');
+  assert.equal(result.text, '[REDACTED]');
+  assert.doesNotMatch(JSON.stringify(events), /opaque-bridge-sentinel/);
 });
 
 test('native JSONL preserves UTF-8 fragments, stdin and unknown diagnostics', async () => {
