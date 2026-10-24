@@ -51,6 +51,7 @@ import {
 } from '../packages/supervisor/src/coordinator.ts';
 import { observeProcess } from '../packages/supervisor/src/reconciliation.ts';
 import type { ProcessIdentity } from '../packages/supervisor/src/reconciliation.ts';
+import type { IntegrationCandidate } from '../packages/workspace/src/index.ts';
 
 type Reply<T> = { result: T; run_version: number };
 type Status = {
@@ -2075,3 +2076,587 @@ for (const variant of ['forged_identity', 'intent_without_identity'] as const) {
     },
   );
 }
+
+test(
+  'isolated deliveries pass but their failed combination requires an explicit corrective mission and fresh reviewed candidate before completion',
+  { timeout: 30_000 },
+  async (t) => {
+    const targetRef = 'refs/heads/crew-corrected-capacity';
+    const initialWorkers = barrier(2);
+    const trace: string[] = [];
+    let phase:
+      'plan' | 'initial' | 'correction' | 'reviews' | 'accepted' | 'completed' =
+      'plan';
+    let baseRevision = '';
+    let failed!: IntegrationCandidate;
+    let corrected!: IntegrationCandidate;
+    const sourceIds = [
+      'task:feature-a',
+      'task:feature-b',
+      'task:capacity-correction',
+    ];
+    const isolated: IntegrationCandidate[] = [];
+    const provider = new ScriptedProvider(async ({ request }) => {
+      const api = agent(request),
+        status = (await api.status()).result;
+      const collect = async (id: string) =>
+        (
+          await api.call<Collected>('collect_delivery', {
+            task_id: id,
+            handoff_id: null,
+          })
+        ).result;
+      const prepare = async (deliveries: Collected[], checkId: string) =>
+        (
+          await api.call<IntegrationCandidate>('propose_integration', {
+            handoff_ids: deliveries.map((delivery) => delivery.handoff.id),
+            target_ref: targetRef,
+            expected_target_revision: baseRevision,
+            required_check_ids: [checkId],
+          })
+        ).result;
+      if (request.role === 'chief') {
+        if (phase === 'plan') {
+          baseRevision = (
+            await api.call<{ git: { revision: string } }>('inspect_project', {
+              focus: ['**'],
+              requested_source_ids: [],
+            })
+          ).result.git.revision;
+          for (const name of ['a', 'b']) {
+            const spec: TaskSpec = {
+              ...task(status.run, `task:feature-${name}`, 'documenter'),
+              role: 'developer',
+              objective: `Enable feature ${name} and retain the one-unit resource budget in its isolated delivery`,
+              acceptance_criteria: [
+                {
+                  id: `criterion:feature-${name}`,
+                  description: `Feature ${name} enabled and executable in isolation`,
+                  required: true,
+                  verification: `check:isolated-${name}`,
+                },
+              ],
+              scope: {
+                read_paths: ['**'],
+                write_paths: [`features/${name}.json`],
+                excluded_paths: [],
+              },
+              base_revision: baseRevision,
+              expected_deliverables: [
+                `features/${name}.json enabled with a passing isolated check`,
+              ],
+            };
+            await api.call('create_task', { task: spec });
+          }
+          phase = 'initial';
+          for (const name of ['a', 'b'])
+            await api.call('delegate_task', {
+              task_id: `task:feature-${name}`,
+              provider: 'fake',
+              model: null,
+            });
+          await initialWorkers.ready;
+          return;
+        }
+        if (phase === 'initial') {
+          if (
+            status.tasks
+              .filter((item) => sourceIds.slice(0, 2).includes(item.id))
+              .some((item) => item.status !== 'in_review')
+          )
+            return;
+          const deliveries = await Promise.all(
+            sourceIds.slice(0, 2).map(collect),
+          );
+          for (const [index, delivery] of deliveries.entries()) {
+            const candidate = await prepare(
+              [delivery],
+              `check:isolated-${index === 0 ? 'a' : 'b'}`,
+            );
+            assert.equal(candidate.status, 'validated');
+            assert.ok(
+              candidate.proofs.every(
+                (proof) =>
+                  proof.exitCode === 0 &&
+                  proof.candidateRevision === candidate.candidateRevision,
+              ),
+            );
+            isolated.push(candidate);
+            trace.push(`isolated:${index}:passed`);
+          }
+          failed = await prepare(deliveries, 'check:combined-capacity');
+          assert.equal(failed.status, 'validation_failed');
+          assert.equal(failed.proofs[0]!.exitCode, 1);
+          assert.match(
+            failed.proofs[0]!.output,
+            /Combined capacity exceeded: 2 > 1/,
+          );
+          assert.equal(
+            git(request.cwd, 'rev-parse', targetRef),
+            baseRevision.slice(4),
+          );
+          trace.push('combined:failed');
+          const observed = await collect(sourceIds[0]!);
+          await assert.rejects(
+            api.call('finish_run', {
+              summary: 'Isolated success cannot complete a failed combination',
+              criterion_evidence: [
+                {
+                  criterion_id: status.run.acceptance_criteria[0]!.id,
+                  evidence_artifact_ids:
+                    observed.verifications[0]!.evidence_artifact_ids,
+                },
+              ],
+              delivered_artifact_ids: deliveries.flatMap((delivery) =>
+                delivery.handoff.artifacts.map((artifact) => artifact.id),
+              ),
+            }),
+            hasCode('INVALID_EVIDENCE'),
+          );
+          assert.equal((await api.status()).result.run.status, 'running');
+          const fix: TaskSpec = {
+            ...task(status.run, sourceIds[2]!, 'documenter'),
+            role: 'developer',
+            objective: `Correct failed candidate ${failed.candidateRevision}: serialize application dispatch while keeping both features enabled`,
+            acceptance_criteria: [status.run.acceptance_criteria[0]!],
+            scope: {
+              read_paths: ['**'],
+              write_paths: ['policy.json'],
+              excluded_paths: [],
+            },
+            base_revision: failed.candidateRevision,
+            expected_deliverables: [
+              'policy.json enables serial execution; combined check passes with both features still present',
+            ],
+          };
+          await api.call('create_task', { task: fix });
+          await api.call('record_decision', {
+            decision_id: 'decision:correct-combined-capacity',
+            question:
+              'How should the failed combined capacity check be corrected?',
+            answer: `Keep both delivered features and the original one-unit criterion; use a dedicated mission based on ${failed.candidateRevision} to serialize dispatch`,
+            requested_status: 'approved',
+            basis: 'technical_judgment',
+            user_response_id: null,
+            source_ids: [],
+            affects_task_ids: sourceIds,
+            supersedes: null,
+          });
+          phase = 'correction';
+          trace.push('correction:requested');
+          await api.call('delegate_task', {
+            task_id: fix.id,
+            provider: 'fake',
+            model: null,
+          });
+          return;
+        }
+        if (phase === 'correction') {
+          if (
+            status.tasks.find((item) => item.id === sourceIds[2])?.status !==
+            'in_review'
+          )
+            return;
+          const deliveries = await Promise.all(sourceIds.map(collect));
+          trace.push('correction:delivered');
+          corrected = await prepare(deliveries, 'check:combined-capacity');
+          assert.equal(corrected.status, 'validated');
+          assert.notEqual(
+            corrected.candidateRevision,
+            failed.candidateRevision,
+          );
+          assert.ok(
+            corrected.proofs.every(
+              (proof) =>
+                proof.exitCode === 0 &&
+                proof.candidateRevision === corrected.candidateRevision,
+            ),
+          );
+          assert.equal(
+            git(request.cwd, 'rev-parse', targetRef),
+            baseRevision.slice(4),
+          );
+          trace.push('combined:corrected');
+          phase = 'reviews';
+          for (const [index, delivery] of deliveries.entries()) {
+            const spec: TaskSpec = {
+              ...task(status.run, `task:capacity-review-${index}`, 'reviewer'),
+              objective: `Review ${delivery.handoff.task_id} against the corrected exact combined candidate; require both features and peak capacity one`,
+              acceptance_criteria: [
+                {
+                  id: `criterion:capacity-review-${index}`,
+                  description:
+                    'Current source and corrected combined result independently inspected',
+                  required: true,
+                  verification: 'Canonical review snapshot',
+                },
+              ],
+              scope: {
+                read_paths: ['**'],
+                write_paths: [],
+                excluded_paths: [],
+              },
+              base_revision: corrected.candidateRevision,
+              expected_deliverables: [
+                `Approved or changes_requested Review for ${delivery.handoff.id} on ${corrected.candidateRevision}`,
+              ],
+            };
+            await api.call('create_task', { task: spec });
+            await api.call('delegate_task', {
+              task_id: spec.id,
+              provider: 'fake',
+              model: null,
+            });
+          }
+          return;
+        }
+        if (phase === 'reviews' || phase === 'accepted') {
+          const deliveries = await Promise.all(sourceIds.map(collect));
+          if (phase === 'reviews') {
+            if (
+              deliveries.some(
+                (delivery) =>
+                  !delivery.reviews.some(
+                    (review) =>
+                      review.outcome === 'approved' &&
+                      review.tested_revision === corrected.candidateRevision,
+                  ),
+              )
+            )
+              return;
+            trace.push('reviews:approved');
+            for (const delivery of deliveries) {
+              const review = delivery.reviews.find(
+                (item) =>
+                  item.outcome === 'approved' &&
+                  item.tested_revision === corrected.candidateRevision,
+              )!;
+              const proofs = delivery.verifications.filter(
+                (proof) =>
+                  proof.tested_revision === corrected.candidateRevision,
+              );
+              assert.ok(proofs.length);
+              assert.equal(
+                (
+                  await api.call<TaskState>('accept_delivery', {
+                    handoff_id: delivery.handoff.id,
+                    review_ids: [review.id],
+                    verification_ids: proofs.map((proof) => proof.id),
+                    accepted_revision: corrected.candidateRevision,
+                  })
+                ).result.status,
+                'accepted',
+              );
+            }
+            phase = 'accepted';
+            trace.push('deliveries:accepted');
+          }
+          const proof = deliveries[2]!.verifications.find(
+            (item) => item.tested_revision === corrected.candidateRevision,
+          )!;
+          try {
+            const final = (
+              await api.call<Run>('finish_run', {
+                summary:
+                  'Failed combination corrected without dropping a feature or weakening the one-unit criterion; providers simulated',
+                criterion_evidence: [
+                  {
+                    criterion_id: status.run.acceptance_criteria[0]!.id,
+                    evidence_artifact_ids: proof.evidence_artifact_ids,
+                  },
+                ],
+                delivered_artifact_ids: deliveries.flatMap((delivery) =>
+                  delivery.handoff.artifacts.map((artifact) => artifact.id),
+                ),
+              })
+            ).result;
+            assert.equal(final.status, 'completed');
+            phase = 'completed';
+            trace.push('run:completed');
+          } catch (error) {
+            if (!(error instanceof CrewError) || error.code !== 'RUN_BUSY')
+              throw error;
+            // The last review's physical turn must exit before the next chief can finish.
+          }
+          return;
+        }
+        assert.fail('Unexpected chief turn after verified completion');
+      }
+      const own = status.tasks[0]!;
+      if (request.role === 'developer') {
+        if (own.id === sourceIds[2]) {
+          assert.equal(
+            `git:${git(request.cwd, 'rev-parse', 'HEAD')}`,
+            failed.candidateRevision,
+          );
+          assert.ok(
+            JSON.parse(
+              readFileSync(join(request.cwd, 'features/a.json'), 'utf8'),
+            ).enabled,
+          );
+          assert.ok(
+            JSON.parse(
+              readFileSync(join(request.cwd, 'features/b.json'), 'utf8'),
+            ).enabled,
+          );
+          writeFileSync(
+            join(request.cwd, 'policy.json'),
+            JSON.stringify({ mode: 'serial' }),
+          );
+          const plan = JSON.parse(
+            execFileSync(process.execPath, ['check.mjs'], {
+              cwd: request.cwd,
+              encoding: 'utf8',
+            }),
+          );
+          assert.deepEqual(plan.enabled, ['a', 'b']);
+          assert.equal(plan.peak, 1);
+        } else {
+          const feature = own.id.endsWith('-a') ? 'a' : 'b';
+          await initialWorkers.enter();
+          writeFileSync(
+            join(request.cwd, `features/${feature}.json`),
+            JSON.stringify({ enabled: true }),
+          );
+          const plan = JSON.parse(
+            execFileSync(
+              process.execPath,
+              ['check.mjs', `--feature=${feature}`],
+              { cwd: request.cwd, encoding: 'utf8' },
+            ),
+          );
+          assert.deepEqual(plan.enabled, [feature]);
+          assert.equal(plan.peak, 1);
+        }
+        const handoff: Handoff = {
+          schema_version: 1,
+          id: `handoff:${own.id}`,
+          task_id: own.id,
+          run_id: api.runId,
+          attempt_id: own.active_attempt_id!,
+          generation: own.generation,
+          status: 'delivered',
+          summary: 'Actual checked code/configuration snapshot',
+          source_revision: null,
+          artifacts: [],
+          verifications: [],
+          criteria_claimed: own.spec.acceptance_criteria.map(
+            (criterion) => criterion.id,
+          ),
+          limitations: [],
+          next_information: [],
+          created_at: now(),
+        };
+        await api.call('submit_handoff', { handoff });
+        return;
+      }
+      assert.equal(request.role, 'reviewer');
+      assert.equal(
+        `git:${git(request.cwd, 'rev-parse', 'HEAD')}`,
+        corrected.candidateRevision,
+      );
+      const plan = JSON.parse(
+        execFileSync(process.execPath, ['check.mjs'], {
+          cwd: request.cwd,
+          encoding: 'utf8',
+        }),
+      );
+      assert.deepEqual(plan.enabled, ['a', 'b']);
+      assert.deepEqual(plan.batches, [['a'], ['b']]);
+      const index = Number(own.id.slice('task:capacity-review-'.length));
+      const delivery = await collect(sourceIds[index]!);
+      const proofs = delivery.verifications.filter(
+        (proof) => proof.tested_revision === corrected.candidateRevision,
+      );
+      assert.ok(proofs.length);
+      assert.ok(
+        proofs.every(
+          (proof) => proof.result === 'passed' && proof.exit_code === 0,
+        ),
+      );
+      const review: Review = {
+        schema_version: 1,
+        id: `review:capacity-${index}`,
+        run_id: api.runId,
+        review_task_id: own.id,
+        review_of_task_id: delivery.handoff.task_id,
+        handoff_id: delivery.handoff.id,
+        outcome: 'approved',
+        verification_scope: 'combined_code',
+        source_revision: delivery.handoff.source_revision!,
+        tested_revision: corrected.candidateRevision,
+        summary:
+          'Both features remain enabled and execute once with peak capacity one on the corrected combined candidate',
+        findings: [],
+        verification_ids: proofs.map((proof) => proof.id),
+        created_at: now(),
+      };
+      await api.call('submit_review', { review });
+    });
+    const f = await fixture(t, provider, 3, 'code');
+    mkdirSync(join(f.root, 'features'));
+    for (const name of ['a', 'b'])
+      writeFileSync(
+        join(f.root, `features/${name}.json`),
+        JSON.stringify({ enabled: false }),
+      );
+    writeFileSync(
+      join(f.root, 'policy.json'),
+      JSON.stringify({ mode: 'parallel' }),
+    );
+    for (const [fixtureName, target] of [
+      ['capacity-app.mjs', 'app.mjs'],
+      ['capacity-check.mjs', 'check.mjs'],
+    ])
+      writeFileSync(
+        join(f.root, target!),
+        readFileSync(
+          new URL(
+            `../../tests/fixtures/runtime/${fixtureName}`,
+            import.meta.url,
+          ),
+        ),
+      );
+    git(f.root, 'add', '--all');
+    git(
+      f.root,
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@localhost',
+      'commit',
+      '-m',
+      'capacity application baseline',
+    );
+    const initial = git(f.root, 'rev-parse', 'HEAD');
+    f.store.configureProject({
+      ...f.store.project.config,
+      verification_commands: [
+        {
+          id: 'check:isolated-a',
+          argv: [process.execPath, 'check.mjs', '--feature=a'],
+          cwd: '.',
+          timeout_seconds: 10,
+        },
+        {
+          id: 'check:isolated-b',
+          argv: [process.execPath, 'check.mjs', '--feature=b'],
+          cwd: '.',
+          timeout_seconds: 10,
+        },
+        {
+          id: 'check:combined-capacity',
+          argv: [process.execPath, 'check.mjs'],
+          cwd: '.',
+          timeout_seconds: 10,
+        },
+      ],
+    });
+    writeFileSync(
+      join(f.root, 'user-note.txt'),
+      'Preserve the principal checkout and this uncommitted note',
+    );
+    const run = (await f.owner.admin({
+      method: 'create_run',
+      arguments: {
+        objective:
+          'Enable both application features and execute each exactly once without exceeding one unit of simultaneous capacity',
+        criteria: [
+          'Both features remain enabled, each runs exactly once, and combined peak capacity is at most one',
+        ],
+        constraints: [
+          'Do not remove a feature or weaken the shared budget to obtain success',
+        ],
+        chief_provider: 'fake',
+        chief_model: null,
+        max_active_agents: 3,
+        delivery_mode: 'code',
+      },
+    })) as Run;
+    try {
+      await f.completed(run.id);
+    } catch (error) {
+      throw new Error(
+        `Correction workflow stopped in phase ${phase} after ${trace.join(', ')}; configured context budget=${f.store.project.config.context.input_budget_tokens}`,
+        { cause: error },
+      );
+    }
+    assert.deepEqual(trace, [
+      'isolated:0:passed',
+      'isolated:1:passed',
+      'combined:failed',
+      'correction:requested',
+      'correction:delivered',
+      'combined:corrected',
+      'reviews:approved',
+      'deliveries:accepted',
+      'run:completed',
+    ]);
+    assert.equal(phase, 'completed');
+    assert.deepEqual(provider.failures, []);
+    assert.equal(isolated.length, 2);
+    assert.ok(provider.peak <= 3);
+    assert.equal(
+      git(f.root, 'rev-parse', targetRef),
+      corrected.candidateRevision.slice(4),
+    );
+    assert.equal(git(f.root, 'rev-parse', 'HEAD'), initial);
+    assert.equal(
+      readFileSync(join(f.root, 'user-note.txt'), 'utf8'),
+      'Preserve the principal checkout and this uncommitted note',
+    );
+    assert.equal(
+      JSON.parse(git(f.root, 'show', `${targetRef}:policy.json`)).mode,
+      'serial',
+    );
+    for (const name of ['a', 'b'])
+      assert.equal(
+        JSON.parse(git(f.root, 'show', `${targetRef}:features/${name}.json`))
+          .enabled,
+        true,
+      );
+    assert.equal(
+      JSON.parse(readFileSync(join(failed.path, 'policy.json'), 'utf8')).mode,
+      'parallel',
+    );
+    assert.ok(
+      existsSync(failed.path),
+      'The failed candidate remains inspectable',
+    );
+    const operations = f.store
+      .records<Operation>(run.id, 'operation')
+      .filter((operation) => operation.kind === 'integration.prepare');
+    assert.equal(operations.length, 4);
+    assert.equal(
+      (
+        operations.find((operation) => operation.id === failed.operationId)!
+          .result as IntegrationCandidate
+      ).status,
+      'validation_failed',
+    );
+    const proofs = f.store.records<Verification>(run.id, 'verification');
+    assert.ok(
+      !proofs.some(
+        (proof) =>
+          proof.tested_revision === failed.candidateRevision &&
+          proof.result === 'passed',
+      ),
+    );
+    const final = f.store.getRun(run.id);
+    assert.equal(final.status, 'completed');
+    assert.deepEqual(final.acceptance_criteria, run.acceptance_criteria);
+    assert.deepEqual(final.constraints, run.constraints);
+    assert.equal(f.store.tasks(run.id).length, 6);
+    assert.ok(
+      f.store.tasks(run.id).every((item) => item.status === 'accepted'),
+    );
+    assert.equal(
+      f.store.getTask(sourceIds[2]!).spec.base_revision,
+      failed.candidateRevision,
+    );
+    assert.equal(
+      f.store.records<Decision>(run.id, 'decision')[0]!.id,
+      'decision:correct-combined-capacity',
+    );
+  },
+);
