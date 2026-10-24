@@ -18,14 +18,17 @@
   "exports": {
     "./contracts": "./dist/packages/contracts/src/index.js",
     "./core": "./dist/packages/core/src/index.js",
-    "./providers": "./dist/packages/providers/src/index.js"
+    "./providers": "./dist/packages/providers/src/index.js",
+    "./schema/runtime": "./packages/contracts/schema/runtime.schema.json",
+    "./schema/project-config": "./packages/contracts/schema/project-config.schema.json"
   },
   "files": [
     "bin",
     "dist",
     "README.md",
     "CHANGELOG.md",
-    "docs"
+    "docs",
+    "packages/contracts/schema"
   ],
   "scripts": {
     "generate": "node scripts/generate-contracts.mjs",

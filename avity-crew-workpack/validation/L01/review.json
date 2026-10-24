@@ -1,0 +1,43 @@
+{
+  "handoff_id": "handoff-298b85db3103496e81b4a2a7b9e508bb",
+  "outcome": "changes_requested",
+  "source_revision": "git:78ffc5bafd7c593cb779961a7ba86e23feb55398",
+  "tested_revision": "git:78ffc5bafd7c593cb779961a7ba86e23feb55398",
+  "verification_scope": "combined_code",
+  "summary": "Clean-checkout installation and checks pass, but FakeProvider.send reports queued while silently discarding the update. L01 requires unsupported operations to fail explicitly. Reject this candidate until send rejects with UNSUPPORTED and a focused test covers it.",
+  "findings": [
+    "packages/providers/src/fake.ts:73: send ignores its update argument and always returns queued, although probe declares mid_turn_input unsupported and no queue or continuation retains that update. Reproduced against the compiled candidate. Reject with CrewError UNSUPPORTED and test the explicit rejection; otherwise offline supervisor tests can falsely treat lost decisions as retained."
+  ],
+  "integration": {
+    "base_revision": "git:e42d658c2e2cf55bc70973e4f6b893d3b61850ba",
+    "source_revision": "git:78ffc5bafd7c593cb779961a7ba86e23feb55398",
+    "candidate_revision": "git:78ffc5bafd7c593cb779961a7ba86e23feb55398",
+    "evidence_ref": "avity-crew-workpack/validation/L01/review.md"
+  },
+  "checks": [
+    {
+      "name": "Clean-checkout lockfile installation",
+      "command": "npm ci",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L01/review.md",
+      "revision": "git:78ffc5bafd7c593cb779961a7ba86e23feb55398"
+    },
+    {
+      "name": "Independent strict types, formatting, build and seven offline tests",
+      "command": "npm run check",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L01/review.md",
+      "revision": "git:78ffc5bafd7c593cb779961a7ba86e23feb55398"
+    },
+    {
+      "name": "Initial help command smoke",
+      "command": "node bin/avity-crew.mjs --help",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L01/review.md",
+      "revision": "git:78ffc5bafd7c593cb779961a7ba86e23feb55398"
+    }
+  ]
+}

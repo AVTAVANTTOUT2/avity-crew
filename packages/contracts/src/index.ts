@@ -2,6 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 import { runtimeSchema } from './generated/runtime-schema.ts';
+import { projectSchema } from './generated/project-schema.ts';
+import type { ProjectConfig } from './generated/project-config.ts';
+import { contractDefinitions } from './generated/contract-map.ts';
+import type { ContractMap } from './generated/contract-map.ts';
 import type {
   TaskSpec,
   Handoff,
@@ -14,7 +18,8 @@ import type {
 } from './generated/runtime.ts';
 
 export * from './generated/runtime.ts';
-export { runtimeSchema };
+export * from './generated/project-config.ts';
+export { runtimeSchema, projectSchema };
 export const PROTOCOL_VERSION = 1;
 export const now = (): string => new Date().toISOString();
 export const ident = (prefix: string): string => `${prefix}:${randomUUID()}`;
@@ -32,17 +37,24 @@ export class CrewError extends Error {
 
 const ajv = new Ajv2020({
   allErrors: true,
-  strict: false,
+  strict: true,
   validateFormats: true,
 });
 addFormats.default(ajv);
 ajv.addSchema(runtimeSchema);
+ajv.addSchema(projectSchema);
 
-export function validate<T>(
-  definition: string,
+export function validate<K extends keyof ContractMap>(
+  definition: K,
   value: unknown,
-): asserts value is T {
-  const validator = ajv.getSchema(`${runtimeSchema.$id}#/$defs/${definition}`);
+): asserts value is ContractMap[K] {
+  if (!contractDefinitions.includes(definition))
+    throw new CrewError('UNKNOWN_SCHEMA', `Unknown contract: ${definition}`);
+  const validator = ajv.getSchema(
+    definition === 'ProjectConfig'
+      ? projectSchema.$id
+      : `${runtimeSchema.$id}#/$defs/${definition}`,
+  );
   if (!validator)
     throw new CrewError('UNKNOWN_SCHEMA', `Unknown contract: ${definition}`);
   if (!validator(value))
@@ -61,17 +73,6 @@ export interface Project {
   config: ProjectConfig;
   map_version: number;
   created_at: string;
-}
-
-export interface ProjectConfig {
-  schema_version: 1;
-  chief: { provider: Exclude<ProviderId, 'fake'>; model: string | null };
-  max_active_agents: number;
-  checks: { id: string; command: string[]; cwd: string }[];
-  permissions: {
-    sandbox: 'read-only' | 'workspace-write';
-    approval: 'never' | 'on-request';
-  };
 }
 
 export interface Run {
@@ -180,7 +181,10 @@ export interface ProviderRequest {
   prompt: string;
   model: string | null;
   role: Actor['role'];
-  permissions: ProjectConfig['permissions'];
+  permissions: {
+    sandbox: 'read-only' | 'workspace-write';
+    approval: 'never' | 'on-request';
+  };
   bridge?: { command: string; args: string[]; env: Record<string, string> };
 }
 

@@ -1,0 +1,12 @@
+{
+  "summary": "Socle TypeScript strict compilable, contrats générés depuis le schéma v1, validations et transitions explicites, interface provider neutre et simulation traçable, aide CLI et CI sans secrets.",
+  "revision": "git:78ffc5bafd7c593cb779961a7ba86e23feb55398",
+  "artifacts": [{"commit": "78ffc5bafd7c593cb779961a7ba86e23feb55398"}],
+  "tests": [
+    {"name": "Contrôles Node 26", "command": "npm run check", "kind": "unit", "exit_code": 0, "evidence_ref": "avity-crew-workpack/validation/L01/checks.md", "revision": "git:78ffc5bafd7c593cb779961a7ba86e23feb55398"},
+    {"name": "Tests référence Node 24", "command": "npm exec --yes --package=node@24.22.1 -- node --test 'dist/tests/**/*.test.js'", "kind": "integration", "exit_code": 0, "evidence_ref": "avity-crew-workpack/validation/L01/checks.md", "revision": "git:78ffc5bafd7c593cb779961a7ba86e23feb55398"}
+  ],
+  "limitations": [],
+  "next_steps": [],
+  "live_verification": "not_applicable"
+}

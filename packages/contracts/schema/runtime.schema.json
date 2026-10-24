@@ -1,0 +1,2112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:avity-crew:runtime:v1",
+  "title": "Avity Crew — contrats runtime initiaux v1",
+  "description": "Contrats de conception à implémenter en L01. Les validations métier et d'autorité restent obligatoires dans le superviseur.",
+  "$defs": {
+    "Identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "Revision": {
+      "type": "string",
+      "pattern": "^(git:(?:[0-9a-f]{40}|[0-9a-f]{64})|sha256:[0-9a-f]{64})$"
+    },
+    "ProviderId": {
+      "type": "string",
+      "enum": ["claude", "codex", "fake"]
+    },
+    "TaskStatus": {
+      "type": "string",
+      "enum": [
+        "planned",
+        "ready",
+        "running",
+        "waiting_dependency",
+        "waiting_user",
+        "waiting_provider",
+        "blocked",
+        "in_review",
+        "changes_requested",
+        "validating",
+        "accepted",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "RunStatus": {
+      "type": "string",
+      "enum": [
+        "planning",
+        "running",
+        "paused",
+        "waiting_user",
+        "waiting_provider",
+        "blocked",
+        "validating",
+        "completed",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "RelativePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\r\\n\\u0000]+$"
+    },
+    "SourceRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "repo_file",
+            "instruction",
+            "decision",
+            "artifact",
+            "user_message",
+            "documentation",
+            "observation"
+          ]
+        },
+        "reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^(git:(?:[0-9a-f]{40}|[0-9a-f]{64})|sha256:[0-9a-f]{64})$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "authority": {
+          "type": "string",
+          "enum": [
+            "user_requirement",
+            "applicable_instruction",
+            "approved_decision",
+            "observed_code",
+            "observation",
+            "hypothesis"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "reference",
+        "observed_at",
+        "revision",
+        "authority",
+        "summary"
+      ],
+      "additionalProperties": false
+    },
+    "Criterion": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "verification": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["id", "description", "required", "verification"],
+      "additionalProperties": false
+    },
+    "ArtifactRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["git_commit", "patch", "file", "test_log", "report"]
+        },
+        "reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^(git:(?:[0-9a-f]{40}|[0-9a-f]{64})|sha256:[0-9a-f]{64})$"
+        },
+        "producer_attempt_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "reference",
+        "revision",
+        "producer_attempt_id",
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "Verification": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "criterion_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "minItems": 1
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["simulated", "live", "static"]
+        },
+        "execution": {
+          "type": "string",
+          "enum": ["automated", "manual"]
+        },
+        "command": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cwd": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "type": "string",
+          "enum": ["passed", "failed", "not_run", "blocked"]
+        },
+        "exit_code": {
+          "type": ["integer", "null"]
+        },
+        "tested_revision": {
+          "type": "string",
+          "pattern": "^(git:(?:[0-9a-f]{40}|[0-9a-f]{64})|sha256:[0-9a-f]{64})$"
+        },
+        "evidence_artifact_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "minItems": 0
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "ended_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": ["claude", "codex", "fake"]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "criterion_ids",
+        "mode",
+        "execution",
+        "command",
+        "cwd",
+        "result",
+        "exit_code",
+        "tested_revision",
+        "evidence_artifact_ids",
+        "started_at",
+        "ended_at",
+        "provider"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "execution": {
+                "const": "automated"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "command": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "TaskSpec": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "run_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "objective": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "developer",
+            "reviewer",
+            "validator",
+            "documenter",
+            "investigator",
+            "refactorer",
+            "ci"
+          ]
+        },
+        "acceptance_criteria": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Criterion"
+          },
+          "minItems": 1
+        },
+        "depends_on": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "minItems": 0
+        },
+        "scope": {
+          "type": "object",
+          "properties": {
+            "read_paths": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 0
+            },
+            "write_paths": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 0
+            },
+            "excluded_paths": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 0
+            }
+          },
+          "required": ["read_paths", "write_paths", "excluded_paths"],
+          "additionalProperties": false
+        },
+        "base_revision": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^(git:(?:[0-9a-f]{40}|[0-9a-f]{64})|sha256:[0-9a-f]{64})$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "context_source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "minItems": 0
+        },
+        "expected_deliverables": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "schema_version",
+        "id",
+        "run_id",
+        "title",
+        "objective",
+        "role",
+        "acceptance_criteria",
+        "depends_on",
+        "scope",
+        "base_revision",
+        "context_source_ids",
+        "expected_deliverables",
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "ContextBundle": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "run_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "subject_kind": {
+          "type": "string",
+          "enum": ["task", "control"]
+        },
+        "subject_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "objective": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SourceRef"
+          },
+          "minItems": 0
+        },
+        "decision_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "minItems": 0
+        },
+        "layers": {
+          "type": "object",
+          "properties": {
+            "team_rules": {
+              "type": "string",
+              "minLength": 1
+            },
+            "role_rules": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mission": {
+              "type": "string",
+              "minLength": 1
+            },
+            "updates": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 0
+            }
+          },
+          "required": ["team_rules", "role_rules", "mission", "updates"],
+          "additionalProperties": false
+        },
+        "budget": {
+          "type": "object",
+          "properties": {
+            "max_input_tokens": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "estimated_input_tokens": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            },
+            "measurement": {
+              "type": "string",
+              "enum": ["provider", "estimated", "unavailable"]
+            }
+          },
+          "required": [
+            "max_input_tokens",
+            "estimated_input_tokens",
+            "measurement"
+          ],
+          "additionalProperties": false
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "schema_version",
+        "id",
+        "run_id",
+        "subject_kind",
+        "subject_id",
+        "version",
+        "objective",
+        "sources",
+        "decision_ids",
+        "layers",
+        "budget",
+        "content_sha256",
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "Handoff": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "task_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "run_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "attempt_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": ["delivered", "partial", "blocked"]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_revision": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^(git:(?:[0-9a-f]{40}|[0-9a-f]{64})|sha256:[0-9a-f]{64})$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 0
+        },
+        "verifications": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Verification"
+          },
+          "minItems": 0
+        },
+        "criteria_claimed": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "minItems": 0
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "next_information": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "schema_version",
+        "id",
+        "task_id",
+        "run_id",
+        "attempt_id",
+        "generation",
+        "status",
+        "summary",
+        "source_revision",
+        "artifacts",
+        "verifications",
+        "criteria_claimed",
+        "limitations",
+        "next_information",
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "Decision": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "run_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1
+        },
+        "answer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": ["proposed", "approved", "superseded", "rejected"]
+        },
+        "approved_by": {
+          "type": ["string", "null"]
+        },
+        "source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "minItems": 0
+        },
+        "affects_task_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "minItems": 0
+        },
+        "supersedes": {
+          "type": ["string", "null"]
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "schema_version",
+        "id",
+        "run_id",
+        "question",
+        "answer",
+        "status",
+        "approved_by",
+        "source_ids",
+        "affects_task_ids",
+        "supersedes",
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "CrewEvent": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "run_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "task_id": {
+          "type": ["string", "null"]
+        },
+        "session_id": {
+          "type": ["string", "null"]
+        },
+        "attempt_id": {
+          "type": ["string", "null"]
+        },
+        "generation": {
+          "type": ["integer", "null"],
+          "minimum": 1
+        },
+        "actor_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "occurred_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "schema_version",
+        "id",
+        "seq",
+        "type",
+        "project_id",
+        "run_id",
+        "task_id",
+        "session_id",
+        "attempt_id",
+        "generation",
+        "actor_id",
+        "occurred_at",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "Capability": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["supported", "unsupported", "unverified"]
+        },
+        "evidence_ref": {
+          "type": ["string", "null"]
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["status", "evidence_ref", "note"],
+      "additionalProperties": false
+    },
+    "ProviderCapabilities": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "provider": {
+          "$ref": "#/$defs/ProviderId"
+        },
+        "binary_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "checked_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "native_resume": {
+          "$ref": "#/$defs/Capability"
+        },
+        "structured_events": {
+          "$ref": "#/$defs/Capability"
+        },
+        "mid_turn_input": {
+          "$ref": "#/$defs/Capability"
+        },
+        "permission_requests": {
+          "$ref": "#/$defs/Capability"
+        },
+        "mcp_tools": {
+          "$ref": "#/$defs/Capability"
+        },
+        "usage_reporting": {
+          "$ref": "#/$defs/Capability"
+        }
+      },
+      "required": [
+        "schema_version",
+        "provider",
+        "binary_path",
+        "version",
+        "checked_at",
+        "native_resume",
+        "structured_events",
+        "mid_turn_input",
+        "permission_requests",
+        "mcp_tools",
+        "usage_reporting"
+      ],
+      "additionalProperties": false
+    },
+    "InspectProjectArgs": {
+      "type": "object",
+      "properties": {
+        "focus": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "requested_source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "minItems": 0
+        }
+      },
+      "required": ["focus", "requested_source_ids"],
+      "additionalProperties": false
+    },
+    "CreateTaskArgs": {
+      "type": "object",
+      "properties": {
+        "task": {
+          "$ref": "#/$defs/TaskSpec"
+        }
+      },
+      "required": ["task"],
+      "additionalProperties": false
+    },
+    "DelegateTaskArgs": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "provider": {
+          "$ref": "#/$defs/ProviderId"
+        },
+        "model": {
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["task_id", "provider", "model"],
+      "additionalProperties": false
+    },
+    "GetStatusArgs": {
+      "type": "object",
+      "properties": {
+        "after_seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "task_id": {
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["after_seq", "limit", "task_id"],
+      "additionalProperties": false
+    },
+    "SendMessageArgs": {
+      "type": "object",
+      "properties": {
+        "recipient_kind": {
+          "type": "string",
+          "enum": ["task", "chief", "user"]
+        },
+        "recipient_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "information",
+            "decision_update",
+            "question",
+            "blocker",
+            "correction"
+          ]
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "minItems": 0
+        },
+        "requires_ack": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "recipient_kind",
+        "recipient_id",
+        "kind",
+        "content",
+        "source_ids",
+        "requires_ack"
+      ],
+      "additionalProperties": false
+    },
+    "CollectDeliveryArgs": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "handoff_id": {
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["task_id", "handoff_id"],
+      "additionalProperties": false
+    },
+    "RequestUserInputArgs": {
+      "type": "object",
+      "properties": {
+        "question_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "consequence": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": ["label", "consequence"],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        },
+        "affects_task_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "minItems": 0
+        },
+        "blocking": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "question_id",
+        "question",
+        "options",
+        "affects_task_ids",
+        "blocking"
+      ],
+      "additionalProperties": false
+    },
+    "ProposeIntegrationArgs": {
+      "type": "object",
+      "properties": {
+        "handoff_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "minItems": 1
+        },
+        "target_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_target_revision": {
+          "type": "string",
+          "pattern": "^(git:(?:[0-9a-f]{40}|[0-9a-f]{64})|sha256:[0-9a-f]{64})$"
+        },
+        "required_check_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "handoff_ids",
+        "target_ref",
+        "expected_target_revision",
+        "required_check_ids"
+      ],
+      "additionalProperties": false
+    },
+    "FinishRunArgs": {
+      "type": "object",
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "criterion_evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "criterion_id": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+              },
+              "evidence_artifact_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+                },
+                "minItems": 1
+              }
+            },
+            "required": ["criterion_id", "evidence_artifact_ids"],
+            "additionalProperties": false
+          },
+          "minItems": 1
+        },
+        "delivered_artifact_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "minItems": 1
+        }
+      },
+      "required": ["summary", "criterion_evidence", "delivered_artifact_ids"],
+      "additionalProperties": false
+    },
+    "ReadContextArgs": {
+      "type": "object",
+      "properties": {
+        "subject_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "minItems": 0
+        },
+        "after_version": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": ["subject_id", "source_ids", "after_version"],
+      "additionalProperties": false
+    },
+    "PublishNoteArgs": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "observation",
+            "hypothesis",
+            "question",
+            "proposal",
+            "progress"
+          ]
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "minItems": 0
+        }
+      },
+      "required": ["task_id", "kind", "content", "source_ids"],
+      "additionalProperties": false
+    },
+    "ReportBlockerArgs": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required_action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "minItems": 0
+        }
+      },
+      "required": ["task_id", "reason", "required_action", "source_ids"],
+      "additionalProperties": false
+    },
+    "SubmitHandoffArgs": {
+      "type": "object",
+      "properties": {
+        "handoff": {
+          "$ref": "#/$defs/Handoff"
+        }
+      },
+      "required": ["handoff"],
+      "additionalProperties": false
+    },
+    "ToolCall": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": 1
+            },
+            "request_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "idempotency_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "run_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "method": {
+              "const": "inspect_project"
+            },
+            "arguments": {
+              "$ref": "#/$defs/InspectProjectArgs"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "idempotency_key",
+            "run_id",
+            "expected_version",
+            "method",
+            "arguments"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": 1
+            },
+            "request_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "idempotency_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "run_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "method": {
+              "const": "create_task"
+            },
+            "arguments": {
+              "$ref": "#/$defs/CreateTaskArgs"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "idempotency_key",
+            "run_id",
+            "expected_version",
+            "method",
+            "arguments"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": 1
+            },
+            "request_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "idempotency_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "run_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "method": {
+              "const": "delegate_task"
+            },
+            "arguments": {
+              "$ref": "#/$defs/DelegateTaskArgs"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "idempotency_key",
+            "run_id",
+            "expected_version",
+            "method",
+            "arguments"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": 1
+            },
+            "request_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "idempotency_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "run_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "method": {
+              "const": "get_status"
+            },
+            "arguments": {
+              "$ref": "#/$defs/GetStatusArgs"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "idempotency_key",
+            "run_id",
+            "expected_version",
+            "method",
+            "arguments"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": 1
+            },
+            "request_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "idempotency_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "run_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "method": {
+              "const": "send_message"
+            },
+            "arguments": {
+              "$ref": "#/$defs/SendMessageArgs"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "idempotency_key",
+            "run_id",
+            "expected_version",
+            "method",
+            "arguments"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": 1
+            },
+            "request_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "idempotency_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "run_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "method": {
+              "const": "collect_delivery"
+            },
+            "arguments": {
+              "$ref": "#/$defs/CollectDeliveryArgs"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "idempotency_key",
+            "run_id",
+            "expected_version",
+            "method",
+            "arguments"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": 1
+            },
+            "request_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "idempotency_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "run_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "method": {
+              "const": "request_user_input"
+            },
+            "arguments": {
+              "$ref": "#/$defs/RequestUserInputArgs"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "idempotency_key",
+            "run_id",
+            "expected_version",
+            "method",
+            "arguments"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": 1
+            },
+            "request_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "idempotency_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "run_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "method": {
+              "const": "propose_integration"
+            },
+            "arguments": {
+              "$ref": "#/$defs/ProposeIntegrationArgs"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "idempotency_key",
+            "run_id",
+            "expected_version",
+            "method",
+            "arguments"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": 1
+            },
+            "request_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "idempotency_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "run_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "method": {
+              "const": "finish_run"
+            },
+            "arguments": {
+              "$ref": "#/$defs/FinishRunArgs"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "idempotency_key",
+            "run_id",
+            "expected_version",
+            "method",
+            "arguments"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": 1
+            },
+            "request_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "idempotency_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "run_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "method": {
+              "const": "read_context"
+            },
+            "arguments": {
+              "$ref": "#/$defs/ReadContextArgs"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "idempotency_key",
+            "run_id",
+            "expected_version",
+            "method",
+            "arguments"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": 1
+            },
+            "request_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "idempotency_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "run_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "method": {
+              "const": "publish_note"
+            },
+            "arguments": {
+              "$ref": "#/$defs/PublishNoteArgs"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "idempotency_key",
+            "run_id",
+            "expected_version",
+            "method",
+            "arguments"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": 1
+            },
+            "request_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "idempotency_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "run_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "method": {
+              "const": "report_blocker"
+            },
+            "arguments": {
+              "$ref": "#/$defs/ReportBlockerArgs"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "idempotency_key",
+            "run_id",
+            "expected_version",
+            "method",
+            "arguments"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": 1
+            },
+            "request_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "idempotency_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "run_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "method": {
+              "const": "submit_handoff"
+            },
+            "arguments": {
+              "$ref": "#/$defs/SubmitHandoffArgs"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "idempotency_key",
+            "run_id",
+            "expected_version",
+            "method",
+            "arguments"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": 1
+            },
+            "request_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "idempotency_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "run_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "method": {
+              "const": "record_decision"
+            },
+            "arguments": {
+              "$ref": "#/$defs/RecordDecisionArgs"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "idempotency_key",
+            "run_id",
+            "expected_version",
+            "method",
+            "arguments"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": 1
+            },
+            "request_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "idempotency_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "run_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "method": {
+              "const": "submit_review"
+            },
+            "arguments": {
+              "$ref": "#/$defs/SubmitReviewArgs"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "idempotency_key",
+            "run_id",
+            "expected_version",
+            "method",
+            "arguments"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": 1
+            },
+            "request_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "idempotency_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "run_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "method": {
+              "const": "accept_delivery"
+            },
+            "arguments": {
+              "$ref": "#/$defs/AcceptDeliveryArgs"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "idempotency_key",
+            "run_id",
+            "expected_version",
+            "method",
+            "arguments"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Review": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "run_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "review_task_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "review_of_task_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "handoff_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "outcome": {
+          "type": "string",
+          "enum": ["approved", "changes_requested", "blocked"]
+        },
+        "verification_scope": {
+          "type": "string",
+          "enum": ["source", "combined_code", "documentation"]
+        },
+        "source_revision": {
+          "type": "string",
+          "pattern": "^(git:(?:[0-9a-f]{40}|[0-9a-f]{64})|sha256:[0-9a-f]{64})$"
+        },
+        "tested_revision": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^(git:(?:[0-9a-f]{40}|[0-9a-f]{64})|sha256:[0-9a-f]{64})$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "severity": {
+                "type": "string",
+                "enum": ["blocking", "advisory"]
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reference": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": ["severity", "description", "reference"],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        },
+        "verification_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "minItems": 0
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "schema_version",
+        "id",
+        "run_id",
+        "review_task_id",
+        "review_of_task_id",
+        "handoff_id",
+        "outcome",
+        "verification_scope",
+        "source_revision",
+        "tested_revision",
+        "summary",
+        "findings",
+        "verification_ids",
+        "created_at"
+      ],
+      "additionalProperties": false
+    },
+    "RecordDecisionArgs": {
+      "type": "object",
+      "properties": {
+        "decision_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1
+        },
+        "answer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requested_status": {
+          "type": "string",
+          "enum": ["proposed", "approved"]
+        },
+        "basis": {
+          "type": "string",
+          "enum": ["technical_judgment", "user_response"]
+        },
+        "user_response_id": {
+          "type": ["string", "null"]
+        },
+        "source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "minItems": 0
+        },
+        "affects_task_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "minItems": 0
+        },
+        "supersedes": {
+          "type": ["string", "null"]
+        }
+      },
+      "required": [
+        "decision_id",
+        "question",
+        "answer",
+        "requested_status",
+        "basis",
+        "user_response_id",
+        "source_ids",
+        "affects_task_ids",
+        "supersedes"
+      ],
+      "additionalProperties": false
+    },
+    "SubmitReviewArgs": {
+      "type": "object",
+      "properties": {
+        "review": {
+          "$ref": "#/$defs/Review"
+        }
+      },
+      "required": ["review"],
+      "additionalProperties": false
+    },
+    "AcceptDeliveryArgs": {
+      "type": "object",
+      "properties": {
+        "handoff_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+        },
+        "review_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "minItems": 1
+        },
+        "verification_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "minItems": 1
+        },
+        "accepted_revision": {
+          "type": "string",
+          "pattern": "^(git:(?:[0-9a-f]{40}|[0-9a-f]{64})|sha256:[0-9a-f]{64})$"
+        }
+      },
+      "required": [
+        "handoff_id",
+        "review_ids",
+        "verification_ids",
+        "accepted_revision"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/TaskSpec"
+    },
+    {
+      "$ref": "#/$defs/ContextBundle"
+    },
+    {
+      "$ref": "#/$defs/Handoff"
+    },
+    {
+      "$ref": "#/$defs/Decision"
+    },
+    {
+      "$ref": "#/$defs/CrewEvent"
+    },
+    {
+      "$ref": "#/$defs/ProviderCapabilities"
+    },
+    {
+      "$ref": "#/$defs/ToolCall"
+    },
+    {
+      "$ref": "#/$defs/Review"
+    }
+  ]
+}

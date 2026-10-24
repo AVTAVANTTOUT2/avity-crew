@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "id": "example-context-api-1",
+  "run_id": "example-run-planning",
+  "subject_kind": "task",
+  "subject_id": "example-task-api",
+  "version": 1,
+  "objective": "Implémenter la règle de création définie dans la fixture, avec droits et conflit concurrent.",
+  "sources": [
+    {
+      "id": "example-source-contract",
+      "kind": "decision",
+      "reference": "example-decision-contract",
+      "observed_at": "2026-10-24T10:00:00Z",
+      "revision": null,
+      "authority": "approved_decision",
+      "summary": "Décision fictive réservée à un test ; ne vaut pas règle du logiciel réel."
+    }
+  ],
+  "decision_ids": ["example-decision-contract"],
+  "layers": {
+    "team_rules": "Exemple de règles de collaboration à compiler depuis TEAM_RULES.md.",
+    "role_rules": "Exemple de rôle développeur.",
+    "mission": "Réaliser uniquement la mission de la fixture identifiée.",
+    "updates": []
+  },
+  "budget": {
+    "max_input_tokens": 12000,
+    "estimated_input_tokens": 500,
+    "measurement": "estimated"
+  },
+  "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "created_at": "2026-10-24T10:00:00Z"
+}

@@ -12,7 +12,7 @@ npm run check
 node bin/avity-crew.mjs --help
 ```
 
-Les contrats partagés sont générés depuis le schéma runtime du workpack ; ne pas
+Les contrats partagés sont générés depuis `packages/contracts/schema` ; ne pas
 modifier `packages/contracts/src/generated`. `npm run build` génère les types et
 compile les modules ESM. `npm test` exécute uniquement des tests hors ligne à ce
 stade ; aucune preuve live du produit n'est revendiquée.

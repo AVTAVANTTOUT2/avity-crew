@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "request_id": "example-request-1",
+  "idempotency_key": "example-idempotency-1",
+  "run_id": "example-run-planning",
+  "expected_version": 0,
+  "method": "delegate_task",
+  "arguments": {
+    "task_id": "example-task-api",
+    "provider": "codex",
+    "model": null
+  }
+}
