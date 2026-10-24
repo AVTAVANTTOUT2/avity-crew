@@ -239,6 +239,11 @@ mises à jour, avec sources et omissions explicites. Les générations du chef e
 des tâches, les tentatives actives et les versions restent vérifiées côté service :
 un ancien agent ne récupère pas son autorité parce qu'il possède encore un ancien
 prompt ou qu'une requête attendait dans la file.
+Une mission Git reprise peut partir de son snapshot partiel. Sa livraison finale
+reste cumulative depuis la base assignée à la mission, avec les mêmes contrôles
+de scope et d'exclusion. Si une base amendée n'est pas ancêtre du workspace
+conservé, `BASE_CHANGED` exige une nouvelle attribution depuis cette base ; le
+service conserve les fichiers et ne les rebase pas automatiquement.
 Une mutation dont la réponse HTTP s'est perdue peut avoir été exécutée. La CLI
 ne la rejoue pas automatiquement : vérifier l'état avant de répéter l'action.
 Voir les garanties et limites [POSIX de reprise](RECOVERY.md) et la

@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 — Préparation locale, recette ouverte
+## 0.1.0 — Candidat local
 
 - L00 : racine et outils audités, interfaces CLI et reprises minimales réelles
   vérifiées séparément ; cadrage accepté par une session indépendante.
@@ -15,7 +15,7 @@
 - L06 : workspaces et ressources isolés, snapshots, candidat vérifié et promotion
   locale par référence Git ; livraison acceptée.
 
-### Implémenté, en recette d'intégration
+### Fonctions livrées
 
 - Service HTTP local authentifié, outils MCP/CLI partageant les mêmes contrats,
   coordination persistante et chef indépendant du graphe des tâches.
@@ -35,14 +35,19 @@
   les anciennes tentatives ou preuves ne peuvent pas clore le nouvel état.
 - Blocage des nouveaux lancements pendant pause/arrêt, jusqu'à la fin observée
   des processus ; refus des autorités révoquées et des générations périmées.
+- Revalidation des autorités avant les effets Git et la publication des preuves.
+- Conservation de la provenance des instructions requises entre worktrees et
+  exclusion des schémas d'outils natifs du budget de mission.
+- Livraisons Git cumulatives après reprise : le snapshot couvre toute la mission
+  depuis sa base assignée, avec contrôle du scope et refus d'une base incompatible.
 - Banc de charge simulé exerçant sept places réelles du scheduler, avec HTTP,
   workspaces et enfants Node POSIX ; aucune CLI LLM dans cette preuve.
 - Guides d'installation locale, d'usage, de sauvegarde et d'extension des adaptateurs,
   avec exemple de mission documentaire.
 
-Le rapport final de recette devra qualifier la source et le paquet retenus,
+Le rapport de recette livré avec le paquet qualifie la source et le paquet retenus,
 les parcours natifs mixtes, la charge native observée et les limites restantes.
 Les tests simulés et les preuves séparées des adaptateurs ne remplacent pas
-cette recette ; L11/L12 ne sont pas déclarés validés par ce changelog.
+cette recette. Les niveaux de validation sont consignés dans ce rapport.
 Aucune qualification Linux/Windows ou CI distante n'est revendiquée ici.
 Le paquet reste local ; aucune publication externe n'a été effectuée.
