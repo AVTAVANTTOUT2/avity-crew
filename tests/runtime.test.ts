@@ -18,6 +18,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { CrewError, now } from '../packages/contracts/src/index.ts';
 import type {
   AgentSession,
+  Actor,
   ArtifactRef,
   ContextBundle,
   CoordinationQuestion,
@@ -1513,5 +1514,96 @@ test(
     );
     assert.equal(f.store.getRun(run.id).status, 'paused');
     assert.deepEqual(provider.failures, []);
+  },
+);
+
+test(
+  'administrative status bounds accumulated context bodies while explicit inspection preserves exact context',
+  { timeout: 10_000 },
+  async (t) => {
+    let ready!: () => void;
+    const initialTurn = new Promise<void>((resolve) => {
+      ready = resolve;
+    });
+    const provider = new ScriptedProvider(async () => {
+      ready();
+    });
+    const f = await fixture(t, provider);
+    const run = await f.create();
+    await initialTurn;
+    await f.runtime.scheduler.idle();
+    const initialCount = f.store.records(run.id, 'context').length;
+    const user: Actor = {
+      id: 'user:local',
+      role: 'user',
+      project_id: f.project.id,
+      run_id: run.id,
+      generation: run.generation,
+      task_id: null,
+      attempt_id: null,
+    };
+    const body =
+      'large context payload retained for explicit inspection\n'.repeat(1300);
+    assert.ok(Buffer.byteLength(body) >= 67_000);
+    let latest!: ContextBundle;
+    // Test fixture setup through the real Store API, never SQL or simulated-agent authority.
+    for (let version = 1; version <= 20; version++) {
+      latest = {
+        schema_version: 1,
+        id: `context:large-${version}`,
+        run_id: run.id,
+        subject_kind: 'control',
+        subject_id: 'control:large-fixture',
+        version,
+        objective: 'Preserve a large historical context',
+        sources: [],
+        decision_ids: [],
+        layers: {
+          team_rules: 'Fixture rules',
+          role_rules: 'Fixture role',
+          mission: `${version}:${body}`,
+          updates: [],
+        },
+        budget: {
+          max_input_tokens: 120_000,
+          estimated_input_tokens: 22_000,
+          measurement: 'estimated',
+        },
+        content_sha256: digest(`${version}:${body}`),
+        created_at: now(),
+      };
+      f.store.saveContext(
+        user,
+        latest,
+        `fixture:save-context-${version}`,
+        f.store.getRun(run.id).version,
+      );
+    }
+    const status = (await f.owner.admin({
+      method: 'status',
+      arguments: { run_id: run.id, limit: 1 },
+    })) as { context_count: number; contexts: Record<string, unknown>[] };
+    assert.equal(status.context_count, initialCount + 20);
+    assert.equal(status.contexts.length, 20);
+    assert.ok(
+      Buffer.byteLength(JSON.stringify(status)) < 100_000,
+      'Routine status remains bounded independently of historical prompt size',
+    );
+    assert.ok(
+      status.contexts.every(
+        (context) => !('layers' in context) && !('prompt' in context),
+      ),
+    );
+    const metadata = status.contexts.at(-1)!;
+    assert.equal(metadata.id, latest.id);
+    assert.equal(metadata.content_sha256, latest.content_sha256);
+    assert.equal(metadata.subject_id, latest.subject_id);
+    const inspected = (await f.owner.admin({
+      method: 'inspect_context',
+      arguments: { run_id: run.id, subject_id: latest.subject_id },
+    })) as { context: ContextBundle };
+    assert.deepEqual(inspected.context, latest);
+    assert.equal(inspected.context.layers.mission, `20:${body}`);
+    assert.equal(f.store.records(run.id, 'context').length, initialCount + 20);
   },
 );
