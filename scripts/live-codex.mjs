@@ -13,8 +13,8 @@ assert.ok(
   'Pass an absolute JSON report path',
 );
 assert.ok(
-  ['single', 'parallel'].includes(mode),
-  'Mode must be single or parallel',
+  ['single', 'parallel', 'permission'].includes(mode),
+  'Mode must be single, parallel or permission',
 );
 const provider = new CodexProvider(
   process.env.AVITY_CREW_CODEX_BINARY || 'codex',
@@ -28,6 +28,12 @@ const records = [];
 const report = {
   mode,
   checked_at: new Date().toISOString(),
+  source_revision: spawnSync('git', ['rev-parse', 'HEAD'], {
+    encoding: 'utf8',
+  }).stdout.trim(),
+  requested_model: process.env.AVITY_CREW_CODEX_MODEL || null,
+  effective_model: null,
+  model_evidence: 'Exec JSONL does not expose the selected model',
   cwd,
   capabilities: await provider.probe(),
   records,
@@ -77,12 +83,40 @@ async function run(name, req, session, interrupt = false) {
   try {
     const result = await native.result;
     await consuming;
-    const record = { name, interrupted, result, events };
+    const record = {
+      name,
+      permissions: req.permissions,
+      interrupted,
+      result,
+      events,
+    };
     records.push(record);
     return record;
   } finally {
     clearTimeout(timeout);
   }
+}
+async function verifyPermission() {
+  const denied = await run(
+    'permission-read-only',
+    request(
+      "This test requires observing the native sandbox boundary. Use the shell tool once to execute exactly: printf 'DENIED\\n' > denied.txt . Do not substitute an explanation before trying the command. If refused, report the refusal and do not retry, request escalation, or change permissions.",
+      'read-only',
+    ),
+  );
+  await assert.rejects(access(resolve(cwd, 'denied.txt')));
+  assert.ok(
+    denied.events.some((event) => event.type === 'tool'),
+    'A native tool attempt must be observed',
+  );
+  assert.ok(
+    denied.events.some(
+      (event) =>
+        event.type === 'permission' || event.error?.kind === 'permission',
+    ),
+    'Native refusal must be normalized',
+  );
+  assert.equal(denied.result.success, false);
 }
 try {
   if (mode === 'single') {
@@ -145,23 +179,9 @@ try {
       await readFile(resolve(cwd, 'recovered.txt'), 'utf8'),
       'RECOVERED\n',
     );
-    const denied = await run(
-      'permission-read-only',
-      request(
-        'Attempt once with a file or shell tool to create denied.txt containing DENIED. If the sandbox refuses, report the refusal and do not retry or escalate.',
-        'read-only',
-      ),
-    );
-    await assert.rejects(access(resolve(cwd, 'denied.txt')));
-    assert.ok(
-      denied.events.some(
-        (event) =>
-          event.type === 'permission' ||
-          event.error?.kind === 'permission' ||
-          /denied|not permitted|read.only|failed/i.test(event.text || ''),
-      ),
-      'Native refusal must be visible',
-    );
+    await verifyPermission();
+  } else if (mode === 'permission') {
+    await verifyPermission();
   } else {
     const [a, b] = await Promise.all([
       run(
