@@ -52,6 +52,35 @@ test('native requests reject malformed runtime input before process launch', () 
   assert.doesNotThrow(() => validateProviderRequest(request()));
 });
 
+test('nonsecret bridge settings do not corrupt native identities while capabilities remain redacted', async () => {
+  const child = runNative(
+    'codex',
+    process.execPath,
+    [
+      '-e',
+      `${emit} emit({type:'session',native_session_id:'session-1'});emit({type:'text',text:'port=1 capability='+process.env.AVITY_CREW_CAPABILITY});emit({type:'result',success:true});`,
+    ],
+    {
+      ...request(),
+      bridge: {
+        command: process.execPath,
+        args: [],
+        env: {
+          AVITY_CREW_PORT: '1',
+          AVITY_CREW_CAPABILITY: 'private-capability-sentinel',
+        },
+      },
+    },
+    decode,
+  );
+  const events = await collect(child);
+  const result = await child.result;
+  assert.equal(result.native_session_id, 'session-1');
+  assert.equal(result.text, 'port=1 capability=[REDACTED]');
+  assert.ok(events.every((event) => event.native_session_id === 'session-1'));
+  assert.doesNotMatch(JSON.stringify(events), /private-capability-sentinel/);
+});
+
 test('native JSONL preserves UTF-8 fragments, stdin and unknown diagnostics', async () => {
   const source = `${emit}
     let input=''; for await (const chunk of process.stdin) input+=chunk;

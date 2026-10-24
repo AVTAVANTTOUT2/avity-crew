@@ -75,12 +75,14 @@ export function runNative(
 ): ProviderProcess {
   validateProviderRequest(request);
   const env = { ...process.env, ...request.bridge?.env };
-  const secrets = [
-    ...Object.entries(env)
-      .filter(([key]) => /TOKEN|SECRET|PASSWORD|PASSWD|API_KEY|AUTH/i.test(key))
-      .map(([, value]) => value),
-    ...Object.values(request.bridge?.env ?? {}),
-  ].filter((value): value is string => Boolean(value));
+  const secrets = Object.entries(env)
+    .filter(([key]) =>
+      /TOKEN|SECRET|PASSWORD|PASSWD|API_KEY|PRIVATE|CAPABILITY|AUTH(?:ORIZATION|_SOCK)?$/i.test(
+        key,
+      ),
+    )
+    .map(([, value]) => value)
+    .filter((value): value is string => Boolean(value));
   const redact = (value: string): string => {
     let clean = value;
     for (const secret of secrets)
@@ -132,7 +134,8 @@ export function runNative(
         ...event,
         error: { ...event.error, message: redact(event.error.message) },
       };
-    if (sessionId) event = { ...event, native_session_id: redact(sessionId) };
+    // Native IDs are protocol keys; masking them would break exact resume.
+    if (sessionId) event = { ...event, native_session_id: sessionId };
     while (queue.length >= MAX_QUEUE && !abandoned)
       await new Promise<void>((resolve) => {
         space = resolve;
@@ -321,7 +324,7 @@ export function runNative(
     resolveResult({
       provider,
       provenance: 'live',
-      native_session_id: sessionId ? redact(sessionId) : null,
+      native_session_id: sessionId,
       exit_code: exit.code,
       signal: exit.signal ?? interrupted,
       success,
