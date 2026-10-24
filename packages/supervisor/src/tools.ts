@@ -20,6 +20,8 @@ const descriptions: Record<ToolCall['method'], string> = {
     'Inspecter les sources accessibles et leurs références vérifiées.',
   create_task:
     'Créer une mission précise, ses critères, son périmètre et ses dépendances.',
+  amend_task:
+    'Corriger une TaskSpec arrêtée après une décision approuvée, avec une raison conservée. Les critères et contraintes du run restent inchangés. Une livraison antérieure doit être resoumise et relue.',
   delegate_task:
     'Enregistrer une délégation et retourner immédiatement ; le superviseur lance les tours prêts.',
   get_status:
