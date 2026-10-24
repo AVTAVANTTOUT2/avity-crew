@@ -140,7 +140,7 @@ export interface Message {
     'information' | 'decision_update' | 'question' | 'blocker' | 'correction';
   content: string;
   source_ids: string[];
-  status: 'queued' | 'delivered' | 'acknowledged' | 'applied';
+  status: 'queued' | 'delivered' | 'acknowledged' | 'applied' | 'failed';
   created_at: string;
 }
 
@@ -248,5 +248,5 @@ export interface StoragePort {
   getRun(id: string): Run;
   getTask(id: string): TaskState;
   events(runId: string, afterSeq: number, limit: number): CrewEvent[];
-  submitHandoff(actor: Actor, handoff: Handoff, key: string): unknown;
+  submitHandoff(actor: Actor, handoff: Handoff, key: string): Handoff;
 }

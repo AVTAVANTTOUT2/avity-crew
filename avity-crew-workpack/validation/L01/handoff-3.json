@@ -1,0 +1,7 @@
+{
+  "summary": "Socle corrigé après deux itérations de revue, avec régression reproduite avant correctif pour erreur de simulation sans détail ; 12 tests et contrôles locaux verts.",
+  "revision": "git:4767e10e03806309bc629d4dc1e65cedc0604f0a",
+  "artifacts": [{"commit":"4767e10e03806309bc629d4dc1e65cedc0604f0a"}],
+  "tests": [{"name":"Contrôles finaux et 12 tests", "command":"npm run check", "kind":"unit", "exit_code":0, "evidence_ref":"avity-crew-workpack/validation/L01/checks-3.md", "revision":"git:4767e10e03806309bc629d4dc1e65cedc0604f0a"}],
+  "limitations": [], "next_steps": [], "live_verification": "not_applicable"
+}
