@@ -676,16 +676,7 @@ test(
             status: 'delivered',
             summary: 'A real document file is ready to capture',
             source_revision: null,
-            artifacts: [
-              {
-                id: 'artifact:model-declared',
-                kind: 'file',
-                reference: 'docs/livrable.md',
-                revision: `sha256:${'0'.repeat(64)}`,
-                producer_attempt_id: own.active_attempt_id!,
-                created_at: now(),
-              },
-            ],
+            artifacts: [],
             verifications: [],
             criteria_claimed: own.spec.acceptance_criteria.map(
               (item) => item.id,
@@ -694,13 +685,22 @@ test(
             next_information: [],
             created_at: now(),
           };
+          assert.equal(
+            JSON.stringify(declared).includes('sha256:'),
+            false,
+            'The model supplies paths without inventing any revision or hash',
+          );
           const captured = (
-            await api.call<Handoff>('submit_handoff', { handoff: declared })
+            await api.call<Handoff>('submit_handoff', {
+              handoff: declared,
+              document_paths: ['docs/livrable.md'],
+            })
           ).result;
           assert.match(captured.source_revision!, /^sha256:[a-f0-9]{64}$/);
           const file = captured.artifacts.find((item) => item.kind === 'file')!;
           assert.equal(file.revision, `sha256:${digest(content)}`);
-          assert.notEqual(file.id, declared.artifacts[0]!.id);
+          assert.match(file.id, /^artifact:/);
+          assert.equal(file.producer_attempt_id, own.active_attempt_id);
           assert.match(file.reference, /^artifacts\//);
           assert.equal(
             (await api.status()).result.tasks[0]!.status,
