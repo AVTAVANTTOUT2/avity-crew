@@ -739,6 +739,7 @@ export class WorkspaceManager {
       checks: readonly Check[];
     },
     key: string,
+    assertCurrent: () => void = () => {},
   ): Promise<IntegrationCandidate> {
     if (!request.deliveryOperationIds.length || !request.checks.length)
       throw new CrewError(
@@ -752,6 +753,7 @@ export class WorkspaceManager {
       throw new CrewError('INVALID_REF', 'Use an explicit local delivery ref');
     await git(this.root, ['check-ref-format', request.targetRef]);
     return this.serial(key, async () => {
+      assertCurrent();
       const operation = this.open(key, 'integration.prepare', request);
       if (operation.status === 'completed')
         return operation.result as IntegrationCandidate;
@@ -762,6 +764,7 @@ export class WorkspaceManager {
           '-e',
           `${sha(previous.candidateRevision)}^{commit}`,
         ]);
+        assertCurrent();
         return this.finish(operation, key, previous);
       }
       const path = join(
@@ -784,14 +787,15 @@ export class WorkspaceManager {
           ['rev-parse', '--verify', request.targetRef],
           true,
         );
-        if (target.exitCode !== 0)
+        if (target.exitCode !== 0) {
+          assertCurrent();
           await git(this.root, [
             'update-ref',
             request.targetRef,
             base,
             '0'.repeat(base.length),
           ]);
-        else if (line(target.stdout) !== base)
+        } else if (line(target.stdout) !== base)
           throw new CrewError(
             'TARGET_ADVANCED',
             'Delivery target no longer has the expected base',
@@ -808,6 +812,7 @@ export class WorkspaceManager {
           recursive: true,
           mode: 0o700,
         });
+        assertCurrent();
         await git(this.root, [
           'worktree',
           'add',
@@ -840,6 +845,7 @@ export class WorkspaceManager {
               'INVALID_DELIVERY',
               'Delivery is not the recorded immutable snapshot',
             );
+          assertCurrent();
           const cherry = await git(
             path,
             [
@@ -871,6 +877,7 @@ export class WorkspaceManager {
         candidate.candidateRevision = `git:${line((await git(path, ['rev-parse', 'HEAD'])).stdout)}`;
         if (candidate.status !== 'conflict') {
           for (const check of request.checks) {
+            assertCurrent();
             const startedAt = now();
             const observed = await runCommand(
               path,
@@ -901,6 +908,7 @@ export class WorkspaceManager {
           )
             candidate.status = 'validation_failed';
         }
+        assertCurrent();
         this.store.observeOperation(
           this.actor,
           operation.id,

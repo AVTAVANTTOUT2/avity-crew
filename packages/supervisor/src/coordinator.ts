@@ -535,7 +535,7 @@ export class Coordinator implements SupervisorApi {
         return review;
       }
       case 'propose_integration':
-        return this.integrate(actor, call);
+        return this.integrate(actor, call, assertCurrent);
       case 'accept_delivery': {
         const handoff = this.store.getRecord<Handoff>(
           run.id,
@@ -703,6 +703,7 @@ export class Coordinator implements SupervisorApi {
   private async integrate(
     actor: Actor,
     call: Extract<ToolCall, { method: 'propose_integration' }>,
+    assertCurrent: () => void,
   ): Promise<IntegrationCandidate> {
     const { arguments: args, idempotency_key: key } = call;
     const manager = new WorkspaceManager(
@@ -767,7 +768,9 @@ export class Coordinator implements SupervisorApi {
         checks,
       },
       key,
+      assertCurrent,
     );
+    assertCurrent();
     if (candidate.status === 'validated') {
       for (const handoff of handoffs)
         for (const proof of candidate.proofs) {
