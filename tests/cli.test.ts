@@ -227,6 +227,7 @@ async function child(
   dataHome: string,
   input = '',
   extraEnv: Record<string, string> = {},
+  onStdout?: (chunk: string) => void,
 ): Promise<{ code: number | null; stdout: string; stderr: string }> {
   const processChild = spawn(process.execPath, [cli, ...args], {
     cwd,
@@ -237,6 +238,7 @@ async function child(
     stderr = '';
   processChild.stdout.on('data', (chunk: Buffer) => {
     stdout += chunk;
+    onStdout?.(chunk.toString());
   });
   processChild.stderr.on('data', (chunk: Buffer) => {
     stderr += chunk;
@@ -571,12 +573,28 @@ test('internal mcp remains pure JSON-RPC over the same capability-backed call', 
 
 test('watch detaches without controlling the service and reconnects with its cursor', async (t) => {
   const f = await fixture(t);
+  let connected!: () => void;
+  const ready = new Promise<void>((resolve) => {
+    connected = resolve;
+  });
+  let observed = '';
   const viewing = child(
     ['watch', '--json', '--timeout', '1400'],
     f.root,
     f.dataHome,
+    '',
+    {},
+    (chunk) => {
+      observed += chunk;
+      if (observed.includes('"ok":true')) connected();
+    },
   );
-  await delay(350);
+  await Promise.race([
+    ready,
+    viewing.then(() =>
+      assert.fail('The view exited before its initial snapshot'),
+    ),
+  ]);
   await f.server.close();
   await delay(650);
   f.server = await startTransport({
