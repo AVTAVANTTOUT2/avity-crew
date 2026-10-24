@@ -10,11 +10,12 @@ if (mode === 'same-group-probe') {
   });
   writeFileSync(join(directory, 'child-pid'), String(child.pid));
 } else if (mode === 'zombie-holder') {
-  writeFileSync(join(directory, 'beat'), '.');
   const child = spawn(process.execPath, ['-e', 'process.exit(0)'], {
     stdio: 'ignore',
   });
   writeFileSync(join(directory, 'child-pid'), String(child.pid));
+  // laboratory observes beat as ready: publish it only after the child PID.
+  writeFileSync(join(directory, 'beat'), '.');
   // Prevent libuv from reaping its child until the test observes the zombie.
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5000);
 } else if (mode === 'tree-exit' || mode === 'tree-ignore') {
