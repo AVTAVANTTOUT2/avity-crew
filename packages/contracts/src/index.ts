@@ -18,6 +18,7 @@ import type {
   DelegateTaskArgs,
   PublishNoteArgs,
   ReportBlockerArgs,
+  RequestUserInputArgs,
 } from './generated/runtime.ts';
 
 export * from './generated/runtime.ts';
@@ -205,7 +206,7 @@ export interface CoordinationQuestion {
   id: string;
   run_id: string;
   question: string;
-  options: string[];
+  options: RequestUserInputArgs['options'];
   affects_task_ids: string[];
   blocking: boolean;
   status: 'open' | 'answered';
