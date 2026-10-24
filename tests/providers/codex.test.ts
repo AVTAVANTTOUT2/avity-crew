@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtemp, realpath, rm } from 'node:fs/promises';
+import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -243,6 +243,11 @@ test('Codex passes prompt on stdin, preserves argv, model, permissions and bridg
     ]);
     assert.ok(capture.args.includes('sandbox_mode="workspace-write"'));
     assert.ok(capture.args.includes('approval_policy="never"'));
+    assert.ok(capture.args.includes('features.plugins=false'));
+    assert.ok(
+      capture.args.includes('mcp_servers.ambientFixture.enabled=false'),
+    );
+    assert.ok(!capture.args.includes('--ignore-user-config'));
     assert.ok(capture.args.includes('accessible-model'));
     assert.ok(
       capture.args.includes(
@@ -258,6 +263,95 @@ test('Codex passes prompt on stdin, preserves argv, model, permissions and bridg
       }),
     );
     assert.ok(!JSON.stringify(leaked).includes('sensitive-test-sentinel'));
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test('Codex inherits native defaults and refreshes its scoped MCP inventory every turn', async () => {
+  const cwd = await mkdtemp(resolve(tmpdir(), 'avity codex inventory '));
+  try {
+    const path = resolve(cwd, '.codex-fixture-inventory.json');
+    const input = request({ scenario: 'capture', id: first }, cwd);
+    await writeFile(
+      path,
+      JSON.stringify([{ name: 'ambientA', enabled: true }]),
+    );
+    const initial = JSON.parse(
+      (await collect(provider.start(input))).result.text,
+    ) as { args: string[] };
+    assert.ok(initial.args.includes('mcp_servers.ambientA.enabled=false'));
+    assert.ok(!initial.args.includes('--model'));
+    assert.ok(!initial.args.includes('--ignore-user-config'));
+    await writeFile(
+      path,
+      JSON.stringify([
+        { name: 'ambientB', enabled: false },
+        { name: 'crew', enabled: true },
+      ]),
+    );
+    const resumed = JSON.parse(
+      (await collect(provider.resume({ ...input, native_session_id: first })))
+        .result.text,
+    ) as { args: string[] };
+    assert.ok(resumed.args.includes('mcp_servers.ambientB.enabled=false'));
+    assert.ok(resumed.args.includes('mcp_servers.crew.enabled=false'));
+    assert.ok(!resumed.args.includes('mcp_servers.ambientA.enabled=false'));
+    assert.throws(
+      () =>
+        provider.start({
+          ...input,
+          bridge: { command: process.execPath, args: [], env: {} },
+        }),
+      { code: 'MCP_NAMESPACE_CONFLICT' },
+    );
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test('Codex refuses invalid or unreadable MCP inventories without exposing diagnostics', async () => {
+  const cwd = await mkdtemp(
+    resolve(tmpdir(), 'avity codex invalid inventory '),
+  );
+  try {
+    const path = resolve(cwd, '.codex-fixture-inventory.json');
+    const invalid = [
+      { diagnostic_error: true },
+      { malformed_output: true },
+      { not_an_array: true },
+      [null],
+      [{ name: 'unsafe.dotted', enabled: true }],
+      [{ name: 'sensitive-inventory-diagnostic', enabled: 'invalid' }],
+      [
+        { name: 'duplicate', enabled: true },
+        { name: 'duplicate', enabled: false },
+      ],
+      [
+        {
+          name: 'oversized',
+          enabled: true,
+          transport: {
+            env: { TOKEN: 'sensitive-inventory-diagnostic'.repeat(50_000) },
+          },
+        },
+      ],
+    ];
+    for (const inventory of invalid) {
+      await writeFile(path, JSON.stringify(inventory));
+      assert.throws(
+        () => provider.start(request({ id: first }, cwd)),
+        (error: unknown) => {
+          assert.ok(error instanceof Error);
+          assert.equal(
+            (error as Error & { code?: string }).code,
+            'MCP_INVENTORY_FAILED',
+          );
+          assert.ok(!error.message.includes('sensitive-inventory-diagnostic'));
+          return true;
+        },
+      );
+    }
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }

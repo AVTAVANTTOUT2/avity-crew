@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { delimiter, isAbsolute, resolve } from 'node:path';
@@ -146,18 +146,78 @@ export function decodeCodexEvent(value: unknown): ProviderEvent[] {
   ];
 }
 
-function argumentsFor(request: ProviderRequest, sessionId?: string): string[] {
+export function codexArguments(
+  binary: string,
+  request: ProviderRequest,
+  sessionId?: string,
+): string[] {
   validateProviderRequest(request);
+  const inventory = spawnSync(
+    binary,
+    ['-c', 'features.plugins=false', 'mcp', 'list', '--json'],
+    {
+      cwd: request.cwd,
+      encoding: 'utf8',
+      timeout: 10_000,
+      maxBuffer: 1024 * 1024,
+      killSignal: 'SIGKILL',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
+  if (inventory.error || inventory.status !== 0)
+    throw new CrewError(
+      'MCP_INVENTORY_FAILED',
+      'Cannot inspect Codex MCP configuration within 10 seconds and 1 MiB; check codex mcp list --json',
+    );
+  let configured: unknown;
+  try {
+    configured = JSON.parse(inventory.stdout);
+  } catch {
+    throw new CrewError(
+      'MCP_INVENTORY_FAILED',
+      'Codex MCP inventory is not valid JSON',
+    );
+  }
+  if (!Array.isArray(configured))
+    throw new CrewError(
+      'MCP_INVENTORY_FAILED',
+      'Codex MCP inventory must be an array',
+    );
+  const names = new Set<string>();
+  for (const entry of configured) {
+    const server = object(entry);
+    // shortcut: restrict names to safe dotted keys until quoted CLI keys are verified.
+    if (
+      !server ||
+      typeof server.name !== 'string' ||
+      !/^[A-Za-z0-9_-]+$/.test(server.name) ||
+      typeof server.enabled !== 'boolean' ||
+      names.has(server.name)
+    )
+      throw new CrewError(
+        'MCP_INVENTORY_FAILED',
+        'Codex MCP inventory contains an invalid or duplicate server identifier',
+      );
+    names.add(server.name);
+  }
+  if (request.bridge && names.has('crew'))
+    throw new CrewError(
+      'MCP_NAMESPACE_CONFLICT',
+      'Native MCP name crew is already configured; rename it before attaching the mission bridge',
+    );
   const args = ['exec', ...(sessionId ? ['resume'] : [])];
   args.push(
-    '--ignore-user-config',
     '--json',
     '--skip-git-repo-check',
+    '-c',
+    'features.plugins=false',
     '-c',
     `sandbox_mode=${JSON.stringify(request.permissions.sandbox)}`,
     '-c',
     `approval_policy=${JSON.stringify(request.permissions.approval)}`,
   );
+  for (const name of names)
+    args.push('-c', `mcp_servers.${name}.enabled=false`);
   if (request.model !== null) args.push('--model', request.model);
   if (request.bridge) {
     const bridge = request.bridge;
@@ -264,7 +324,7 @@ export class CodexProvider implements ProviderAdapter {
     return runNative(
       this.id,
       this.binary,
-      argumentsFor(request),
+      codexArguments(this.binary, request),
       request,
       decodeCodexEvent,
     );
@@ -285,7 +345,7 @@ export class CodexProvider implements ProviderAdapter {
     return runNative(
       this.id,
       this.binary,
-      argumentsFor(request, request.native_session_id),
+      codexArguments(this.binary, request, request.native_session_id),
       request,
       decodeCodexEvent,
     );

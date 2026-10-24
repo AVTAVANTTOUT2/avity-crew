@@ -7,6 +7,7 @@ import { basename, dirname, resolve, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   CodexProvider,
+  codexArguments,
   decodeCodexEvent,
 } from '../dist/packages/providers/src/codex.js';
 import { runNative } from '../dist/packages/providers/src/process.js';
@@ -32,6 +33,7 @@ const records = [];
 const artifacts = [];
 const report = {
   mode,
+  config_mode: 'native-preferences-scoped-mcp',
   checked_at: new Date().toISOString(),
   source_revision: spawnSync('git', ['rev-parse', 'HEAD'], {
     encoding: 'utf8',
@@ -73,7 +75,11 @@ const request = (prompt, sandbox = 'workspace-write') => ({
         new URL('../tests/fixtures/providers/mcp-ping.mjs', import.meta.url),
       ),
     ],
-    env: { AVITY_CREW_MCP_AUDIT: audit, AVITY_CREW_BRIDGE_TOKEN: token },
+    env: {
+      AVITY_CREW_MCP_AUDIT: audit,
+      AVITY_CREW_BRIDGE_TOKEN: token,
+      AVITY_CREW_PORT: '1',
+    },
   },
 });
 async function run(
@@ -84,33 +90,21 @@ async function run(
   requirePingApproval = false,
 ) {
   // The negative probe tightens one tool's policy without changing the product contract.
+  const approvalArgs = requirePingApproval
+    ? codexArguments(report.capabilities.binary_path, req)
+    : null;
+  if (approvalArgs)
+    approvalArgs.splice(
+      -1,
+      0,
+      '-c',
+      'mcp_servers.crew.tools.ping.approval_mode="prompt"',
+    );
   const native = requirePingApproval
     ? runNative(
         'codex',
         report.capabilities.binary_path,
-        [
-          'exec',
-          '--ignore-user-config',
-          '--json',
-          '--skip-git-repo-check',
-          '-c',
-          `sandbox_mode=${JSON.stringify(req.permissions.sandbox)}`,
-          '-c',
-          `approval_policy=${JSON.stringify(req.permissions.approval)}`,
-          ...Object.entries({
-            command: req.bridge.command,
-            args: req.bridge.args,
-            env_vars: Object.keys(req.bridge.env),
-            required: true,
-          }).flatMap(([key, value]) => [
-            '-c',
-            `mcp_servers.crew.${key}=${JSON.stringify(value)}`,
-          ]),
-          '-c',
-          'mcp_servers.crew.tools.ping.approval_mode="prompt"',
-          ...(req.model ? ['--model', req.model] : []),
-          '-',
-        ],
+        approvalArgs,
         req,
         decodeCodexEvent,
       )

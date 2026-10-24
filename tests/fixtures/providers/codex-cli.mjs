@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 // Offline protocol fixture: this executable never contacts a provider.
 const args = process.argv.slice(2);
 if (args.includes('--version')) {
@@ -7,6 +9,17 @@ if (args.includes('--version')) {
   console.log(
     'Usage: codex exec resume [OPTIONS] [SESSION_ID] [PROMPT]\n--json --config',
   );
+} else if (args.includes('mcp') && args.includes('list')) {
+  const path = resolve(process.cwd(), '.codex-fixture-inventory.json');
+  const inventory = existsSync(path)
+    ? JSON.parse(readFileSync(path, 'utf8'))
+    : [{ name: 'ambientFixture', enabled: true }];
+  if (inventory?.diagnostic_error) {
+    console.error('sensitive-inventory-diagnostic');
+    process.exitCode = 1;
+  } else if (inventory?.malformed_output) {
+    console.log('sensitive-inventory-diagnostic {');
+  } else console.log(JSON.stringify(inventory));
 } else {
   let prompt = '';
   for await (const chunk of process.stdin) prompt += chunk;
