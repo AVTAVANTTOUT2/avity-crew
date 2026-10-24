@@ -39,6 +39,8 @@ import type {
   CompileContextInput,
   SourceSelection,
 } from '../packages/context/src/index.ts';
+import { toolsFor } from '../packages/supervisor/src/tools.ts';
+import type { ToolDescriptor } from '../packages/supervisor/src/protocol.ts';
 
 const date = '2026-10-24T12:00:00.000Z';
 const criterion = {
@@ -147,6 +149,65 @@ async function fixture(): Promise<string> {
   });
   return root;
 }
+
+test('rich native tool schemas stay outside the mission while the tool index and all mission obligations remain intact', async () => {
+  const root = await fixture();
+  try {
+    const args = await input(
+      await selectTaskSources(
+        await inspectProject(root, { observed_at: date }),
+        task(),
+      ),
+    );
+    const native = toolsFor({ kind: 'agent', actor: actor() }).find(
+      (tool) => tool.name === 'get_status',
+    )!;
+    const schemaDescription = `NATIVE_TOOL_SCHEMA_SENTINEL ${'schema detail '.repeat(10_000)}`;
+    const richTools: ToolDescriptor[] = [
+      {
+        ...native,
+        inputSchema: { ...native.inputSchema, description: schemaDescription },
+      },
+    ];
+    args.available_tools = richTools;
+    args.budget = { context_window_tokens: 24_000, reserve_tokens: 4000 };
+    args.decisions = [
+      decision(
+        'decision:retain-contract',
+        'Keep the original billing contract and tenant isolation',
+      ),
+    ];
+    const compiled = compileContext(args);
+    const mission = JSON.parse(compiled.bundle.layers.mission);
+    assert.deepEqual(mission.available_tools, [
+      { name: native.name, description: native.description },
+    ]);
+    assert.equal(
+      compiled.prompt.includes('NATIVE_TOOL_SCHEMA_SENTINEL'),
+      false,
+    );
+    assert.deepEqual(
+      mission.global_acceptance_criteria,
+      args.run.acceptance_criteria,
+    );
+    assert.deepEqual(mission.constraints, args.run.constraints);
+    assert.deepEqual(mission.task, args.task);
+    assert.deepEqual(
+      mission.approved_decisions.map((item: Decision) => item.id),
+      ['decision:retain-contract'],
+    );
+    assert.equal(compiled.bundle.budget.max_input_tokens, 20_000);
+    assert.ok(compiled.bundle.budget.estimated_input_tokens! <= 20_000);
+    assert.equal(
+      richTools[0]!.inputSchema.description,
+      schemaDescription,
+      'The full descriptor remains available to the authenticated native tool channel',
+    );
+    assert.ok(compiled.bundle.sources.length);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test('two simulated missions receive targeted current files and applicable instructions', async () => {
   const root = await fixture();
