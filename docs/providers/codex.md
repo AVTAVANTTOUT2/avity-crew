@@ -43,6 +43,8 @@ La découverte de lancement et reprise s'appuie sur l'aide locale. MCP et usage 
 
 `turn.failed`, `error` et les erreurs d'items deviennent des erreurs classées : quota, authentification, réseau, permission ou protocole. Un refus terminal de commande ou un refus d'approbation d'un outil MCP est explicite et interdit un résultat réussi, même si Codex termine son tour avec un code 0. Un code non nul d'une commande récupérable reste un événement outil : Codex peut le corriger dans le même tour. Le runner garde stderr séparé, borne JSONL et les diagnostics, masque les valeurs sensibles du bridge, et exige résultat natif réussi **et** sortie processus 0, sans erreur ni interruption.
 
+Exception étroite vérifiée en 0.163.0 : les avertissements de démarrage « Codex is ignoring … unrecognized configuration settings. » et « Under-development features enabled: » arrivent dans stdout comme `item.completed` avec un item `error`, sans champ de sévérité. Ces deux préfixes deviennent des diagnostics `unknown` visibles, avec leur message conservé. Les autres items d'erreur, `error` de premier niveau et `turn.failed` restent fatals. Un avertissement ne crée aucun résultat réussi : `turn.completed` et sortie 0 sont toujours requis ; une sortie non nulle ou un résultat absent échoue. La configuration utilisateur n'est ni modifiée ni rendue silencieuse.
+
 Le consommateur doit lire `events` pendant qu'il attend `result`. Le runner applique une contre-pression bornée ; attendre le résultat sans consommer les événements peut suspendre volontairement un gros flux.
 
 ## Bridge MCP

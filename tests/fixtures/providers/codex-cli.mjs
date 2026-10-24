@@ -38,6 +38,23 @@ if (args.includes('--version')) {
   } else if (input.scenario === 'truncated') {
     process.stdout.write('{"type":"turn.completed"');
   } else {
+    if (
+      ['warnings', 'warnings-bad-exit', 'warnings-no-result'].includes(
+        input.scenario,
+      )
+    ) {
+      for (const [id, message] of [
+        [
+          'warning_0',
+          'Codex is ignoring 3 unrecognized configuration settings. Diagnostic details remain visible.',
+        ],
+        [
+          'warning_1',
+          'Under-development features enabled: fixture. Under-development features are incomplete and may behave unpredictably.',
+        ],
+      ])
+        emit({ type: 'item.completed', item: { id, type: 'error', message } });
+    }
     if (input.scenario === 'mcp-denied')
       emit({
         type: 'item.completed',
@@ -73,10 +90,12 @@ if (args.includes('--version')) {
         await new Promise((resolve) => setTimeout(resolve, 1));
       }
     } else process.stdout.write(line);
-    emit({
-      type: 'turn.completed',
-      usage: { input_tokens: 11, cached_input_tokens: 3, output_tokens: 7 },
-    });
-    if (input.scenario === 'bad-exit') process.exitCode = 7;
+    if (input.scenario !== 'warnings-no-result')
+      emit({
+        type: 'turn.completed',
+        usage: { input_tokens: 11, cached_input_tokens: 3, output_tokens: 7 },
+      });
+    if (['bad-exit', 'warnings-bad-exit'].includes(input.scenario))
+      process.exitCode = 7;
   }
 }

@@ -87,11 +87,27 @@ export function decodeCodexEvent(value: unknown): ProviderEvent[] {
         ? [{ type: 'text', text: item.text, ...live }]
         : [];
     if (itemType === 'reasoning') return [];
-    if (itemType === 'error')
+    if (itemType === 'error') {
+      const message = text(item.message);
+      // Codex 0.163.0 emits these startup warnings as error items without severity.
+      if (
+        completed &&
+        /^(?:Codex is ignoring \d+ unrecognized configuration settings\.|Under-development features enabled:)/.test(
+          message,
+        )
+      )
+        return [
+          {
+            type: 'unknown',
+            text: `Codex startup warning ${text(item.id)}: ${message}`,
+            ...live,
+          },
+        ];
       return failure(
-        text(item.message) || 'Codex item error without diagnostic',
-        text(item.message) ? 'process' : 'protocol',
+        message || 'Codex item error without diagnostic',
+        message ? 'process' : 'protocol',
       );
+    }
     const label = `${itemType} ${text(item.id)} (${text(item.status) || type})`;
     let detail: string;
     switch (itemType) {

@@ -210,6 +210,65 @@ test('Codex probe is bounded and reports unsupported interactive operations', as
   );
 });
 
+test('Codex startup warning items stay visible and never override terminal failures', async () => {
+  const warning =
+    'Codex is ignoring 3 unrecognized configuration settings. Diagnostic details remain visible.';
+  const successful = await collect(
+    provider.start(
+      request({ scenario: 'warnings', id: first, message: 'done' }),
+    ),
+  );
+  assert.equal(successful.result.success, true);
+  assert.equal(successful.result.text, 'done');
+  assert.equal(
+    successful.events.filter((event) => event.type === 'unknown').length,
+    2,
+  );
+  assert.ok(
+    successful.events.some((event) =>
+      event.text?.includes('Diagnostic details remain visible.'),
+    ),
+  );
+  for (const scenario of ['warnings-bad-exit', 'warnings-no-result'])
+    assert.equal(
+      (
+        await collect(
+          provider.start(request({ scenario, id: first, message: 'done' })),
+        )
+      ).result.success,
+      false,
+    );
+  for (const type of ['error', 'turn.failed'])
+    assert.ok(
+      decodeCodexEvent({
+        type,
+        message: warning,
+        error: { message: warning },
+      }).some((event) => event.type === 'error'),
+    );
+  for (const [message, kind] of [
+    ['Usage limit reached', 'quota'],
+    ['Authentication failed', 'authentication'],
+    ['Permission denied', 'permission'],
+    ['Network connection failed', 'network'],
+  ]) {
+    const events = decodeCodexEvent({
+      type: 'item.completed',
+      item: { id: 'failure', type: 'error', message },
+    });
+    assert.equal(
+      events.find((event) => event.type === 'error')?.error?.kind,
+      kind,
+    );
+  }
+  assert.equal(
+    decodeCodexEvent({ type: 'item.completed', item: { type: 'error' } }).find(
+      (event) => event.type === 'error',
+    )?.error?.kind,
+    'protocol',
+  );
+});
+
 test('Codex passes prompt on stdin, preserves argv, model, permissions and bridge env', async () => {
   const cwd = await mkdtemp(resolve(tmpdir(), 'avity codex offline '));
   try {
