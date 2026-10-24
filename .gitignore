@@ -1,0 +1,15 @@
+# AVITY_CREW_WORKPACK:BEGIN
+/avity-crew-workpack/coordination/STATE.json
+/avity-crew-workpack/coordination/.coordination.lock
+/avity-crew-workpack/coordination/.state-*.tmp
+/avity-crew-workpack/coordination/bootstrap-backups/
+/avity-crew-workpack/scripts/__pycache__/
+# AVITY_CREW_WORKPACK:END
+
+.DS_Store
+node_modules/
+dist/
+*.tgz
+coverage/
+.serena/cache/
+.avity-crew/

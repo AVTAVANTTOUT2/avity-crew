@@ -1,0 +1,53 @@
+{
+  "auditDate": "2026-10-24",
+  "author": "l00_provider_audit",
+  "scope": "L00 provider discovery and minimal live conversation, not product acceptance",
+  "providers": [
+    {
+      "name": "claude",
+      "binary": "/opt/homebrew/bin/claude",
+      "version": "2.1.304",
+      "nativeAuthentication": { "observed": true, "method": "claude.ai", "command": "claude auth status" },
+      "documentedInterface": "claude -p --output-format stream-json --verbose",
+      "promptTransport": "stdin",
+      "resume": { "method": "--resume SESSION_ID", "status": "supported", "liveVerified": true },
+      "sessionId": "4b7fdb1c-d058-4dc4-a1e0-2a627e1735c2",
+      "observedModel": "claude-opus-5-5",
+      "jsonStreaming": { "status": "supported", "liveVerified": true },
+      "mcp": { "status": "supported", "evidence": "local help and official documentation", "liveVerified": false, "configuration": "--mcp-config and --strict-mcp-config" },
+      "permissionPolicyInLiveProbe": "dontAsk; permission-prompts none; no built-in tools",
+      "liveInitial": { "exitCode": 0, "result": "AVITY_CREW_L00_OK" },
+      "liveResume": { "exitCode": 0, "result": "AVITY_CREW_L00_24 DELTA_24", "sameSession": true },
+      "observedEvents": ["system", "assistant", "rate_limit_event", "result"],
+      "interruption": { "status": "unverified", "plannedMethod": "SIGTERM followed by bounded escalation for process group" },
+      "limitations": ["MCP live call unverified", "actual code work unverified", "same-provider concurrency unverified", "permissions and interruption unverified", "bare mode does not support the observed OAuth authentication"]
+    },
+    {
+      "name": "codex",
+      "binary": "/Users/zeldris/.local/bin/codex",
+      "version": "0.163.0",
+      "nativeAuthentication": { "observed": true, "method": "ChatGPT", "command": "codex login status" },
+      "documentedInterface": "codex exec --json -",
+      "promptTransport": "stdin",
+      "resume": { "method": "codex exec resume SESSION_ID -", "status": "supported", "liveVerified": true },
+      "sessionId": "01a16d78-ed26-7700-a822-800d5a353153",
+      "observedModel": null,
+      "jsonStreaming": { "status": "supported", "liveVerified": true },
+      "mcp": { "status": "supported", "evidence": "local help and official documentation", "liveVerified": false, "configuration": "session config overrides for mcp_servers" },
+      "permissionPolicyInLiveProbe": "read-only; approval_policy never; ignore-user-config",
+      "liveInitial": { "exitCode": 0, "result": "AVITY_CREW_L00_OK" },
+      "liveResume": { "exitCode": 0, "result": "AVITY_CREW_L00_24 DELTA_24", "sameSession": true },
+      "observedEvents": ["thread.started", "turn.started", "item.completed", "turn.completed"],
+      "interruption": { "status": "unverified", "plannedMethod": "SIGTERM followed by bounded escalation for process group" },
+      "limitations": ["model not exposed in observed event stream", "MCP live call unverified", "actual code work unverified", "same-provider concurrency unverified", "permissions and interruption unverified", "App Server not live-tested", "exec resume has no --sandbox option in local help; config override used for probe"]
+    }
+  ],
+  "sources": [
+    "https://code.claude.com/docs/en/headless",
+    "https://code.claude.com/docs/en/cli-reference",
+    "https://developers.openai.com/codex/non-interactive-mode",
+    "https://developers.openai.com/codex/mcp"
+  ],
+  "secretsCopied": false,
+  "nativeConfigurationChanged": false
+}

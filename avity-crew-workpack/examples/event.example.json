@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "example-event-1",
+  "seq": 1,
+  "type": "task.created",
+  "project_id": "example-project-transport",
+  "run_id": "example-run-planning",
+  "task_id": "example-task-api",
+  "session_id": null,
+  "attempt_id": null,
+  "generation": null,
+  "actor_id": "example-chief",
+  "occurred_at": "2026-10-24T10:00:00Z",
+  "payload": {
+    "task_id": "example-task-api",
+    "example": true
+  }
+}

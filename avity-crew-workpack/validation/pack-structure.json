@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "scope": "workpack_only",
+  "product_implemented": false,
+  "lots": 13,
+  "acceptance_criteria": 79,
+  "requirements": 16,
+  "prompt_templates": 8,
+  "json_files_checked": 12,
+  "local_links_checked": 177,
+  "runtime_examples_checked": 6,
+  "negative_schema_probes": 3,
+  "note": "Vérification structurelle du dossier ; aucun fournisseur réel ni logiciel Avity Crew exécuté.",
+  "checked_at": "2026-10-24T10:16:04+00:00"
+}

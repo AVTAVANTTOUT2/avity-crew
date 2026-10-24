@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "id": "example-handoff-1",
+  "task_id": "example-task-api",
+  "run_id": "example-run-planning",
+  "attempt_id": "example-attempt-1",
+  "generation": 1,
+  "status": "partial",
+  "summary": "Exemple de forme uniquement : aucune fonctionnalité n'a été exécutée.",
+  "source_revision": "git:1111111111111111111111111111111111111111",
+  "artifacts": [
+    {
+      "id": "example-artifact-patch",
+      "kind": "patch",
+      "reference": "fixtures/example.patch",
+      "revision": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "producer_attempt_id": "example-attempt-1",
+      "created_at": "2026-10-24T10:00:00Z"
+    }
+  ],
+  "verifications": [
+    {
+      "id": "example-check-1",
+      "criterion_ids": [
+        "example-criterion-create"
+      ],
+      "mode": "simulated",
+      "execution": "automated",
+      "command": [
+        "npm",
+        "test",
+        "--",
+        "planning"
+      ],
+      "cwd": ".",
+      "result": "not_run",
+      "exit_code": null,
+      "tested_revision": "git:1111111111111111111111111111111111111111",
+      "evidence_artifact_ids": [],
+      "started_at": "2026-10-24T10:00:00Z",
+      "ended_at": null,
+      "provider": "fake"
+    }
+  ],
+  "criteria_claimed": [],
+  "limitations": [
+    "Exemple non exécuté ; révisions et empreintes fictives."
+  ],
+  "next_information": [
+    "Remplacer toutes les observations fictives pour une livraison réelle."
+  ],
+  "created_at": "2026-10-24T10:00:00Z"
+}

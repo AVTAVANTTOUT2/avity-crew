@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:avity-crew:project-config:v1",
+  "title": "Configuration projet Avity Crew",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "orchestrator": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": [
+            "claude",
+            "codex"
+          ]
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "provider",
+        "model"
+      ],
+      "additionalProperties": false
+    },
+    "workers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "claude",
+              "codex"
+            ]
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "provider",
+          "model"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1
+    },
+    "max_active_agents": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "language": {
+      "const": "fr"
+    },
+    "context": {
+      "type": "object",
+      "properties": {
+        "input_budget_tokens": {
+          "type": "integer",
+          "minimum": 1024
+        },
+        "exclude_paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "input_budget_tokens",
+        "exclude_paths"
+      ],
+      "additionalProperties": false
+    },
+    "verification_commands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "argv": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          },
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "id",
+          "argv",
+          "cwd",
+          "timeout_seconds"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0
+    },
+    "delivery": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "local",
+            "branch",
+            "pull_request",
+            "preproduction",
+            "production"
+          ]
+        },
+        "target_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "mode",
+        "target_ref"
+      ],
+      "additionalProperties": false
+    },
+    "permissions": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "type": "string",
+          "enum": [
+            "workspace",
+            "read_only",
+            "custom"
+          ]
+        },
+        "allow_production": {
+          "type": "boolean"
+        },
+        "allow_external_publication": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "profile",
+        "allow_production",
+        "allow_external_publication"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schema_version",
+    "orchestrator",
+    "workers",
+    "max_active_agents",
+    "language",
+    "context",
+    "verification_commands",
+    "delivery",
+    "permissions"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,26 @@
+test_accepted_requires_matching_review_and_candidate_revision (__main__.CoordinationTests.test_accepted_requires_matching_review_and_candidate_revision) ... ok
+test_block_resume_and_rejected_delivery_preserve_history (__main__.CoordinationTests.test_block_resume_and_rejected_delivery_preserve_history) ... ok
+test_combined_candidate_can_differ_only_with_consistent_provenance (__main__.CoordinationTests.test_combined_candidate_can_differ_only_with_consistent_provenance) ... ok
+test_concurrent_claim_has_exactly_one_winner (__main__.CoordinationTests.test_concurrent_claim_has_exactly_one_winner) ... ok
+test_corrupt_state_is_not_replaced (__main__.CoordinationTests.test_corrupt_state_is_not_replaced) ... ok
+test_dependencies_gate_claim_and_accepted_delivery_unlocks_next (__main__.CoordinationTests.test_dependencies_gate_claim_and_accepted_delivery_unlocks_next) ... ok
+test_failed_checks_and_open_work_prevent_acceptance (__main__.CoordinationTests.test_failed_checks_and_open_work_prevent_acceptance) ... ok
+test_failed_source_check_prevents_acceptance_even_with_green_review (__main__.CoordinationTests.test_failed_source_check_prevents_acceptance_even_with_green_review) ... ok
+test_final_lots_require_both_provider_live_evidence (__main__.CoordinationTests.test_final_lots_require_both_provider_live_evidence) ... ok
+test_forged_accepted_task_cannot_unlock_dependency (__main__.CoordinationTests.test_forged_accepted_task_cannot_unlock_dependency) ... ok
+test_in_review_requires_current_attempt_and_author (__main__.CoordinationTests.test_in_review_requires_current_attempt_and_author) ... ok
+test_invalid_report_and_path_traversal_do_not_mutate_state (__main__.CoordinationTests.test_invalid_report_and_path_traversal_do_not_mutate_state) ... ok
+test_notes_are_unique_persistent_and_not_shell_commands (__main__.CoordinationTests.test_notes_are_unique_persistent_and_not_shell_commands) ... ok
+test_overdue_heartbeat_never_reassigns_automatically (__main__.CoordinationTests.test_overdue_heartbeat_never_reassigns_automatically) ... ok
+test_rejection_before_merge_candidate_requires_only_source_and_findings (__main__.CoordinationTests.test_rejection_before_merge_candidate_requires_only_source_and_findings) ... ok
+test_rejection_validates_optional_proofs_and_current_source (__main__.CoordinationTests.test_rejection_validates_optional_proofs_and_current_source) ... ok
+test_review_must_be_independent_and_target_exact_revision (__main__.CoordinationTests.test_review_must_be_independent_and_target_exact_revision) ... ok
+test_source_checks_cannot_reference_another_revision (__main__.CoordinationTests.test_source_checks_cannot_reference_another_revision) ... ok
+test_stale_token_rejected_after_explicit_reassignment (__main__.CoordinationTests.test_stale_token_rejected_after_explicit_reassignment) ... ok
+test_status_does_not_create_state_and_paths_with_spaces_work (__main__.CoordinationTests.test_status_does_not_create_state_and_paths_with_spaces_work) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 3.377s
+
+OK
+

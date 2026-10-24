@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "id": "example-task-api",
+  "run_id": "example-run-planning",
+  "title": "Création serveur du planning fictif",
+  "objective": "Implémenter la règle de création définie dans la fixture, avec droits et conflit concurrent.",
+  "role": "developer",
+  "acceptance_criteria": [
+    {
+      "id": "example-criterion-create",
+      "description": "Le chauffeur autorisé crée son planning dans le cas convenu.",
+      "required": true,
+      "verification": "Test d'intégration de la fixture."
+    }
+  ],
+  "depends_on": [
+    "example-task-contract"
+  ],
+  "scope": {
+    "read_paths": [
+      "src/",
+      "tests/"
+    ],
+    "write_paths": [
+      "src/planning/",
+      "tests/planning/"
+    ],
+    "excluded_paths": [
+      "production-data/"
+    ]
+  },
+  "base_revision": "git:1111111111111111111111111111111111111111",
+  "context_source_ids": [
+    "example-source-contract"
+  ],
+  "expected_deliverables": [
+    "Commit source et preuves de vérification de la fixture"
+  ],
+  "created_at": "2026-10-24T10:00:00Z"
+}

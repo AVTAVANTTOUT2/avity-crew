@@ -1,0 +1,19 @@
+{
+  "handoff_id": "A_REMPLACER_PAR_IDENTIFIANT_RETOURNE_PAR_SUBMIT",
+  "outcome": "accepted",
+  "source_revision": "A_REMPLACER_PAR_REVISION_EXACTE_DE_LA_LIVRAISON",
+  "tested_revision": "A_REMPLACER_PAR_REVISION_EXACTE_DE_LA_LIVRAISON",
+  "verification_scope": "documentation",
+  "summary": "A_REMPLACER : conclusion du relecteur indépendant et périmètre vérifié.",
+  "findings": [],
+  "checks": [
+    {
+      "name": "A_REMPLACER : vérification indépendante",
+      "command": "A_REMPLACER : commande réellement exécutée",
+      "kind": "doc_validation",
+      "exit_code": 0,
+      "evidence_ref": "validation/L00-review.log",
+      "revision": "A_REMPLACER_PAR_REVISION_EXACTE_DE_LA_LIVRAISON"
+    }
+  ]
+}

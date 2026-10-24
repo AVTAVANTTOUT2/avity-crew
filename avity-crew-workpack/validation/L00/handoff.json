@@ -1,0 +1,20 @@
+{
+  "summary": "Racine neuve auditée, versions et interfaces fournisseurs relevées, essais live minimaux et reprise exacte séparés de la future recette produit ; socle, frontières, commandes et affectations initiales fixés.",
+  "revision": "sha256:20416bcacece8c37d36de325ae79d9555f5f66c8405ae8141467d750b6c56f4d",
+  "artifacts": [
+    {"ref": "avity-crew-workpack/validation/L00/audit.md", "sha256": "20416bcacece8c37d36de325ae79d9555f5f66c8405ae8141467d750b6c56f4d"},
+    {"ref": "avity-crew-workpack/validation/L00/compatibility.json", "sha256": "eeb3cfaeb81bc1a043ba427be6bf07221bb2554ede046f66781099df16e79b0c"},
+    {"ref": "avity-crew-workpack/validation/L00/providers.md", "sha256": "22d208aa9b8d228c6dfa3ecde6f2e445b5a72ac94e7bd55ca413cf3130d27a4e"},
+    {"ref": "avity-crew-workpack/validation/L00/provider-capabilities.json", "sha256": "9270ac7154eaabead62e81b879ed70779ece485df379005e69b1d2e0ddb1dc1a"},
+    {"ref": "avity-crew-workpack/validation/L00/acceptance-map.md", "sha256": "10b0a9aa80729cb8f39dd0e4dd8c68e3ae51f3fda0df18498386fa9ff54965be"},
+    {"ref": "docs/decisions/001-foundation.md", "sha256": "50554dbbe1ae7c44c8f2f57e4e3db8fa2f0cc93ff3ca8e3123d87849b420172d"}
+  ],
+  "tests": [
+    {"name": "Pack de coordination", "command": "python3 avity-crew-workpack/scripts/test_coordination.py", "kind": "doc_validation", "exit_code": 0, "evidence_ref": "avity-crew-workpack/validation/L00/audit.md", "revision": "sha256:20416bcacece8c37d36de325ae79d9555f5f66c8405ae8141467d750b6c56f4d"},
+    {"name": "Bootstrap", "command": "python3 avity-crew-workpack/scripts/test_bootstrap.py", "kind": "doc_validation", "exit_code": 0, "evidence_ref": "avity-crew-workpack/validation/L00/audit.md", "revision": "sha256:20416bcacece8c37d36de325ae79d9555f5f66c8405ae8141467d750b6c56f4d"},
+    {"name": "Structure workpack", "command": "python3 avity-crew-workpack/scripts/validate_pack.py", "kind": "doc_validation", "exit_code": 0, "evidence_ref": "avity-crew-workpack/validation/L00/audit.md", "revision": "sha256:20416bcacece8c37d36de325ae79d9555f5f66c8405ae8141467d750b6c56f4d"}
+  ],
+  "limitations": [],
+  "next_steps": [],
+  "live_verification": "not_applicable"
+}

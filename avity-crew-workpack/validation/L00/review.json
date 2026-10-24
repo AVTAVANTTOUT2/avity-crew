@@ -1,0 +1,35 @@
+{
+  "handoff_id": "handoff-473890b5c8224f6c91d54b9e2d438bfd",
+  "outcome": "accepted",
+  "source_revision": "sha256:20416bcacece8c37d36de325ae79d9555f5f66c8405ae8141467d750b6c56f4d",
+  "tested_revision": "sha256:20416bcacece8c37d36de325ae79d9555f5f66c8405ae8141467d750b6c56f4d",
+  "verification_scope": "documentation",
+  "summary": "L00 conforme aux cinq critères de cadrage : racine et préservation explicites, versions et interfaces observées/documentées séparées, décisions utilisables par L01, limites fournisseur/plateformes visibles. Six empreintes de livraison vérifiées ; tests du workpack réexécutés par le relecteur. Aucun succès applicatif revendiqué.",
+  "findings": [],
+  "checks": [
+    {
+      "name": "Coordination du workpack, 20 tests indépendamment réexécutés",
+      "command": "python3 avity-crew-workpack/scripts/test_coordination.py",
+      "kind": "doc_validation",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L00/audit-review.md",
+      "revision": "sha256:20416bcacece8c37d36de325ae79d9555f5f66c8405ae8141467d750b6c56f4d"
+    },
+    {
+      "name": "Bootstrap du workpack, 8 tests indépendamment réexécutés",
+      "command": "python3 avity-crew-workpack/scripts/test_bootstrap.py",
+      "kind": "doc_validation",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L00/audit-review.md",
+      "revision": "sha256:20416bcacece8c37d36de325ae79d9555f5f66c8405ae8141467d750b6c56f4d"
+    },
+    {
+      "name": "Validation structurelle indépendante du workpack",
+      "command": "python3 avity-crew-workpack/scripts/validate_pack.py",
+      "kind": "doc_validation",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L00/audit-review.md",
+      "revision": "sha256:20416bcacece8c37d36de325ae79d9555f5f66c8405ae8141467d750b6c56f4d"
+    }
+  ]
+}

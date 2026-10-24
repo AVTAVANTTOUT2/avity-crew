@@ -1,0 +1,14 @@
+test_concurrent_change_refused (__main__.BootstrapTests.test_concurrent_change_refused) ... ok
+test_gitignore_preserved (__main__.BootstrapTests.test_gitignore_preserved) ... ok
+test_malformed_marker_refuses_before_any_mutation (__main__.BootstrapTests.test_malformed_marker_refuses_before_any_mutation) ... ok
+test_multiple_markers_refused (__main__.BootstrapTests.test_multiple_markers_refused) ... ok
+test_outside_pack_refused (__main__.BootstrapTests.test_outside_pack_refused) ... ok
+test_plan_does_not_write_root (__main__.BootstrapTests.test_plan_does_not_write_root) ... ok
+test_preserves_existing_and_is_idempotent (__main__.BootstrapTests.test_preserves_existing_and_is_idempotent) ... ok
+test_symlink_target_refused (__main__.BootstrapTests.test_symlink_target_refused) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.015s
+
+OK
+

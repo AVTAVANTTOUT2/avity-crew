@@ -1,0 +1,23 @@
+{
+  "summary": "A_REMPLACER : résultat réellement obtenu pour ce lot.",
+  "revision": "A_REMPLACER_PAR_git:SHA_COMPLET_OU_sha256:EMPREINTE",
+  "artifacts": [
+    {
+      "ref": "validation/L00/audit.md",
+      "sha256": "A_REMPLACER_PAR_EMPREINTE_REELLE_64_CARACTERES"
+    }
+  ],
+  "tests": [
+    {
+      "name": "A_REMPLACER : nom de la vérification réellement exécutée",
+      "command": "A_REMPLACER : commande exacte",
+      "kind": "doc_validation",
+      "exit_code": 0,
+      "evidence_ref": "validation/L00-audit.log",
+      "revision": "A_REMPLACER_PAR_LA_REVISION_REELLEMENT_VERIFIEE"
+    }
+  ],
+  "limitations": ["A_REMPLACER : limites ou éléments non terminés ; liste vide uniquement si aucun."],
+  "next_steps": ["A_REMPLACER : travail manquant à ce lot ; liste vide uniquement si aucun."],
+  "live_verification": "not_applicable"
+}

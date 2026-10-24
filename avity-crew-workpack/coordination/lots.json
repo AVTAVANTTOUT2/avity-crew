@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "project": "Avity Crew",
+  "lots": [
+    {
+      "id": "L00",
+      "title": "Audit du dépôt et cadrage",
+      "file": "lots/L00-audit.md",
+      "depends_on": [],
+      "scope": [
+        "audit du dépôt",
+        "versions et capacités",
+        "décisions initiales"
+      ]
+    },
+    {
+      "id": "L01",
+      "title": "Socle, contrats et CI minimale",
+      "file": "lots/L01-socle-contrats.md",
+      "depends_on": [
+        "L00"
+      ],
+      "scope": [
+        "workspace TypeScript",
+        "contrats du domaine",
+        "interfaces fournisseurs",
+        "CI initiale"
+      ]
+    },
+    {
+      "id": "L02",
+      "title": "État persistant et journal",
+      "file": "lots/L02-etat-persistant.md",
+      "depends_on": [
+        "L01"
+      ],
+      "scope": [
+        "stockage SQLite",
+        "migrations",
+        "transitions transactionnelles",
+        "journal et idempotence"
+      ]
+    },
+    {
+      "id": "L03",
+      "title": "Contexte, mémoire et prompts",
+      "file": "lots/L03-contexte-prompts.md",
+      "depends_on": [
+        "L02"
+      ],
+      "scope": [
+        "carte du projet",
+        "sélection et compilation du contexte",
+        "provenance",
+        "reprise de contexte"
+      ]
+    },
+    {
+      "id": "L04",
+      "title": "Adaptateur Claude Code",
+      "file": "lots/L04-claude.md",
+      "depends_on": [
+        "L01"
+      ],
+      "scope": [
+        "adaptateur Claude",
+        "fixtures de protocole Claude",
+        "essais live Claude"
+      ]
+    },
+    {
+      "id": "L05",
+      "title": "Adaptateur Codex",
+      "file": "lots/L05-codex.md",
+      "depends_on": [
+        "L01"
+      ],
+      "scope": [
+        "adaptateur Codex",
+        "fixtures de protocole Codex",
+        "essais live Codex"
+      ]
+    },
+    {
+      "id": "L06",
+      "title": "Workspaces, Git et ressources",
+      "file": "lots/L06-workspaces-git.md",
+      "depends_on": [
+        "L02"
+      ],
+      "scope": [
+        "worktrees et branches",
+        "allocation de ressources",
+        "collecte des livraisons",
+        "file d’intégration"
+      ]
+    },
+    {
+      "id": "L07",
+      "title": "Superviseur et outils de coordination",
+      "file": "lots/L07-superviseur-outils.md",
+      "depends_on": [
+        "L03",
+        "L04",
+        "L05",
+        "L06"
+      ],
+      "scope": [
+        "service local",
+        "cycle de vie des processus",
+        "bridge MCP/CLI",
+        "identités et droits des sessions"
+      ]
+    },
+    {
+      "id": "L08",
+      "title": "Orchestration de bout en bout",
+      "file": "lots/L08-orchestration.md",
+      "depends_on": [
+        "L07"
+      ],
+      "scope": [
+        "dossier d’objectif",
+        "graphe de missions",
+        "délégation et retours",
+        "critères de clôture"
+      ]
+    },
+    {
+      "id": "L09",
+      "title": "CLI et interface terminal",
+      "file": "lots/L09-cli-tui.md",
+      "depends_on": [
+        "L08"
+      ],
+      "scope": [
+        "commande avity-crew",
+        "conversation terminal",
+        "vues d’inspection",
+        "sorties structurées"
+      ]
+    },
+    {
+      "id": "L10",
+      "title": "Reprise et résilience",
+      "file": "lots/L10-reprise-resilience.md",
+      "depends_on": [
+        "L09"
+      ],
+      "scope": [
+        "réconciliation après panne",
+        "limites fournisseur",
+        "réattribution",
+        "changement de chef"
+      ]
+    },
+    {
+      "id": "L11",
+      "title": "Recette complète et documentation",
+      "file": "lots/L11-recette-documentation.md",
+      "depends_on": [
+        "L10"
+      ],
+      "scope": [
+        "scénarios E2E réels",
+        "recette sept agents",
+        "documentation produit",
+        "CI finale"
+      ]
+    },
+    {
+      "id": "L12",
+      "title": "Installation et livraison finale",
+      "file": "lots/L12-release.md",
+      "depends_on": [
+        "L11"
+      ],
+      "scope": [
+        "paquet local npm",
+        "installation propre",
+        "portabilité",
+        "rapport de release"
+      ]
+    }
+  ]
+}
+
