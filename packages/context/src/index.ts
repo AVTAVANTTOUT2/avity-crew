@@ -443,7 +443,10 @@ export function compileContext(input: CompileContextInput): CompiledContext {
       delivery_mode: run.delivery_mode,
       task: task ?? null,
       execution_policy: input.execution_policy,
-      available_tools: input.available_tools,
+      available_tools: input.available_tools.map(({ name, description }) => ({
+        name,
+        description,
+      })),
       provider_capabilities: input.provider,
       applicable_instructions: instructionSources.map((item) => item.source.id),
       approved_decisions: approved.valid,
