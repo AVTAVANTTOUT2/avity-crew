@@ -1,0 +1,43 @@
+{
+  "handoff_id": "handoff-46925c7999154c878dc62da01e2c9100",
+  "outcome": "changes_requested",
+  "source_revision": "git:ea8ac7a9c6d23d077f9239d12ad634b564e05856",
+  "tested_revision": "git:ea8ac7a9c6d23d077f9239d12ad634b564e05856",
+  "verification_scope": "combined_code",
+  "summary": "All three original findings are fixed, and independent clean install/check plus all 42 tests pass on Node 24/26. One concrete reopen defect remains in the new stable-identity path: Store.project retains git_common_dir null from before git init despite receiving fresh detected metadata. Refresh current location/Git metadata while preserving durable configuration and history, then cover reopen after init.",
+  "findings": [
+    "Store constructor in packages/storage/src/index.ts returns the previous project JSON with only data_dir refreshed. A Store opened before git init and reopened afterwards with identifyProject's fresh descriptor still exposes project.git_common_dir null. Reproduced against the compiled candidate in a disposable Git project. Refresh detected root/git_common_dir durably on open without resetting config/map_version/created_at, and test reopen after init."
+  ],
+  "integration": {
+    "base_revision": "git:b30b3301a826513ed706d248962df1baf44e8354",
+    "source_revision": "git:ea8ac7a9c6d23d077f9239d12ad634b564e05856",
+    "candidate_revision": "git:ea8ac7a9c6d23d077f9239d12ad634b564e05856",
+    "evidence_ref": "avity-crew-workpack/validation/L02/review-2.md"
+  },
+  "checks": [
+    {
+      "name": "Independent clean lockfile installation",
+      "command": "npm ci",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L02/review-2.md",
+      "revision": "git:ea8ac7a9c6d23d077f9239d12ad634b564e05856"
+    },
+    {
+      "name": "Combined strict types, format, build and 42 offline tests on Node 26",
+      "command": "npm run check",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L02/review-2.md",
+      "revision": "git:ea8ac7a9c6d23d077f9239d12ad634b564e05856"
+    },
+    {
+      "name": "Combined 42 offline tests on reference Node 24.22.1",
+      "command": "npm exec --yes --package=node@24.22.1 -- node --test 'dist/tests/**/*.test.js'",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L02/review-2.md",
+      "revision": "git:ea8ac7a9c6d23d077f9239d12ad634b564e05856"
+    }
+  ]
+}

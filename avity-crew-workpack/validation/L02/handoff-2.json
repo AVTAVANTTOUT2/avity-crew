@@ -1,0 +1,10 @@
+{
+  "summary":"Stockage corrigé après revue indépendante : événements corrélés à leurs cibles, artefacts existants contrôlés, racine Git canonique et identité durable à l'initialisation. Quatre régressions rouges avant correctif puis 42 contrôles intégrés verts sur Node24/26.",
+  "revision":"git:ea8ac7a9c6d23d077f9239d12ad634b564e05856",
+  "artifacts":[{"commit":"ea8ac7a9c6d23d077f9239d12ad634b564e05856"}],
+  "tests":[
+    {"name":"Contrôles intégrés Node26", "command":"npm run check", "kind":"integration", "exit_code":0, "evidence_ref":"avity-crew-workpack/validation/L02/checks-2.md", "revision":"git:ea8ac7a9c6d23d077f9239d12ad634b564e05856"},
+    {"name":"42 tests Node24", "command":"npm exec --yes --package=node@24.22.1 -- node --test 'dist/tests/**/*.test.js'", "kind":"integration", "exit_code":0, "evidence_ref":"avity-crew-workpack/validation/L02/checks-2.md", "revision":"git:ea8ac7a9c6d23d077f9239d12ad634b564e05856"}
+  ],
+  "limitations":[], "next_steps":[], "live_verification":"not_applicable"
+}

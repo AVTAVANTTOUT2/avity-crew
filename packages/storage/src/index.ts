@@ -119,16 +119,23 @@ export class Store {
             'PROJECT_MISMATCH',
             'Database belongs to another project',
           );
-        if (!row)
-          this.db
-            .prepare('INSERT INTO project(id,data) VALUES (?,?)')
-            .run(project.id, JSON.stringify(project));
-        return row
+        const current = row
           ? {
               ...(JSON.parse(String(row['data'])) as Project),
+              root: project.root,
+              git_common_dir: project.git_common_dir,
               data_dir: project.data_dir,
             }
           : project;
+        if (!row)
+          this.db
+            .prepare('INSERT INTO project(id,data) VALUES (?,?)')
+            .run(project.id, JSON.stringify(current));
+        else
+          this.db
+            .prepare('UPDATE project SET data=? WHERE id=?')
+            .run(JSON.stringify(current), project.id);
+        return current;
       });
     } catch (error) {
       this.db.close();

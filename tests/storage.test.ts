@@ -783,3 +783,26 @@ test('initializing Git in a new project preserves its durable project identity',
   assert.equal(after.id, before.id);
   assert.equal(after.data_dir, before.data_dir);
 });
+
+test('reopening after Git initialization refreshes detection and preserves work and preferences', (t) => {
+  const f = fixture(t);
+  const before = identifyProject(f.root, join(f.directory, 'metadata data'));
+  before.config.max_active_agents = 3;
+  before.map_version = 8;
+  before.created_at = '2026-10-01T00:00:00.000Z';
+  const initial = new Store(before);
+  initial.createRun({ ...f.run, project_id: before.id }, 'create:run');
+  initial.close();
+  execFileSync('git', ['-C', f.root, 'init', '-b', 'main'], {
+    stdio: 'ignore',
+  });
+  const detected = identifyProject(f.root, join(f.directory, 'metadata data'));
+  const reopened = new Store(detected);
+  t.after(() => reopened.close());
+  assert.equal(reopened.project.git_common_dir, detected.git_common_dir);
+  assert.equal(reopened.project.root, detected.root);
+  assert.equal(reopened.project.created_at, before.created_at);
+  assert.equal(reopened.project.map_version, 8);
+  assert.equal(reopened.project.config.max_active_agents, 3);
+  assert.equal(reopened.getRun(f.run.id).objective, f.run.objective);
+});
