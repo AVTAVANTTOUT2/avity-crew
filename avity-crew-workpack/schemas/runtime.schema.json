@@ -1026,6 +1026,27 @@
       ],
       "additionalProperties": false
     },
+    "AmendTaskArgs": {
+      "type": "object",
+      "properties": {
+        "task": {
+          "$ref": "#/$defs/TaskSpec"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_id": {
+          "$ref": "#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "task",
+        "reason",
+        "decision_id"
+      ],
+      "additionalProperties": false
+    },
     "DelegateTaskArgs": {
       "type": "object",
       "properties": {
@@ -2031,6 +2052,46 @@
             },
             "arguments": {
               "$ref": "#/$defs/AcceptDeliveryArgs"
+            }
+          },
+          "required": [
+            "schema_version",
+            "request_id",
+            "idempotency_key",
+            "run_id",
+            "expected_version",
+            "method",
+            "arguments"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "const": 1
+            },
+            "request_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "idempotency_key": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "run_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "method": {
+              "const": "amend_task"
+            },
+            "arguments": {
+              "$ref": "#/$defs/AmendTaskArgs"
             }
           },
           "required": [
