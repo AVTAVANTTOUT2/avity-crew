@@ -639,10 +639,30 @@ export class SupervisorRuntime {
             created_at: now(),
           });
       const methods = toolsFor({ kind: 'agent', actor });
-      const handoffs = this.store.records<Handoff>(run.id, 'handoff');
+      const handoffs = this.store
+        .records<Handoff>(run.id, 'handoff')
+        .filter((handoff) => {
+          const current = this.store.getTask(handoff.task_id);
+          return (
+            current.active_attempt_id === handoff.attempt_id &&
+            current.generation === handoff.generation
+          );
+        });
+      const resuming =
+        session.native_session_id !== null &&
+        capability.native_resume.status === 'supported';
+      if (session.native_session_id && !resuming)
+        throw new CrewError(
+          'NATIVE_RESUME_UNAVAILABLE',
+          'This conversation cannot be resumed with the observed capabilities; replace its chief or reassign explicitly',
+        );
       const messages = this.store
         .records<Message>(run.id, 'message')
-        .filter((message) => message.status !== 'failed');
+        .filter(
+          (message) =>
+            !['failed', 'applied'].includes(message.status) &&
+            (!resuming || message.status === 'queued'),
+        );
       const context = compileContext({
         id: requestId(invocation, 'context'),
         version:
@@ -729,6 +749,26 @@ export class SupervisorRuntime {
           run_version: this.version(run.id),
           details:
             'get_status(task_id) restitue la TaskSpec complète ; collect_delivery restitue passation, limites, revues et preuves exactes.',
+          delivered_updates: resuming
+            ? this.store
+                .records<Message>(run.id, 'message')
+                .filter(
+                  (message) =>
+                    ['delivered', 'acknowledged'].includes(message.status) &&
+                    (actor.role === 'chief'
+                      ? message.recipient_kind === 'chief'
+                      : message.recipient_kind === 'task' &&
+                        message.recipient_id === actor.task_id),
+                )
+                .map(({ id, sender_id, source_ids, status }) => ({
+                  id,
+                  sender_id,
+                  source_ids,
+                  status,
+                  detail:
+                    'get_status restitue le message conservé ; delivered ne signifie pas appliqué',
+                }))
+            : [],
           tasks: this.store.tasks(run.id).map((item) => ({
             id: item.id,
             title: item.spec.title,
@@ -758,6 +798,9 @@ export class SupervisorRuntime {
           })),
           reviews: this.store
             .records<Review>(run.id, 'review')
+            .filter((review) =>
+              handoffs.some((handoff) => handoff.id === review.handoff_id),
+            )
             .map((review) => ({
               id: review.id,
               review_task_id: review.review_task_id,
