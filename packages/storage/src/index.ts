@@ -36,12 +36,28 @@ import type {
   SourceRef,
   Verification,
   ArtifactRef,
+  Review,
+  DelegateTaskArgs,
+  PublishNoteArgs,
+  ReportBlockerArgs,
+  RequestUserInputArgs,
+  AcceptDeliveryArgs,
+  FinishRunArgs,
+  Delegation,
+  TaskNote,
+  TaskBlocker,
+  CoordinationQuestion,
+  UserResponse,
+  DecisionProvenance,
+  DeliveryAcceptance,
+  ProviderId,
 } from '../../contracts/src/index.ts';
 import {
   assertAcyclic,
   assertTransition,
   assertCurrentAttempt,
   assertRunTransition,
+  assertRunCompletable,
 } from '../../core/src/index.ts';
 export { identifyProject, defaultConfig } from './project.ts';
 
@@ -93,7 +109,14 @@ type RecordKind =
   | 'workspace'
   | 'operation'
   | 'artifact'
-  | 'verification';
+  | 'verification'
+  | 'review'
+  | 'question'
+  | 'user_response'
+  | 'delegation'
+  | 'blocker'
+  | 'acceptance'
+  | 'final';
 type Row = { data: string };
 
 export class Store {
@@ -341,6 +364,512 @@ export class Store {
     }
     return run;
   }
+  private openRun(actor: Actor, roles: readonly Actor['role'][]): Run {
+    const run = this.authority(actor, roles);
+    if (['completed', 'cancelled', 'failed'].includes(run.status))
+      throw new CrewError('RUN_TERMINAL', 'The run no longer accepts new work');
+    return run;
+  }
+  private replaceRecord(
+    runId: string,
+    kind: RecordKind,
+    value: { id: string },
+  ): void {
+    this.db
+      .prepare('UPDATE records SET data=? WHERE run_id=? AND kind=? AND id=?')
+      .run(JSON.stringify(value), runId, kind, value.id);
+  }
+  private scopedSources(actor: Actor, sourceIds: readonly string[]): void {
+    for (const id of sourceIds)
+      this.getRecord<SourceRef>(actor.run_id, 'source', id);
+  }
+  private moveTask(task: TaskState, status: TaskState['status']): void {
+    if (task.status !== status) {
+      assertTransition(task.status, status);
+      task.status = status;
+      task.version++;
+      this.writeTask(task);
+    }
+  }
+
+  private assignedWorker(
+    actor: Actor,
+    taskId = actor.task_id,
+  ): { task: TaskState; attempt: Attempt } {
+    this.openRun(actor, [
+      'developer',
+      'reviewer',
+      'validator',
+      'documenter',
+      'investigator',
+      'refactorer',
+      'ci',
+    ]);
+    if (!taskId || taskId !== actor.task_id || !actor.attempt_id)
+      throw new CrewError('FORBIDDEN', 'Worker action belongs to its own task');
+    const task = this.getTask(taskId),
+      attempt = this.getAttempt(actor.attempt_id);
+    if (
+      task.spec.role !== actor.role ||
+      attempt.task_id !== task.id ||
+      attempt.run_id !== actor.run_id ||
+      !['running', 'exited'].includes(attempt.status) ||
+      ['accepted', 'cancelled'].includes(task.status)
+    )
+      throw new CrewError(
+        'INACTIVE_ATTEMPT',
+        'Worker assignment is not active',
+      );
+    return { task, attempt };
+  }
+
+  private allRecords<T>(runId: string, kind: RecordKind): T[] {
+    return this.db
+      .prepare(
+        'SELECT data FROM records WHERE run_id=? AND kind=? ORDER BY rowid',
+      )
+      .all(runId, kind)
+      .map((row) => this.decode<T>(row, kind));
+  }
+
+  private blockingQuestions(
+    runId: string,
+    taskId?: string,
+  ): CoordinationQuestion[] {
+    return this.allRecords<CoordinationQuestion>(runId, 'question').filter(
+      (question) =>
+        question.status === 'open' &&
+        question.blocking &&
+        (taskId === undefined || question.affects_task_ids.includes(taskId)),
+    );
+  }
+
+  private currentHandoff(runId: string, taskId: string): Handoff {
+    const row = this.db
+      .prepare(
+        "SELECT data FROM records WHERE run_id=? AND kind='handoff' AND task_id=? ORDER BY rowid DESC LIMIT 1",
+      )
+      .get(runId, taskId);
+    return this.decode<Handoff>(row, 'Current handoff');
+  }
+
+  private storedOperation<T>(runId: string, id: string, kind: string): T {
+    const operation = this.getRecord<Operation>(runId, 'operation', id);
+    if (
+      operation.kind !== kind ||
+      operation.status !== 'completed' ||
+      operation.result === null ||
+      typeof operation.result !== 'object'
+    )
+      throw new CrewError(
+        'INVALID_INTEGRATION',
+        'Integration operation is incomplete or has another kind',
+      );
+    return operation.result as T;
+  }
+
+  private sourceDelivery(
+    runId: string,
+    handoff: Handoff,
+    ids: readonly string[],
+  ): { preservationRef: string | null; sourceRevision: string } {
+    for (const id of ids) {
+      const delivery = this.storedOperation<{
+        type: string;
+        operationId: string;
+        workspaceOperationId: string;
+        sourceRevision: string;
+        preservationRef: string | null;
+      }>(runId, id, 'workspace.collect');
+      if (
+        delivery.type !== 'delivery' ||
+        delivery.operationId !== id ||
+        delivery.sourceRevision !== handoff.source_revision
+      )
+        continue;
+      const workspace = this.storedOperation<{
+        type: string;
+        operationId: string;
+        taskId: string;
+        attemptId: string;
+      }>(runId, delivery.workspaceOperationId, 'workspace.create');
+      if (
+        workspace.type === 'workspace' &&
+        workspace.operationId === delivery.workspaceOperationId &&
+        workspace.taskId === handoff.task_id &&
+        workspace.attemptId === handoff.attempt_id &&
+        typeof delivery.preservationRef === 'string'
+      )
+        return delivery;
+    }
+    throw new CrewError(
+      'INVALID_INTEGRATION',
+      'Candidate does not contain this task attempt delivery',
+    );
+  }
+
+  private preparedIntegration(
+    runId: string,
+    handoff: Handoff,
+    revision: string,
+    promotionRequired: boolean,
+  ): {
+    delivery: { preservationRef: string | null; sourceRevision: string };
+    proofs: {
+      command: readonly string[];
+      cwd: string;
+      exitCode: number | null;
+      signal: string | null;
+      candidateRevision: string;
+    }[];
+  } {
+    const operations = this.allRecords<Operation>(runId, 'operation');
+    for (const operation of operations) {
+      if (
+        operation.kind !== 'integration.prepare' ||
+        operation.status !== 'completed'
+      )
+        continue;
+      const candidate = operation.result as {
+        type?: string;
+        operationId?: string;
+        status?: string;
+        candidateRevision?: string;
+        targetRef?: string;
+        expectedBase?: string;
+        deliveryOperationIds?: string[];
+        proofs?: {
+          command: readonly string[];
+          cwd: string;
+          exitCode: number | null;
+          signal: string | null;
+          candidateRevision: string;
+        }[];
+      } | null;
+      if (
+        !candidate ||
+        candidate.type !== 'integration' ||
+        candidate.operationId !== operation.id ||
+        candidate.status !== 'validated' ||
+        candidate.candidateRevision !== revision ||
+        typeof candidate.targetRef !== 'string' ||
+        typeof candidate.expectedBase !== 'string' ||
+        !Array.isArray(candidate.deliveryOperationIds) ||
+        !candidate.deliveryOperationIds.length ||
+        !Array.isArray(candidate.proofs) ||
+        !candidate.proofs.length ||
+        candidate.proofs.some(
+          (proof) =>
+            !proof ||
+            !Array.isArray(proof.command) ||
+            !proof.command.length ||
+            typeof proof.cwd !== 'string' ||
+            proof.exitCode !== 0 ||
+            proof.signal !== null ||
+            proof.candidateRevision !== revision,
+        )
+      )
+        continue;
+      let delivery: { preservationRef: string | null; sourceRevision: string };
+      try {
+        delivery = this.sourceDelivery(
+          runId,
+          handoff,
+          candidate.deliveryOperationIds,
+        );
+      } catch (error) {
+        if (error instanceof CrewError) continue;
+        throw error;
+      }
+      if (
+        promotionRequired &&
+        !operations.some((promoted) => {
+          if (
+            promoted.kind !== 'integration.promote' ||
+            promoted.status !== 'completed'
+          )
+            return false;
+          const result = promoted.result as {
+            type?: string;
+            operationId?: string;
+            preparationOperationId?: string;
+            revision?: string;
+            targetRef?: string;
+            previousRevision?: string;
+          } | null;
+          return (
+            result?.type === 'promotion' &&
+            result.operationId === promoted.id &&
+            result.preparationOperationId === operation.id &&
+            result.revision === revision &&
+            result.targetRef === candidate.targetRef &&
+            result.previousRevision === candidate.expectedBase
+          );
+        })
+      )
+        continue;
+      return { delivery, proofs: candidate.proofs };
+    }
+    throw new CrewError(
+      'INTEGRATION_REQUIRED',
+      promotionRequired
+        ? 'Exact validated integration and observed promotion are required'
+        : 'Exact validated integration is required',
+    );
+  }
+
+  private checkedProof(
+    runId: string,
+    id: string,
+    revision: string,
+  ): Verification {
+    const proof = this.getRecord<Verification>(runId, 'verification', id);
+    validate('Verification', proof);
+    if (
+      proof.result !== 'passed' ||
+      proof.tested_revision !== revision ||
+      proof.ended_at === null ||
+      !proof.evidence_artifact_ids.length ||
+      (proof.command === null
+        ? proof.execution !== 'manual' || proof.exit_code !== null
+        : proof.exit_code !== 0)
+    )
+      throw new CrewError(
+        'INVALID_EVIDENCE',
+        'Verification must pass on the exact revision with an observation artifact',
+      );
+    for (const artifactId of proof.evidence_artifact_ids)
+      this.checkedArtifact(runId, artifactId);
+    return proof;
+  }
+
+  private checkedArtifact(runId: string, id: string): ArtifactRef {
+    const artifact = this.getRecord<ArtifactRef>(runId, 'artifact', id);
+    validate('ArtifactRef', artifact);
+    if (artifact.revision.startsWith('sha256:')) this.readArtifact(artifact);
+    else if (artifact.kind !== 'git_commit')
+      throw new CrewError(
+        'INVALID_ARTIFACT',
+        'Git artifact must be an immutable commit',
+      );
+    return artifact;
+  }
+
+  private deliveryCheck(
+    actor: Actor,
+    args: AcceptDeliveryArgs,
+    promotionRequired: boolean,
+  ): {
+    task: TaskState;
+    handoff: Handoff;
+    proofs: Verification[];
+    artifactIds: string[];
+    existing: DeliveryAcceptance | undefined;
+  } {
+    validate('AcceptDeliveryArgs', args);
+    const run = this.openRun(actor, ['user', 'chief']);
+    const handoff = this.getRecord<Handoff>(run.id, 'handoff', args.handoff_id),
+      task = this.getTask(handoff.task_id),
+      attempt = this.getAttempt(handoff.attempt_id);
+    const existing = this.allRecords<DeliveryAcceptance>(
+      run.id,
+      'acceptance',
+    ).find(
+      (record) =>
+        record.task_id === task.id &&
+        record.handoff_id === handoff.id &&
+        record.accepted_revision === args.accepted_revision,
+    );
+    if (
+      task.run_id !== run.id ||
+      this.currentHandoff(run.id, task.id).id !== handoff.id ||
+      task.active_attempt_id !== attempt.id ||
+      task.generation !== handoff.generation ||
+      attempt.generation !== handoff.generation ||
+      !['exited', 'interrupted'].includes(attempt.status)
+    )
+      throw new CrewError(
+        'STALE_DELIVERY',
+        'Delivery is not current or its writer has not stopped',
+      );
+    if (
+      !['in_review', 'validating'].includes(task.status) &&
+      !(task.status === 'accepted' && existing)
+    )
+      throw new CrewError(
+        'INVALID_TRANSITION',
+        'Task is not ready for acceptance',
+      );
+    if (
+      handoff.status !== 'delivered' ||
+      handoff.limitations.length ||
+      !handoff.source_revision ||
+      !handoff.artifacts.length ||
+      this.blockingQuestions(run.id, task.id).length
+    )
+      throw new CrewError(
+        'INCOMPLETE_DELIVERY',
+        'Delivery is partial, limited, empty or waiting for a user answer',
+      );
+    const required = task.spec.acceptance_criteria
+      .filter((criterion) => criterion.required)
+      .map((criterion) => criterion.id);
+    if (required.some((id) => !handoff.criteria_claimed.includes(id)))
+      throw new CrewError(
+        'MISSING_CRITERIA',
+        'Delivery does not claim every required task criterion',
+      );
+    const proofs = [...new Set(args.verification_ids)].map((id) =>
+      this.checkedProof(run.id, id, args.accepted_revision),
+    );
+    for (const proof of proofs) {
+      const record = this.db
+        .prepare(
+          'SELECT task_id FROM records WHERE run_id=? AND kind=? AND id=?',
+        )
+        .get(run.id, 'verification', proof.id);
+      if (record?.['task_id'] !== task.id)
+        throw new CrewError(
+          'INVALID_EVIDENCE',
+          'Verification belongs to another task',
+        );
+    }
+    if (
+      !proofs.length ||
+      required.some(
+        (id) => !proofs.some((proof) => proof.criterion_ids.includes(id)),
+      )
+    )
+      throw new CrewError(
+        'MISSING_EVIDENCE',
+        'Required task criteria lack passing proofs',
+      );
+    if (!args.review_ids.length)
+      throw new CrewError(
+        'REVIEW_REQUIRED',
+        'Independent approved review is required',
+      );
+    const code = run.delivery_mode === 'code';
+    for (const id of new Set(args.review_ids)) {
+      const review = this.getRecord<Review>(run.id, 'review', id);
+      if (
+        review.outcome !== 'approved' ||
+        review.findings.some((finding) => finding.severity === 'blocking') ||
+        review.handoff_id !== handoff.id ||
+        review.review_of_task_id !== task.id ||
+        review.source_revision !== handoff.source_revision ||
+        review.tested_revision !== args.accepted_revision ||
+        review.verification_scope !==
+          (code ? 'combined_code' : 'documentation') ||
+        review.verification_ids.some(
+          (proofId) => !args.verification_ids.includes(proofId),
+        )
+      )
+        throw new CrewError(
+          'INVALID_REVIEW',
+          'Review must approve this exact delivery and accepted revision',
+        );
+    }
+    const artifacts = handoff.artifacts.map((artifact) => {
+      const stored = this.checkedArtifact(run.id, artifact.id);
+      if (
+        canonical(stored) !== canonical(artifact) ||
+        artifact.producer_attempt_id !== attempt.id
+      )
+        throw new CrewError(
+          'INVALID_ARTIFACT',
+          'Delivery artifact metadata or producer is inconsistent',
+        );
+      return stored;
+    });
+    if (code) {
+      if (
+        !handoff.source_revision.startsWith('git:') ||
+        !args.accepted_revision.startsWith('git:')
+      )
+        throw new CrewError(
+          'INVALID_REVISION',
+          'Code acceptance requires Git revisions',
+        );
+      const prepared = this.preparedIntegration(
+        run.id,
+        handoff,
+        args.accepted_revision,
+        promotionRequired,
+      );
+      if (
+        !proofs.some(
+          (proof) => proof.execution === 'automated' && proof.command !== null,
+        )
+      )
+        throw new CrewError(
+          'INVALID_EVIDENCE',
+          'Code acceptance requires an observed automated candidate check',
+        );
+      for (const artifact of artifacts.filter((item) =>
+        item.revision.startsWith('git:'),
+      ))
+        if (
+          artifact.revision !== prepared.delivery.sourceRevision ||
+          artifact.reference !== prepared.delivery.preservationRef
+        )
+          throw new CrewError(
+            'INVALID_ARTIFACT',
+            'Git artifact does not identify the recorded source snapshot',
+          );
+      if (
+        !artifacts.some(
+          (artifact) =>
+            artifact.kind === 'git_commit' &&
+            artifact.revision === handoff.source_revision,
+        )
+      )
+        throw new CrewError(
+          'INVALID_ARTIFACT',
+          'Code delivery lacks its immutable Git source artifact',
+        );
+      for (const proof of proofs.filter((item) => item.command !== null))
+        if (
+          !prepared.proofs.some(
+            (observed) =>
+              canonical(observed.command) === canonical(proof.command) &&
+              observed.cwd === proof.cwd &&
+              observed.candidateRevision === proof.tested_revision &&
+              observed.exitCode === proof.exit_code,
+          )
+        )
+          throw new CrewError(
+            'INVALID_EVIDENCE',
+            'Automated proof is not an observed check of the prepared candidate',
+          );
+    } else {
+      if (
+        !args.accepted_revision.startsWith('sha256:') ||
+        handoff.source_revision !== args.accepted_revision
+      )
+        throw new CrewError(
+          'INVALID_REVISION',
+          'Documentation acceptance uses its exact snapshot hash',
+        );
+      this.readArtifact({
+        reference: `artifacts/${args.accepted_revision.slice(7)}`,
+        revision: args.accepted_revision,
+      });
+      if (artifacts.some((artifact) => artifact.revision.startsWith('git:')))
+        throw new CrewError(
+          'INVALID_ARTIFACT',
+          'Documentary delivery does not require artificial Git artifacts',
+        );
+    }
+    const artifactIds = [
+      ...new Set([
+        ...artifacts.map((artifact) => artifact.id),
+        ...proofs.flatMap((proof) => proof.evidence_artifact_ids),
+      ]),
+    ];
+    return { task, handoff, proofs, artifactIds, existing };
+  }
+
   private append(
     runId: string,
     actor: Actor,
@@ -349,7 +878,7 @@ export class Store {
     correlation: Partial<
       Pick<CrewEvent, 'task_id' | 'attempt_id' | 'session_id' | 'generation'>
     > = {},
-  ): void {
+  ): CrewEvent {
     const seq = Number(
       this.db
         .prepare(
@@ -380,6 +909,7 @@ export class Store {
     this.db
       .prepare('INSERT INTO events(run_id,seq,data) VALUES (?,?,?)')
       .run(runId, seq, JSON.stringify(event));
+    return event;
   }
   private mutate<T extends { id: string }>(
     actor: Actor,
@@ -436,11 +966,12 @@ export class Store {
           attempt_id: string;
           session_id: string;
           generation: number;
+          active_attempt_id: string | null;
         }>;
       const attemptId =
         method === 'task.claimed' || method === 'attempt.observed'
           ? result.id
-          : (target.attempt_id ?? actor.attempt_id);
+          : (target.attempt_id ?? target.active_attempt_id ?? actor.attempt_id);
       this.append(
         run.id,
         actor,
@@ -453,7 +984,8 @@ export class Store {
           attempt_id: attemptId,
           session_id:
             target.session_id ??
-            (method === 'session.observed'
+            (method === 'session.observed' ||
+            method === 'chief.session_registered'
               ? result.id
               : attemptId
                 ? this.getAttempt(attemptId).session_id
@@ -548,7 +1080,7 @@ export class Store {
       spec,
       expectedVersion,
       () => {
-        this.authority(actor, ['user', 'chief']);
+        this.openRun(actor, ['user', 'chief']);
         if (spec.run_id !== actor.run_id)
           throw new CrewError('WRONG_RUN', 'Task belongs to another run');
         const tasks = this.tasks(actor.run_id);
@@ -601,7 +1133,7 @@ export class Store {
       { taskId, session },
       expectedVersion,
       () => {
-        this.authority(actor, ['user', 'chief']);
+        this.openRun(actor, ['user', 'chief']);
         const task = this.getTask(taskId);
         if (
           task.run_id !== actor.run_id ||
@@ -613,6 +1145,7 @@ export class Store {
             'Session or task does not match run',
           );
         if (
+          this.blockingQuestions(actor.run_id, task.id).length ||
           task.active_attempt_id ||
           task.status !== 'ready' ||
           task.spec.depends_on.some(
@@ -624,6 +1157,19 @@ export class Store {
             'Task is already owned or has unavailable dependencies',
           );
         validate('ProviderId', session.provider);
+        const delegation = this.allRecords<Delegation>(
+          actor.run_id,
+          'delegation',
+        ).find((item) => item.task_id === task.id && item.status === 'queued');
+        if (
+          delegation &&
+          (delegation.provider !== session.provider ||
+            delegation.model !== session.model)
+        )
+          throw new CrewError(
+            'DELEGATION_MISMATCH',
+            'Claim must use the delegated provider and model',
+          );
         const started = now();
         const attempt: Attempt = {
           id: ident('attempt'),
@@ -655,6 +1201,11 @@ export class Store {
         task.active_attempt_id = attempt.id;
         task.version++;
         this.writeTask(task);
+        if (delegation) {
+          delegation.status = 'claimed';
+          delegation.attempt_id = attempt.id;
+          this.replaceRecord(actor.run_id, 'delegation', delegation);
+        }
         return attempt;
       },
     );
@@ -715,7 +1266,7 @@ export class Store {
       { taskId },
       expectedVersion,
       () => {
-        this.authority(actor, ['user', 'chief']);
+        this.openRun(actor, ['user', 'chief']);
         const task = this.getTask(taskId);
         if (
           task.run_id !== actor.run_id ||
@@ -764,7 +1315,7 @@ export class Store {
       handoff,
       expectedVersion,
       () => {
-        this.authority(actor, [
+        this.openRun(actor, [
           'developer',
           'reviewer',
           'validator',
@@ -816,19 +1367,63 @@ export class Store {
     decision: Decision,
     key: string,
     expectedVersion: number,
+    provenance: DecisionProvenance = {
+      basis: 'technical_judgment',
+      user_response_id: null,
+    },
   ): Decision {
     validate('Decision', decision);
     return this.mutate(
       actor,
       key,
       'decision.recorded',
-      decision,
+      { decision, provenance },
       expectedVersion,
       () => {
-        this.authority(actor, ['user', 'chief']);
+        this.openRun(actor, ['user', 'chief']);
         if (decision.run_id !== actor.run_id)
           throw new CrewError('WRONG_RUN', 'Decision belongs to another run');
-        if (decision.status === 'approved' && decision.approved_by !== actor.id)
+        let approvedBy = actor.id;
+        if (provenance.basis === 'user_response') {
+          if (!provenance.user_response_id)
+            throw new CrewError(
+              'INVALID_PROVENANCE',
+              'User response is required',
+            );
+          const response = this.getRecord<UserResponse>(
+            actor.run_id,
+            'user_response',
+            provenance.user_response_id,
+          );
+          const question = this.getRecord<CoordinationQuestion>(
+            actor.run_id,
+            'question',
+            response.question_id,
+          );
+          if (
+            question.status !== 'answered' ||
+            question.response_id !== response.id ||
+            decision.answer !== response.answer ||
+            decision.affects_task_ids.some(
+              (id) => !question.affects_task_ids.includes(id),
+            ) ||
+            !decision.source_ids.includes(response.source_id)
+          )
+            throw new CrewError(
+              'INVALID_PROVENANCE',
+              'Decision must retain the actual user response and its affected scope',
+            );
+          approvedBy = response.user_actor_id;
+        } else if (
+          provenance.basis !== 'technical_judgment' ||
+          provenance.user_response_id !== null
+        ) {
+          throw new CrewError('INVALID_PROVENANCE', 'Invalid decision basis');
+        }
+        if (
+          decision.status === 'approved' &&
+          decision.approved_by !== approvedBy
+        )
           throw new CrewError(
             'FORBIDDEN',
             'Approval must identify its authenticated author',
@@ -859,8 +1454,690 @@ export class Store {
               previous.id,
             );
         }
-        this.writeRecord(actor, 'decision', decision);
+        const stored = { ...decision, provenance };
+        this.writeRecord(actor, 'decision', stored);
         return decision;
+      },
+    );
+  }
+
+  registerChiefSession(
+    actor: Actor,
+    session: AgentSession,
+    key: string,
+    expectedVersion: number,
+  ): AgentSession {
+    return this.mutate(
+      actor,
+      key,
+      'chief.session_registered',
+      session,
+      expectedVersion,
+      () => {
+        const run = this.openRun(actor, ['user']);
+        validate('Identifier', session.id);
+        validate('ProviderId', session.provider);
+        if (
+          session.run_id !== run.id ||
+          session.task_id !== null ||
+          session.provider !== run.chief_provider ||
+          session.model !== run.chief_model
+        )
+          throw new CrewError(
+            'INVALID_SESSION',
+            'Chief session must match this run without a task or attempt',
+          );
+        if (session.capabilities)
+          validate('ProviderCapabilities', session.capabilities);
+        this.writeRecord(actor, 'session', session);
+        return session;
+      },
+    );
+  }
+
+  delegateTask(
+    actor: Actor,
+    args: DelegateTaskArgs,
+    key: string,
+    expectedVersion: number,
+  ): Delegation {
+    validate('DelegateTaskArgs', args);
+    return this.mutate(
+      actor,
+      key,
+      'task.delegated',
+      args,
+      expectedVersion,
+      () => {
+        this.openRun(actor, ['user', 'chief']);
+        const task = this.getTask(args.task_id);
+        if (task.run_id !== actor.run_id)
+          throw new CrewError('WRONG_RUN', 'Delegation belongs to another run');
+        const reassignable =
+          ['changes_requested', 'blocked', 'waiting_provider'].includes(
+            task.status,
+          ) &&
+          task.active_attempt_id &&
+          ['exited', 'interrupted'].includes(
+            this.getAttempt(task.active_attempt_id).status,
+          );
+        if (
+          (!['ready', 'waiting_dependency'].includes(task.status) ||
+            task.active_attempt_id) &&
+          !reassignable
+        )
+          throw new CrewError(
+            'TASK_NOT_READY',
+            'Only an unclaimed task can be delegated',
+          );
+        const previous = this.allRecords<Delegation>(
+          actor.run_id,
+          'delegation',
+        ).find((item) => item.task_id === task.id && item.status === 'queued');
+        if (previous) {
+          if (
+            previous.provider !== args.provider ||
+            previous.model !== args.model
+          )
+            throw new CrewError(
+              'DELEGATION_MISMATCH',
+              'Task already has another queued delegation',
+            );
+          return previous;
+        }
+        const delegation: Delegation = {
+          ...args,
+          id: ident('delegation'),
+          run_id: actor.run_id,
+          status: 'queued',
+          attempt_id: null,
+          created_at: now(),
+        };
+        this.writeRecord(actor, 'delegation', delegation, task.id);
+        return delegation;
+      },
+    );
+  }
+
+  publishNote(
+    actor: Actor,
+    args: PublishNoteArgs,
+    key: string,
+    expectedVersion: number,
+  ): TaskNote {
+    validate('PublishNoteArgs', args);
+    return this.mutate(
+      actor,
+      key,
+      'task.note_published',
+      args,
+      expectedVersion,
+      () => {
+        this.assignedWorker(actor, args.task_id);
+        this.scopedSources(actor, args.source_ids);
+        const note: TaskNote = {
+          ...args,
+          content: redactSecrets(args.content),
+          id: ident('note'),
+          run_id: actor.run_id,
+          actor_id: actor.id,
+          created_at: now(),
+        };
+        this.writeRecord(actor, 'note', note, args.task_id);
+        return note;
+      },
+    );
+  }
+
+  submitReview(
+    actor: Actor,
+    review: Review,
+    key: string,
+    expectedVersion: number,
+  ): Review {
+    validate('Review', review);
+    return this.mutate(
+      actor,
+      key,
+      'review.submitted',
+      review,
+      expectedVersion,
+      () => {
+        this.openRun(actor, ['reviewer']);
+        const { task: control, attempt: reviewerAttempt } = this.assignedWorker(
+          actor,
+          review.review_task_id,
+        );
+        const target = this.getTask(review.review_of_task_id);
+        const handoff = this.getRecord<Handoff>(
+          actor.run_id,
+          'handoff',
+          review.handoff_id,
+        );
+        const producerAttempt = this.getAttempt(handoff.attempt_id);
+        const producer = this.db
+          .prepare(
+            'SELECT actor_id FROM records WHERE run_id=? AND kind=? AND id=?',
+          )
+          .get(actor.run_id, 'handoff', handoff.id);
+        if (
+          review.run_id !== actor.run_id ||
+          target.run_id !== actor.run_id ||
+          handoff.task_id !== target.id ||
+          review.source_revision !== handoff.source_revision ||
+          this.currentHandoff(actor.run_id, target.id).id !== handoff.id ||
+          target.active_attempt_id !== producerAttempt.id ||
+          target.generation !== handoff.generation ||
+          !['in_review', 'validating'].includes(target.status)
+        )
+          throw new CrewError(
+            'STALE_REVIEW',
+            'Review must refer to the current handoff and source',
+          );
+        const producerSession = this.getRecord<AgentSession>(
+          actor.run_id,
+          'session',
+          producerAttempt.session_id,
+        );
+        const reviewerSession = this.getRecord<AgentSession>(
+          actor.run_id,
+          'session',
+          reviewerAttempt.session_id,
+        );
+        if (
+          control.id === target.id ||
+          producer?.['actor_id'] === actor.id ||
+          producerAttempt.id === reviewerAttempt.id ||
+          producerSession.id === reviewerSession.id ||
+          (producerSession.provider === reviewerSession.provider &&
+            producerSession.native_session_id !== null &&
+            producerSession.native_session_id ===
+              reviewerSession.native_session_id)
+        )
+          throw new CrewError(
+            'SELF_REVIEW',
+            'Review must use an independent worker and provider conversation',
+          );
+        if (
+          review.verification_scope === 'documentation' &&
+          (!review.source_revision.startsWith('sha256:') ||
+            review.tested_revision !== review.source_revision)
+        )
+          throw new CrewError(
+            'INVALID_REVIEW',
+            'Documentation review must inspect the exact document hash',
+          );
+        if (
+          review.verification_scope === 'source' &&
+          review.tested_revision !== null &&
+          review.tested_revision !== review.source_revision
+        )
+          throw new CrewError(
+            'INVALID_REVIEW',
+            'Source review cannot claim another tested revision',
+          );
+        if (review.outcome === 'approved') {
+          if (
+            !review.tested_revision ||
+            review.findings.some(
+              (finding) => finding.severity === 'blocking',
+            ) ||
+            !review.verification_ids.length
+          )
+            throw new CrewError(
+              'INVALID_REVIEW',
+              'Approval requires tested evidence and no unresolved findings',
+            );
+          for (const id of review.verification_ids)
+            this.checkedProof(actor.run_id, id, review.tested_revision);
+          if (review.verification_scope === 'combined_code')
+            this.preparedIntegration(
+              actor.run_id,
+              handoff,
+              review.tested_revision,
+              false,
+            );
+        }
+        this.writeRecord(actor, 'review', review, target.id);
+        if (review.outcome !== 'approved')
+          this.moveTask(
+            target,
+            review.outcome === 'blocked' ? 'blocked' : 'changes_requested',
+          );
+        // The review is the control task's result; it has no recursive review task.
+        this.moveTask(control, 'in_review');
+        this.moveTask(control, 'validating');
+        this.moveTask(control, 'accepted');
+        return review;
+      },
+    );
+  }
+
+  validateDelivery(actor: Actor, args: AcceptDeliveryArgs): void {
+    this.transaction(() => {
+      this.deliveryCheck(actor, args, false);
+    });
+  }
+
+  acceptDelivery(
+    actor: Actor,
+    args: AcceptDeliveryArgs,
+    key: string,
+    expectedVersion: number,
+  ): TaskState {
+    return this.mutate(
+      actor,
+      key,
+      'task.accepted',
+      args,
+      expectedVersion,
+      () => {
+        const checked = this.deliveryCheck(actor, args, true);
+        const { task, handoff } = checked;
+        if (!checked.existing) {
+          this.moveTask(task, 'validating');
+          this.moveTask(task, 'accepted');
+          task.accepted_revision = args.accepted_revision;
+          this.writeTask(task);
+          const acceptance: DeliveryAcceptance = {
+            id: ident('acceptance'),
+            run_id: actor.run_id,
+            task_id: task.id,
+            handoff_id: handoff.id,
+            accepted_revision: args.accepted_revision,
+            review_ids: [...new Set(args.review_ids)],
+            verification_ids: [...new Set(args.verification_ids)],
+            artifact_ids: checked.artifactIds,
+            accepted_by: actor.id,
+            created_at: now(),
+          };
+          this.writeRecord(actor, 'acceptance', acceptance, task.id);
+          for (const dependent of this.tasks(actor.run_id))
+            if (
+              dependent.status === 'waiting_dependency' &&
+              dependent.spec.depends_on.every(
+                (id) => this.getTask(id).status === 'accepted',
+              )
+            )
+              this.moveTask(dependent, 'ready');
+        }
+        return task;
+      },
+    );
+  }
+
+  finishRun(
+    actor: Actor,
+    args: FinishRunArgs,
+    key: string,
+    expectedVersion: number,
+  ): Run {
+    validate('FinishRunArgs', args);
+    return this.mutate(
+      actor,
+      key,
+      'run.completed',
+      args,
+      expectedVersion,
+      (run) => {
+        this.openRun(actor, ['user', 'chief']);
+        const tasks = this.tasks(run.id);
+        if (
+          this.blockingQuestions(run.id).length ||
+          this.attempts(run.id).some((attempt) =>
+            ['queued', 'running', 'unknown'].includes(attempt.status),
+          )
+        )
+          throw new CrewError(
+            'RUN_BUSY',
+            'Blocking questions or active attempts remain',
+          );
+        const acceptances = this.allRecords<DeliveryAcceptance>(
+          run.id,
+          'acceptance',
+        );
+        const proofs = acceptances.flatMap((acceptance) =>
+          acceptance.verification_ids.map((id) =>
+            this.checkedProof(run.id, id, acceptance.accepted_revision),
+          ),
+        );
+        const artifactIds = new Set(
+          acceptances.flatMap((acceptance) => acceptance.artifact_ids),
+        );
+        for (const id of artifactIds) this.checkedArtifact(run.id, id);
+        for (const id of args.delivered_artifact_ids) {
+          if (!artifactIds.has(id))
+            throw new CrewError(
+              'INVALID_EVIDENCE',
+              'Final artifact is not part of an accepted delivery',
+            );
+          this.checkedArtifact(run.id, id);
+        }
+        const required = run.acceptance_criteria.filter(
+          (criterion) => criterion.required,
+        );
+        if (
+          new Set(args.criterion_evidence.map((item) => item.criterion_id))
+            .size !== args.criterion_evidence.length ||
+          args.criterion_evidence.some(
+            (item) =>
+              !run.acceptance_criteria.some(
+                (criterion) => criterion.id === item.criterion_id,
+              ),
+          )
+        )
+          throw new CrewError(
+            'INVALID_EVIDENCE',
+            'Final criterion evidence must identify unique run criteria',
+          );
+        for (const criterion of required) {
+          const entry = args.criterion_evidence.find(
+            (item) => item.criterion_id === criterion.id,
+          );
+          if (
+            !entry?.evidence_artifact_ids.length ||
+            entry.evidence_artifact_ids.some(
+              (id) =>
+                !artifactIds.has(id) ||
+                !proofs.some(
+                  (proof) =>
+                    proof.criterion_ids.includes(criterion.id) &&
+                    proof.evidence_artifact_ids.includes(id),
+                ),
+            )
+          )
+            throw new CrewError(
+              'MISSING_EVIDENCE',
+              'Required run criterion lacks evidence from an accepted delivery',
+            );
+          for (const id of entry.evidence_artifact_ids)
+            this.checkedArtifact(run.id, id);
+        }
+        if (run.status !== 'validating') {
+          assertRunTransition(run.status, 'validating');
+          run.status = 'validating';
+        }
+        assertRunCompletable(run, tasks, proofs);
+        const final = { ...args, id: ident('final'), created_at: now() };
+        this.writeRecord(actor, 'final', final);
+        run.status = 'completed';
+        return run;
+      },
+    );
+  }
+
+  reportBlocker(
+    actor: Actor,
+    args: ReportBlockerArgs,
+    key: string,
+    expectedVersion: number,
+  ): TaskBlocker {
+    validate('ReportBlockerArgs', args);
+    return this.mutate(
+      actor,
+      key,
+      'task.blocked',
+      args,
+      expectedVersion,
+      () => {
+        const { task } = this.assignedWorker(actor, args.task_id);
+        this.scopedSources(actor, args.source_ids);
+        const blocker: TaskBlocker = {
+          ...args,
+          reason: redactSecrets(args.reason),
+          required_action: redactSecrets(args.required_action),
+          id: ident('blocker'),
+          run_id: actor.run_id,
+          actor_id: actor.id,
+          created_at: now(),
+        };
+        this.moveTask(task, 'blocked');
+        task.wait_reason = blocker.reason;
+        this.writeTask(task);
+        this.writeRecord(actor, 'blocker', blocker, task.id);
+        return blocker;
+      },
+    );
+  }
+
+  requestQuestion(
+    actor: Actor,
+    args: RequestUserInputArgs,
+    key: string,
+    expectedVersion: number,
+  ): CoordinationQuestion {
+    validate('RequestUserInputArgs', args);
+    return this.mutate(
+      actor,
+      key,
+      'question.requested',
+      args,
+      expectedVersion,
+      () => {
+        this.openRun(actor, ['user', 'chief']);
+        const tasks = args.affects_task_ids.map((id) => this.getTask(id));
+        if (
+          tasks.some(
+            (task) =>
+              task.run_id !== actor.run_id ||
+              ['accepted', 'cancelled'].includes(task.status),
+          )
+        )
+          throw new CrewError(
+            'INVALID_QUESTION',
+            'Question must affect current tasks in this run',
+          );
+        const question: CoordinationQuestion = {
+          id: args.question_id,
+          run_id: actor.run_id,
+          question: redactSecrets(args.question),
+          options: args.options.map((option) => ({
+            label: redactSecrets(option.label),
+            consequence: redactSecrets(option.consequence),
+          })),
+          affects_task_ids: [...new Set(args.affects_task_ids)],
+          blocking: args.blocking,
+          status: 'open',
+          requested_by: actor.id,
+          response_id: null,
+          created_at: now(),
+        };
+        this.writeRecord(actor, 'question', question);
+        if (args.blocking)
+          for (const task of tasks) {
+            if (task.status === 'running') this.moveTask(task, 'waiting_user');
+            task.wait_reason = `question:${question.id}`;
+            this.writeTask(task);
+          }
+        return question;
+      },
+    );
+  }
+
+  respondQuestion(
+    actor: Actor,
+    questionId: string,
+    answer: string,
+    key: string,
+    expectedVersion: number,
+  ): UserResponse {
+    return this.mutate(
+      actor,
+      key,
+      'question.answered',
+      { questionId, answer },
+      expectedVersion,
+      () => {
+        this.openRun(actor, ['user']);
+        if (!answer.trim())
+          throw new CrewError(
+            'INVALID_RESPONSE',
+            'User answer must not be empty',
+          );
+        const question = this.getRecord<CoordinationQuestion>(
+          actor.run_id,
+          'question',
+          questionId,
+        );
+        if (question.status !== 'open')
+          throw new CrewError(
+            'QUESTION_CLOSED',
+            'Question already has a response',
+          );
+        const safe = redactSecrets(answer),
+          id = ident('response'),
+          sourceId = ident('source'),
+          timestamp = now();
+        const response: UserResponse = {
+          id,
+          run_id: actor.run_id,
+          question_id: question.id,
+          answer: safe,
+          user_actor_id: actor.id,
+          source_id: sourceId,
+          created_at: timestamp,
+        };
+        const source: SourceRef = {
+          id: sourceId,
+          kind: 'user_message',
+          reference: `user_response:${id}`,
+          observed_at: timestamp,
+          revision: `sha256:${createHash('sha256').update(safe).digest('hex')}`,
+          authority: 'user_requirement',
+          summary: safe,
+        };
+        validate('SourceRef', source);
+        this.writeRecord(actor, 'source', source);
+        this.writeRecord(actor, 'user_response', response);
+        question.status = 'answered';
+        question.response_id = id;
+        this.replaceRecord(actor.run_id, 'question', question);
+        if (question.blocking)
+          for (const taskId of question.affects_task_ids) {
+            const task = this.getTask(taskId);
+            if (!this.blockingQuestions(actor.run_id, task.id).length) {
+              if (task.status === 'waiting_user')
+                this.moveTask(
+                  task,
+                  task.active_attempt_id ? 'running' : 'ready',
+                );
+              if (task.wait_reason?.startsWith('question:')) {
+                task.wait_reason = null;
+                this.writeTask(task);
+              }
+            }
+          }
+        return response;
+      },
+    );
+  }
+
+  observation(
+    actor: Actor,
+    type: string,
+    payload: Record<string, unknown>,
+    correlation: Partial<
+      Pick<CrewEvent, 'task_id' | 'attempt_id' | 'session_id' | 'generation'>
+    > = {},
+  ): CrewEvent {
+    return this.transaction(() => {
+      this.authority(actor, ['user']);
+      if (!/^(provider|turn|scheduler)\.[a-z][a-z0-9_.]*$/.test(type))
+        throw new CrewError(
+          'INVALID_OBSERVATION',
+          'Only runtime observation namespaces are permitted',
+        );
+      if (
+        correlation.task_id &&
+        this.getTask(correlation.task_id).run_id !== actor.run_id
+      )
+        throw new CrewError(
+          'WRONG_RUN',
+          'Observation task belongs to another run',
+        );
+      if (correlation.attempt_id) {
+        const attempt = this.getAttempt(correlation.attempt_id);
+        if (
+          attempt.run_id !== actor.run_id ||
+          (correlation.task_id && attempt.task_id !== correlation.task_id)
+        )
+          throw new CrewError(
+            'WRONG_RUN',
+            'Observation attempt belongs to another task or run',
+          );
+      }
+      if (correlation.session_id)
+        this.getRecord<AgentSession>(
+          actor.run_id,
+          'session',
+          correlation.session_id,
+        );
+      return this.append(actor.run_id, actor, type, payload, correlation);
+    });
+  }
+
+  setTaskWait(
+    actor: Actor,
+    taskId: string,
+    status: 'waiting_provider' | 'waiting_user' | 'blocked' | 'failed',
+    reason: string,
+    key: string,
+    expectedVersion: number,
+  ): TaskState {
+    return this.mutate(
+      actor,
+      key,
+      'task.wait_changed',
+      { taskId, status, reason },
+      expectedVersion,
+      () => {
+        this.openRun(actor, ['user']);
+        if (
+          !['waiting_provider', 'waiting_user', 'blocked', 'failed'].includes(
+            status,
+          ) ||
+          !reason.trim()
+        )
+          throw new CrewError(
+            'INVALID_WAIT',
+            'Task wait requires an explicit status and reason',
+          );
+        const task = this.getTask(taskId);
+        if (task.run_id !== actor.run_id)
+          throw new CrewError('WRONG_RUN', 'Task belongs to another run');
+        this.moveTask(task, status);
+        task.wait_reason = redactSecrets(reason);
+        this.writeTask(task);
+        return task;
+      },
+    );
+  }
+
+  replaceChief(
+    actor: Actor,
+    provider: ProviderId,
+    model: string | null,
+    key: string,
+    expectedVersion: number,
+  ): Run {
+    validate('ProviderId', provider);
+    return this.mutate(
+      actor,
+      key,
+      'chief.replaced',
+      { provider, model },
+      expectedVersion,
+      (run) => {
+        this.openRun(actor, ['user']);
+        if (model !== null && (typeof model !== 'string' || !model.trim()))
+          throw new CrewError(
+            'INVALID_MODEL',
+            'Chief model must be null or a nonempty name',
+          );
+        run.generation++;
+        run.chief_provider = provider;
+        run.chief_model = model;
+        return run;
       },
     );
   }
@@ -958,7 +2235,7 @@ export class Store {
     changes: Pick<
       AgentSession,
       'native_session_id' | 'cli_version' | 'capabilities'
-    >,
+    > & { cwd?: string },
     key: string,
     expectedVersion: number,
   ): AgentSession {
@@ -977,6 +2254,17 @@ export class Store {
           'session',
           id,
         );
+        if (
+          changes.cwd !== undefined &&
+          (typeof changes.cwd !== 'string' ||
+            !isAbsolute(changes.cwd) ||
+            !existsSync(changes.cwd) ||
+            !lstatSync(changes.cwd).isDirectory())
+        )
+          throw new CrewError(
+            'INVALID_SESSION',
+            'Observed cwd must be an existing absolute directory',
+          );
         Object.assign(session, changes);
         this.db
           .prepare(
@@ -1062,16 +2350,59 @@ export class Store {
     verification: Verification,
     key: string,
     expectedVersion: number,
+    artifacts: ArtifactRef[] = [],
   ): Verification {
     validate('Verification', verification);
     return this.mutate(
       actor,
       key,
       'verification.observed',
-      { taskId, verification },
+      { taskId, verification, artifacts },
       expectedVersion,
       () => {
         this.authority(actor, ['user']);
+        const task = this.getTask(taskId);
+        if (task.run_id !== actor.run_id)
+          throw new CrewError(
+            'WRONG_RUN',
+            'Verification task belongs to another run',
+          );
+        for (const artifact of artifacts) {
+          validate('ArtifactRef', artifact);
+          const producer = this.getAttempt(artifact.producer_attempt_id);
+          if (
+            producer.run_id !== actor.run_id ||
+            producer.task_id !== taskId ||
+            !verification.evidence_artifact_ids.includes(artifact.id)
+          )
+            throw new CrewError(
+              'WRONG_PRODUCER',
+              'Evidence artifact must belong to this task and verification',
+            );
+          if (!artifact.revision.startsWith('sha256:'))
+            throw new CrewError(
+              'INVALID_ARTIFACT',
+              'Verification observations require an immutable snapshot',
+            );
+          this.readArtifact(artifact);
+          const existing = this.db
+            .prepare(
+              'SELECT data FROM records WHERE run_id=? AND kind=? AND id=?',
+            )
+            .get(actor.run_id, 'artifact', artifact.id);
+          if (existing) {
+            if (
+              canonical(this.decode<ArtifactRef>(existing, 'Artifact')) !==
+              canonical(artifact)
+            )
+              throw new CrewError(
+                'INVALID_ARTIFACT',
+                'Existing evidence metadata differs',
+              );
+          } else this.writeRecord(actor, 'artifact', artifact, taskId);
+        }
+        for (const id of verification.evidence_artifact_ids)
+          this.checkedArtifact(actor.run_id, id);
         this.writeRecord(actor, 'verification', verification, taskId);
         return verification;
       },
