@@ -18,7 +18,8 @@ import type { Actor } from '../../contracts/src/index.ts';
 import type { Store } from '../../storage/src/index.ts';
 
 export type Principal =
-  { kind: 'user'; project_id: string } | { kind: 'agent'; actor: Actor };
+  | { kind: 'user'; project_id: string }
+  | { kind: 'agent'; actor: Actor; assertCurrent?: () => void };
 const digest = (value: string): string =>
   createHash('sha256').update(value).digest('hex');
 
@@ -178,6 +179,24 @@ export class CapabilityRegistry {
       throw new CrewError('FORBIDDEN', 'Unknown capability');
     }
     this.assertCurrent(actor);
-    return { kind: 'agent', actor };
+    const authenticated = actor;
+    const principal: Principal = { kind: 'agent', actor: authenticated };
+    // A queued request must revalidate its channel after the first HTTP check.
+    Object.defineProperty(principal, 'assertCurrent', {
+      value: () => {
+        let current: unknown;
+        try {
+          current = JSON.parse(
+            privateRead(join(this.directory, `${hash}.json`)),
+          );
+        } catch {
+          throw new CrewError('FORBIDDEN', 'Agent capability was revoked');
+        }
+        if (JSON.stringify(current) !== JSON.stringify(authenticated))
+          throw new CrewError('FORBIDDEN', 'Capability identity changed');
+        this.assertCurrent(current);
+      },
+    });
+    return principal;
   }
 }

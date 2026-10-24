@@ -103,8 +103,12 @@ export class Coordinator implements SupervisorApi {
     validate('ToolCall', call);
     assertToolAuthority(principal, call);
     const actor = this.identity(principal, call.run_id);
+    const assertCurrent = () => {
+      if (principal.kind === 'agent') principal.assertCurrent?.();
+    };
     const read = async () => {
       const result = await this.dispatch(actor, call);
+      assertCurrent();
       return { result, run_version: this.store.getRun(call.run_id).version };
     };
     if (
@@ -117,6 +121,7 @@ export class Coordinator implements SupervisorApi {
     )
       return read();
     const pending = this.tail.then(async () => {
+      assertCurrent();
       const user = serviceActor(this.store, call.run_id),
         key = requestId(call.idempotency_key, 'tool');
       const previous = this.store
@@ -148,10 +153,14 @@ export class Coordinator implements SupervisorApi {
           run_version: this.store.getRun(call.run_id).version,
         };
       try {
-        const result = await this.dispatch(actor, {
-          ...call,
-          expected_version: this.store.getRun(call.run_id).version,
-        });
+        const result = await this.dispatch(
+          actor,
+          {
+            ...call,
+            expected_version: this.store.getRun(call.run_id).version,
+          },
+          assertCurrent,
+        );
         this.store.observeOperation(
           user,
           receipt.id,
@@ -287,7 +296,11 @@ export class Coordinator implements SupervisorApi {
     };
   }
 
-  private async dispatch(actor: Actor, call: ToolCall): Promise<unknown> {
+  private async dispatch(
+    actor: Actor,
+    call: ToolCall,
+    assertCurrent: () => void = () => {},
+  ): Promise<unknown> {
     const key = call.idempotency_key,
       version = call.expected_version;
     const run = this.store.getRun(call.run_id);
@@ -509,6 +522,7 @@ export class Coordinator implements SupervisorApi {
           key,
           version,
           call.arguments.document_paths,
+          assertCurrent,
         );
       case 'submit_review': {
         const review = this.store.submitReview(
@@ -551,9 +565,11 @@ export class Coordinator implements SupervisorApi {
             ).promoteIntegration(
               candidate.id,
               requestId(candidate.id, 'promote'),
+              assertCurrent,
             );
           }
         }
+        assertCurrent();
         const result = this.store.acceptDelivery(
           actor,
           call.arguments,
@@ -574,6 +590,7 @@ export class Coordinator implements SupervisorApi {
     key: string,
     version: number,
     documentPaths?: readonly string[],
+    assertCurrent: () => void = () => {},
   ): Promise<Handoff> {
     if (
       !actor.task_id ||
@@ -627,6 +644,7 @@ export class Coordinator implements SupervisorApi {
       },
       requestId(key, 'capture'),
     );
+    assertCurrent();
     const created_at = input.created_at;
     const artifact = (
       id: string,

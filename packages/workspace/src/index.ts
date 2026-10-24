@@ -919,8 +919,10 @@ export class WorkspaceManager {
   async promoteIntegration(
     preparationOperationId: string,
     key: string,
+    assertCurrent: () => void = () => {},
   ): Promise<Promotion> {
     return this.serial(key, async () => {
+      assertCurrent();
       const candidate = this.result<IntegrationCandidate>(
         preparationOperationId,
         'integration.prepare',
@@ -980,6 +982,7 @@ export class WorkspaceManager {
               'CANDIDATE_CHANGED',
               'The candidate ref changed after verification',
             );
+          assertCurrent();
           await git(this.root, [
             'update-ref',
             candidate.targetRef,
