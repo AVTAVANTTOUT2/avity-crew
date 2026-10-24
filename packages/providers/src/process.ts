@@ -110,6 +110,7 @@ export function runNative(
   let error: NativeError | null = null;
   let sessionId: string | null = null;
   let text = '';
+  let textBytes = 0;
   let hasTerminal = false;
   let nativeSuccess = false;
   let stderr = '';
@@ -119,17 +120,19 @@ export function runNative(
       event = { ...event, text: redact(event.text) };
       if (
         (event.type === 'unknown' || event.type === 'tool') &&
-        event.text!.length > MAX_DIAGNOSTIC
+        Buffer.byteLength(event.text!, 'utf8') > MAX_DIAGNOSTIC
       )
         event.text =
-          event.text!.slice(0, MAX_DIAGNOSTIC) + '\n[diagnostic truncated]';
+          Buffer.from(event.text!)
+            .subarray(0, MAX_DIAGNOSTIC)
+            .toString('utf8') + '\n[diagnostic truncated]';
     }
     if (event.error)
       event = {
         ...event,
         error: { ...event.error, message: redact(event.error.message) },
       };
-    if (sessionId) event = { ...event, native_session_id: sessionId };
+    if (sessionId) event = { ...event, native_session_id: redact(sessionId) };
     while (queue.length >= MAX_QUEUE && !abandoned)
       await new Promise<void>((resolve) => {
         space = resolve;
@@ -194,7 +197,8 @@ export function runNative(
             message: 'Native provider reported an error without details',
           };
     if (event.type === 'text') {
-      if (text.length + (event.text?.length ?? 0) > MAX_TEXT) {
+      const addedBytes = Buffer.byteLength(event.text ?? '', 'utf8');
+      if (textBytes + addedBytes > MAX_TEXT) {
         await fail({
           kind: 'protocol',
           message: 'Native provider text exceeded the 2 MiB limit',
@@ -202,13 +206,14 @@ export function runNative(
         void terminate('SIGTERM');
         return;
       }
+      textBytes += addedBytes;
       text += redact(event.text ?? '');
     }
     if (event.type === 'result') {
       hasTerminal = true;
       nativeSuccess = event.success === true;
       if (event.text !== undefined) {
-        if (event.text.length > MAX_TEXT) {
+        if (Buffer.byteLength(event.text, 'utf8') > MAX_TEXT) {
           await fail({
             kind: 'protocol',
             message: 'Native provider result exceeded the 2 MiB limit',
@@ -222,7 +227,7 @@ export function runNative(
   };
   const acceptLine = async (line: string): Promise<void> => {
     if (!line.trim()) return;
-    if (line.length > MAX_LINE)
+    if (Buffer.byteLength(line, 'utf8') > MAX_LINE)
       throw new Error('Native JSONL line exceeded the 1 MiB limit');
     const events = decode(JSON.parse(line));
     for (const event of events) await accept(event);
@@ -235,7 +240,9 @@ export function runNative(
     processError ??= failure;
   });
   child.stderr.on('data', (chunk: Buffer) => {
-    stderr = (stderr + stderrDecoder.write(chunk)).slice(-MAX_DIAGNOSTIC);
+    stderr = Buffer.from(stderr + stderrDecoder.write(chunk))
+      .subarray(-MAX_DIAGNOSTIC)
+      .toString('utf8');
   });
   const closed = new Promise<{
     code: number | null;
@@ -257,7 +264,7 @@ export function runNative(
           pending = pending.slice(newline + 1);
           await acceptLine(line);
         }
-        if (pending.length > MAX_LINE)
+        if (Buffer.byteLength(pending, 'utf8') > MAX_LINE)
           throw new Error('Native JSONL line exceeded the 1 MiB limit');
       }
       pending += decoder.end();
@@ -314,7 +321,7 @@ export function runNative(
     resolveResult({
       provider,
       provenance: 'live',
-      native_session_id: sessionId,
+      native_session_id: sessionId ? redact(sessionId) : null,
       exit_code: exit.code,
       signal: exit.signal ?? interrupted,
       success,

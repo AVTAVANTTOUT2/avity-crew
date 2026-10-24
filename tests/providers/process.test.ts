@@ -60,27 +60,55 @@ test('native JSONL preserves UTF-8 fragments, stdin and unknown diagnostics', as
     for(let i=0;i<bytes.length;i++) { process.stdout.write(bytes.subarray(i,i+1)); await new Promise(r=>setTimeout(r,1)); }
     emit({type:'unknown',text:'future-event'});
     process.stdout.write(JSON.stringify({type:'result',success:true}));`;
-  const process = runNative(
+  const child = runNative(
     'claude',
-    processPath(),
+    process.execPath,
     ['-e', source],
     request(),
     decode,
   );
-  const events = await collect(process);
-  const result = await process.result;
+  const events = await collect(child);
+  const result = await child.result;
   assert.equal(result.success, true);
   assert.equal(result.text, request().prompt);
   assert.equal(result.native_session_id, 'session-one');
   assert.equal(events.find((e) => e.type === 'unknown')?.text, 'future-event');
   assert.ok(events.every((e) => e.native_session_id === 'session-one'));
   assert.ok(events.every((e) => e.provenance === 'live'));
-  await assert.rejects(process.send('update'), /unsupported/);
+  await assert.rejects(child.send('update'), /unsupported/);
 });
 
-function processPath(): string {
-  return process.execPath;
-}
+test('simulated simultaneous native sessions keep their prompts and identities separate', async () => {
+  const children = ['one', 'two'].map((name) =>
+    runNative(
+      'claude',
+      process.execPath,
+      [
+        '-e',
+        `${emit} emit({type:'session',native_session_id:'${name}'});let input='';for await(const chunk of process.stdin)input+=chunk;emit({type:'text',text:input});emit({type:'result',success:true});`,
+      ],
+      { ...request(), prompt: name },
+      decode,
+    ),
+  );
+  const results = await Promise.all(
+    children.map(async (child) => {
+      await collect(child);
+      return child.result;
+    }),
+  );
+  assert.deepEqual(
+    results.map((result) => [
+      result.native_session_id,
+      result.text,
+      result.success,
+    ]),
+    [
+      ['one', 'one', true],
+      ['two', 'two', true],
+    ],
+  );
+});
 
 test('native backpressure retains every event for a slow consumer', async () => {
   const source = `${emit} for(let i=0;i<700;i++)emit({type:'text',text:'x'});emit({type:'result',success:true});`;
@@ -153,6 +181,7 @@ test('malformed or oversized JSONL and changed session identity fail closed', as
   for (const source of [
     `process.stdout.write('not-json\\n');`,
     `process.stdout.write('x'.repeat(1024*1024+1));`,
+    `process.stdout.write(JSON.stringify({type:'unknown',text:'é'.repeat(600*1024)})+'\\n');`,
     `${emit} emit({type:'session',native_session_id:'one'});emit({type:'session',native_session_id:'two'});emit({type:'result',success:true});`,
   ]) {
     const child = runNative(
