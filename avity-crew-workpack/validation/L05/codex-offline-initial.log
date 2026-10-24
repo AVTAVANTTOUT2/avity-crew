@@ -1,0 +1,37 @@
+✔ Codex normalizes session, tool IDs, text, usage and completion (0.6285ms)
+✖ Codex preserves unknown diagnostics and classifies provider errors (3.308083ms)
+✔ Codex probe is bounded and reports unsupported interactive operations (319.244833ms)
+✔ Codex passes prompt on stdin, preserves argv, model, permissions and bridge env (84.870125ms)
+✔ Codex sessions remain isolated and resume only the requested UUID with new input (131.307541ms)
+✔ Codex process rejects truncation, errors, bad exits and unsupported updates (811.12775ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 5
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1448.00825
+
+✖ failing tests:
+
+test at dist/tests/providers/codex.test.js:77:1
+✖ Codex preserves unknown diagnostics and classifies provider errors (3.308083ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(denied.some((event) => event.type === 'permission'))
+  
+      at TestContext.<anonymous> (file:///Users/zeldris/.codex/worktrees/avity-crew-l05/dist/tests/providers/codex.test.js:108:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

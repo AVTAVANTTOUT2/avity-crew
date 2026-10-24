@@ -1,0 +1,29 @@
+{
+  "summary": "Contexte L03 livre avec correction de la revue privacy : les valeurs sensibles de sources JSON citees sont expurgees avant compilation, y compris cles encodees et valeurs avec espaces/echappements. Le reste du fichier, les criteres et la provenance originale sont conserves. Regression rouge avant puis verte apres, sans reduction des AC-L03 ni changement hors perimetre.",
+  "revision": "git:cbb6d4d43af2a3eb5711d281eba5ddcf3a724b35",
+  "artifacts": [
+    { "commit": "cbb6d4d43af2a3eb5711d281eba5ddcf3a724b35" },
+    { "ref": "validation/L03/checks-2.md", "sha256": "aa8bdb42d28932729a77d333d009ce0ccaf6d652715dbd9a4e8aba108e534d56" }
+  ],
+  "tests": [
+    {
+      "name": "Typecheck, Prettier, build et 52 tests sur Node 26.12.0",
+      "command": "npm run check",
+      "kind": "unit",
+      "exit_code": 0,
+      "evidence_ref": "validation/L03/checks-2.md",
+      "revision": "git:cbb6d4d43af2a3eb5711d281eba5ddcf3a724b35"
+    },
+    {
+      "name": "Neuf tests contexte sur Node 24.22.1, incluant la regression JSON jusqu'au prompt",
+      "command": "npm exec --yes --package=node@24.22.1 -- node --test dist/tests/context.test.js",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L03/checks-2.md",
+      "revision": "git:cbb6d4d43af2a3eb5711d281eba5ddcf3a724b35"
+    }
+  ],
+  "limitations": [],
+  "next_steps": [],
+  "live_verification": "not_applicable"
+}

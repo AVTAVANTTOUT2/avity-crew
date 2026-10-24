@@ -1,0 +1,68 @@
+{
+  "source_revision": "90541137a9b93e1cd8a4b1b5cfeda172998f1918",
+  "cli_version": "0.163.0",
+  "scope": "startup interrupted; metadata only, no business result",
+  "shapes": [
+    {
+      "channel": "stdout",
+      "envelope_type": "item.completed",
+      "item_type": "error",
+      "envelope_keys": [
+        "type",
+        "item"
+      ],
+      "item_keys": [
+        "id",
+        "type",
+        "message"
+      ],
+      "message_class": "unrecognized-config",
+      "severity": null,
+      "level": null,
+      "fatal": null
+    },
+    {
+      "channel": "stdout",
+      "envelope_type": "item.completed",
+      "item_type": "error",
+      "envelope_keys": [
+        "type",
+        "item"
+      ],
+      "item_keys": [
+        "id",
+        "type",
+        "message"
+      ],
+      "message_class": "unrecognized-config",
+      "severity": null,
+      "level": null,
+      "fatal": null
+    },
+    {
+      "channel": "stdout",
+      "envelope_type": "item.completed",
+      "item_type": "error",
+      "envelope_keys": [
+        "type",
+        "item"
+      ],
+      "item_keys": [
+        "id",
+        "type",
+        "message"
+      ],
+      "message_class": "unstable-features",
+      "severity": null,
+      "level": null,
+      "fatal": null
+    }
+  ],
+  "stderr_has_config_warning": false,
+  "stderr_has_unstable_warning": false,
+  "stopped": true,
+  "exit": {
+    "code": null,
+    "signal": "SIGKILL"
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "handoff_id": "handoff-a3b4454658bf48ebbfefdf58967b7d76",
+  "outcome": "accepted",
+  "source_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "tested_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "verification_scope": "combined_code",
+  "live_verification": "passed",
+  "summary": "Revue finale indépendante à indépendance répartie de l00_provider_audit : aucun finding bloquant L11. Les critères E2E01–12 et AC-L11 sont reliés aux preuves du moteur537 et du paquet947da88b. Relectures indépendantes SQLite/Git des recettes natives mixtes application/Transport réussies ; correction finale Codex rejouée avec isolés0/0, combinaison1 attendue puis correction0 et trois acceptations du même candidat. Document final sans Git et pic natif1 vérifiés ; sept places restent explicitement simulées, pic natif observé3. Snapshots de conservation avant/après identiques pour911 fichiers/sept projets, commandes et liens installés cohérents, preuve PTY enregistrée. L'ancien run correctif annulé, son quota naturel, son budget temporaire et ses erreurs de plan restent conservés. Les checks live sont des relectures d'observations natives enregistrées au SHA537, sans rouvrir de modèle. Contrôles source Node24/26 déjà exécutés au même SHA, aucune suite complète relancée. Qualification locale macOS ; CI distante et Linux/Windows/WSL non revendiqués.",
+  "findings": [],
+  "integration": {
+    "base_revision": "git:f0d0d077e1ed5464f9dc6e476403e6e349c39bf7",
+    "source_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+    "candidate_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+    "evidence_ref": "avity-crew-workpack/validation/L11/final-review.md"
+  },
+  "checks": [
+    {
+      "name": "Contrôles source indépendants Node26.12.0, déjà exécutés au même SHA pendant la revue L08",
+      "command": "npm run check",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L11/final-review.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Suite indépendante Node24.22.1 au même SHA : 182/182 et zéro skip",
+      "command": "npm exec --yes --package=node@24.22.1 -- node --test --test-reporter=tap 'dist/tests/**/*.test.js'",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L11/final-review.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Observations natives Claude enregistrées : relecture indépendante de la recette mixte application, aucun nouveau modèle",
+      "command": "node /Users/zeldris/avity-crew/avity-crew-workpack/validation/L11/assert-native-recipe.mjs /Users/zeldris/.codex/avity-crew-validation/20261024/data/avity-crew/project-1a121d7e95c2fc3d1965e22469d3c29b/state.sqlite '/Users/zeldris/.codex/avity-crew-validation/20261024/native new app final' run:71469044-5ca6-473e-8e78-de2f4ad719e6",
+      "kind": "live",
+      "provider": "claude",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L11/final-review.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Observations natives Codex enregistrées : relecture indépendante de la recette mixte Transport, aucun nouveau modèle",
+      "command": "node /Users/zeldris/avity-crew/avity-crew-workpack/validation/L11/assert-native-recipe.mjs /Users/zeldris/.codex/avity-crew-validation/20261024/data/avity-crew/project-4125dcc47d867f92f1d8b61235deef81/state.sqlite '/Users/zeldris/.codex/avity-crew-validation/20261024/native transport fixture' run:858ac152-b0d8-4b3f-8720-7ebec5b0a36e",
+      "kind": "live",
+      "provider": "codex",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L11/final-review.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Recette corrective native enregistrée : relecture et réexécution ciblée des quatre contrôles métier",
+      "command": "node /Users/zeldris/avity-crew/avity-crew-workpack/validation/L11/assert-native-correction.mjs /Users/zeldris/.codex/avity-crew-validation/20261024/data/avity-crew/project-222b1ea7f3f11a39a579b09ef73a369f/state.sqlite '/Users/zeldris/.codex/avity-crew-validation/20261024/native correction final' run:f57b56fc-ab6a-47af-b1d1-b446174f1d63",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L11/final-review.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Comparaison indépendante complète des snapshots de conservation avant/après lifecycle",
+      "command": "node -e 'const fs=require(\"node:fs\"),assert=require(\"node:assert/strict\");const base=\"/Users/zeldris/avity-crew/avity-crew-workpack/validation/L12/\";assert.deepStrictEqual(JSON.parse(fs.readFileSync(base+\"lifecycle-before.json\",\"utf8\")),JSON.parse(fs.readFileSync(base+\"lifecycle-after.json\",\"utf8\")));console.log(\"LIFECYCLE_SNAPSHOTS_IDENTICAL\");'",
+      "kind": "packaging",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L11/final-review.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    }
+  ],
+  "evidence_refs": [
+    "avity-crew-workpack/validation/RELEASE_REPORT.md",
+    "avity-crew-workpack/validation/L11/final-handoff.json",
+    "avity-crew-workpack/validation/L11/new-app-native-report.json",
+    "avity-crew-workpack/validation/L11/new-app-browser-qa.json",
+    "avity-crew-workpack/validation/L11/transport-native-report.json",
+    "avity-crew-workpack/validation/L11/transport-browser-qa.json",
+    "avity-crew-workpack/validation/L11/document-native-report.json",
+    "avity-crew-workpack/validation/L11/correction-native-report.json",
+    "avity-crew-workpack/validation/L11/correction-planning-incident.json",
+    "avity-crew-workpack/validation/L11/native-permissions.json",
+    "avity-crew-workpack/validation/L11/final-load-report.json",
+    "avity-crew-workpack/validation/L11/tui-installed-report.json",
+    "avity-crew-workpack/validation/L12/lifecycle-report.json",
+    "avity-crew-workpack/validation/L12/lifecycle-before.json",
+    "avity-crew-workpack/validation/L12/lifecycle-after.json"
+  ]
+}

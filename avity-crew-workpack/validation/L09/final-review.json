@@ -1,0 +1,50 @@
+{
+  "handoff_id": "handoff-3f1bfc4b6ca44bd385870d84b9ae7287",
+  "outcome": "accepted",
+  "source_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "tested_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "verification_scope": "combined_code",
+  "summary": "L09 accepté après revue indépendante du delta depuis ccbab6f : CLI inchangée, barrière de fixture sans assertion affaiblie, 11 tests CLI/PTY rejoués avec succès, paquet final lié par empreinte et égalité des modules. La recette installée et son état SQLite readonly ont été contrôlés : completed version378, cinq tâches acceptées, deux acceptations, question réellement répondue et changement de chef conservé. Aucun nouveau tour LLM, aucune modification produit ou coordination. Qualification macOS arm64 ; limites et distinction simulations/natif dans final-review.md.",
+  "findings": [],
+  "integration": {
+    "base_revision": "git:ccbab6f1551c2f54056bece878b229377f1ef52f",
+    "source_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+    "candidate_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+    "evidence_ref": "validation/L09/final-review.md"
+  },
+  "checks": [
+    {
+      "name": "CLI inchangée depuis la revue indépendante précédente",
+      "command": "git diff --quiet ccbab6f1551c2f54056bece878b229377f1ef52f 537d3c40f673eb2ca7b0984d695bfed90282e746 -- apps/cli/src tests/fixtures/cli docs/CLI.md",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L09/final-review.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "11 tests CLI incluant les trois parcours PTY, Node26.12.0",
+      "command": "node --test dist/tests/cli.test.js",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L09/final-review.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "État durable de la recette native installée vérifié readonly",
+      "command": "node /Users/zeldris/avity-crew/avity-crew-workpack/validation/L11/assert-native-recipe.mjs /Users/zeldris/.codex/avity-crew-validation/20261024/data/avity-crew/project-1a121d7e95c2fc3d1965e22469d3c29b/state.sqlite '/Users/zeldris/.codex/avity-crew-validation/20261024/native new app final' run:71469044-5ca6-473e-8e78-de2f4ad719e6",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L09/final-review.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    }
+  ],
+  "evidence_refs": [
+    "validation/L09/independent-cli-review.md",
+    "validation/L09/final-review.md",
+    "validation/L11/final-checks.md",
+    "validation/L11/new-app-native-report.json",
+    "validation/L11/new-app-browser-qa.json",
+    "validation/L11/native-process-observation.json",
+    "validation/L12/package-installation.json"
+  ]
+}

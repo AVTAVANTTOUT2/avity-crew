@@ -1,0 +1,11 @@
+{
+  "source_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "proof_level": "simulated_integration_with_real_local_processes",
+  "executed_at": "2026-10-24T17:50Z",
+  "checks": [
+    {"command":"node --test dist/tests/load.test.js","node":"26.12.0","exit_code":0},
+    {"command":"npm exec --yes --package=node@24.22.1 -- node --test dist/tests/load.test.js","node":"24.22.1","exit_code":0}
+  ],
+  "metrics_on_each_node_version": {"configured_slots":7,"observed_process_peak":7,"scheduler_peak":7,"worker_workspaces":7,"live_llm_cli_count":0,"final_status":"paused","business_completed":false},
+  "limits": ["The seven processes use the fake provider and do not demonstrate seven native LLM sessions.","Actual native mixed-provider peak three is documented separately in new-app-native-report.json and native-process-observation.json.","macOS arm64 only; Linux and Windows/WSL not verified."]
+}

@@ -1,0 +1,19 @@
+{
+  "source_revision":"b0571ad56aa5a63768537fbfe4bdcd9639c2954e",
+  "version":"0.1.0",
+  "package":"/Users/zeldris/.codex/avity-crew-validation/20261024/release-final/avity-crew-0.1.0.tgz",
+  "sha256":"f51a3216c854c0015ac8eff984e3d9f9e976aa2f9de98d8f470198cc1308730c",
+  "prefix":"/Users/zeldris/.codex/avity-crew-validation/20261024/install prefix",
+  "platform":"darwin-arm64",
+  "node":"26.12.0",
+  "files":130,
+  "pack_exit_code":0,
+  "install_exit_code":0,
+  "preserved_after_upgrade":{"projects":2,"runs":true,"tasks":true,"decisions":true,"criteria":true,"paused_status":true,"check_exit_code":0,"script":"package-state.mjs"},
+  "prior_packages":"package-installation-ccbab6f.json retains earlier db33d66/c71b313/ccbab6f steps and hashes; those tarballs remain in release-old/.",
+  "native_objectives":"in_progress",
+  "uninstall_preservation":"pending",
+  "linux":"not_verified",
+  "windows_wsl":"not_verified",
+  "remote_ci":"not_run"
+}

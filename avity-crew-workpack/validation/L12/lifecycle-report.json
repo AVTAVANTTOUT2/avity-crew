@@ -1,0 +1,22 @@
+{
+  "source_revision":"537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "package_sha256":"947da88b8cede34df6a50d1e3b5c0fed3db006d001c976ca35b8df20550c47d1",
+  "platform":"darwin-arm64",
+  "prefix":"/Users/zeldris/.codex/avity-crew-validation/20261024/install prefix",
+  "all_services_stopped_before_uninstall":true,
+  "old_service_exits_observed":true,
+  "uninstall":{"command":"npm uninstall --global --prefix '/Users/zeldris/.codex/avity-crew-validation/20261024/install prefix' avity-crew","exit_code":0,"removed_packages":7,"binary_absent":true},
+  "reinstall":{"command":"npm install --global --prefix '/Users/zeldris/.codex/avity-crew-validation/20261024/install prefix' '/Users/zeldris/.codex/avity-crew-validation/20261024/release-final/avity-crew-0.1.0.tgz'","exit_code":0,"added_packages":7,"bin_symlink_executable":true},
+  "preservation":{"projects":7,"data_files":911,"whole_data_tree_sha256":"983503595db331fe444a9782198018631f81c9a7a86d96d3e26d3b6836939b58","identical_after_uninstall":true,"identical_after_reinstall_before_start":true,"identical_after_restart_checks":true,"all_project_source_trees_identical":true,"all_sqlite_business_rows_identical":true,"snapshots":["lifecycle-before.json","lifecycle-after.json"]},
+  "node26_checks":{"version":"26.12.0","commands":["--version","--help","service start","doctor --json","status --json","service stop"],"all_exit_codes":0,"projects":[{"root":"/Users/zeldris/.codex/avity-crew-validation/20261024/native new app final","run":"run:71469044-5ca6-473e-8e78-de2f4ad719e6","status":"completed"},{"root":"/Users/zeldris/.codex/avity-crew-validation/20261024/native transport fixture","run":"run:858ac152-b0d8-4b3f-8720-7ebec5b0a36e","status":"completed"}],"distinct_project_ids":true,"space_paths":true,"active_turns":0,"queued_turns":0},
+  "node24_installed_checks":{"version":"24.22.1","command_prefix":"npm exec --yes --package=node@24.22.1 -- node '/Users/zeldris/.codex/avity-crew-validation/20261024/install prefix/bin/avity-crew'","commands":["--version","--help","service start","doctor --json","status --json","service stop"],"all_exit_codes":0,"project":"/Users/zeldris/.codex/avity-crew-validation/20261024/native doc final","run":"run:5ce6a875-cd7e-4760-9fef-20fbb6c92387","status":"completed","new_llm_turns":0},
+  "old_test_upgrade_state":{"command":"node /Users/zeldris/avity-crew/avity-crew-workpack/validation/L12/package-state.mjs check '/Users/zeldris/.codex/avity-crew-validation/20261024/install prefix' /Users/zeldris/.codex/avity-crew-validation/20261024/data /Users/zeldris/.codex/avity-crew-validation/20261024/native-new-app '/Users/zeldris/.codex/avity-crew-validation/20261024/native transport fixture'","exit_code":0,"two_paused_runs_tasks_decisions_and_criteria_preserved":true},
+  "remaining_owned_services":0,
+  "new_llm_turns_during_lifecycle":0,
+  "package_sha256_unchanged":true,
+  "installed_program_left_available":true,
+  "linux":"not_verified",
+  "windows_wsl":"not_verified",
+  "remote_ci":"not_run",
+  "publication":"not_performed"
+}

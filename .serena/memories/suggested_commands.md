@@ -1,0 +1,4 @@
+- Development: npm ci; npm run build; node bin/avity-crew.mjs --help. Help honestly reflects current implemented scope.
+- Formatting: npm run format (workpack and generated contracts excluded); inspect diff before committing.
+- Canonical construction state from any worktree: python3 /Users/zeldris/avity-crew/avity-crew-workpack/scripts/coordination.py --root /Users/zeldris/avity-crew/avity-crew-workpack status.
+- Workpack-only checks: python3 avity-crew-workpack/scripts/test_coordination.py; python3 avity-crew-workpack/scripts/test_bootstrap.py; python3 avity-crew-workpack/scripts/validate_pack.py. These do not verify the product.

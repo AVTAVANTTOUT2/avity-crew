@@ -1,0 +1,337 @@
+{
+  "mode": "single",
+  "checked_at": "2026-10-24T11:23:27.158Z",
+  "cwd": "/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-MbdhWj/avity codex live nKEY7n",
+  "capabilities": {
+    "schema_version": 1,
+    "provider": "codex",
+    "binary_path": "/Users/zeldris/.local/bin/codex",
+    "version": "0.163.0",
+    "checked_at": "2026-10-24T11:23:27.168Z",
+    "native_resume": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "Explicit session ID and new stdin prompt"
+    },
+    "structured_events": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "JSONL exec events"
+    },
+    "mid_turn_input": {
+      "status": "unsupported",
+      "evidence_ref": null,
+      "note": "Exec accepts one stdin prompt; finish or interrupt, then resume the exact session"
+    },
+    "permission_requests": {
+      "status": "unsupported",
+      "evidence_ref": null,
+      "note": "Exec has no interactive approval response transport; denials are surfaced"
+    },
+    "mcp_tools": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "Per-session stdio MCP via config overrides; verified version only"
+    },
+    "usage_reporting": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "Native token counts only; monetary cost unavailable"
+    }
+  },
+  "records": [
+    {
+      "name": "edit-and-mcp",
+      "interrupted": false,
+      "result": {
+        "provider": "codex",
+        "provenance": "live",
+        "native_session_id": "01a16da6-c0ba-7760-aa7b-f75cbfd810cd",
+        "exit_code": 0,
+        "signal": null,
+        "success": true,
+        "text": "I’ll call `crew.ping`, then create `proof.txt` with the exact content.\nDONE",
+        "error": null
+      },
+      "events": [
+        {
+          "type": "session",
+          "native_session_id": "01a16da6-c0ba-7760-aa7b-f75cbfd810cd",
+          "provenance": "live"
+        },
+        {
+          "type": "text",
+          "text": "I’ll call `crew.ping`, then create `proof.txt` with the exact content.\n",
+          "provenance": "live",
+          "native_session_id": "01a16da6-c0ba-7760-aa7b-f75cbfd810cd"
+        },
+        {
+          "type": "tool",
+          "text": "mcp_tool_call item_1 (in_progress)\ncrew.ping\nnull",
+          "provenance": "live",
+          "native_session_id": "01a16da6-c0ba-7760-aa7b-f75cbfd810cd"
+        },
+        {
+          "type": "tool",
+          "text": "mcp_tool_call item_1 (completed)\ncrew.ping\n{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"pong\\\":\\\"L05_FIRST\\\",\\\"token_present\\\":true}\"}],\"structured_content\":null}",
+          "provenance": "live",
+          "native_session_id": "01a16da6-c0ba-7760-aa7b-f75cbfd810cd"
+        },
+        {
+          "type": "tool",
+          "text": "file_change item_2 (in_progress)\n[{\"path\":\"/private/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-MbdhWj/avity codex live nKEY7n/proof.txt\",\"kind\":\"add\"}]",
+          "provenance": "live",
+          "native_session_id": "01a16da6-c0ba-7760-aa7b-f75cbfd810cd"
+        },
+        {
+          "type": "tool",
+          "text": "file_change item_2 (completed)\n[{\"path\":\"/private/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-MbdhWj/avity codex live nKEY7n/proof.txt\",\"kind\":\"add\"}]",
+          "provenance": "live",
+          "native_session_id": "01a16da6-c0ba-7760-aa7b-f75cbfd810cd"
+        },
+        {
+          "type": "text",
+          "text": "DONE",
+          "provenance": "live",
+          "native_session_id": "01a16da6-c0ba-7760-aa7b-f75cbfd810cd"
+        },
+        {
+          "type": "usage",
+          "usage": {
+            "input_tokens": 76737,
+            "output_tokens": 212
+          },
+          "provenance": "live",
+          "native_session_id": "01a16da6-c0ba-7760-aa7b-f75cbfd810cd"
+        },
+        {
+          "type": "result",
+          "provenance": "live",
+          "success": true,
+          "native_session_id": "01a16da6-c0ba-7760-aa7b-f75cbfd810cd"
+        }
+      ]
+    },
+    {
+      "name": "resume-new-note",
+      "interrupted": false,
+      "result": {
+        "provider": "codex",
+        "provenance": "live",
+        "native_session_id": "01a16da6-c0ba-7760-aa7b-f75cbfd810cd",
+        "exit_code": 0,
+        "signal": null,
+        "success": true,
+        "text": "I’ll append the new line to `proof.txt`, preserving the existing line.\nDONE",
+        "error": null
+      },
+      "events": [
+        {
+          "type": "session",
+          "native_session_id": "01a16da6-c0ba-7760-aa7b-f75cbfd810cd",
+          "provenance": "live"
+        },
+        {
+          "type": "text",
+          "text": "I’ll append the new line to `proof.txt`, preserving the existing line.\n",
+          "provenance": "live",
+          "native_session_id": "01a16da6-c0ba-7760-aa7b-f75cbfd810cd"
+        },
+        {
+          "type": "tool",
+          "text": "file_change item_1 (in_progress)\n[{\"path\":\"/private/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-MbdhWj/avity codex live nKEY7n/proof.txt\",\"kind\":\"update\"}]",
+          "provenance": "live",
+          "native_session_id": "01a16da6-c0ba-7760-aa7b-f75cbfd810cd"
+        },
+        {
+          "type": "tool",
+          "text": "file_change item_1 (completed)\n[{\"path\":\"/private/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-MbdhWj/avity codex live nKEY7n/proof.txt\",\"kind\":\"update\"}]",
+          "provenance": "live",
+          "native_session_id": "01a16da6-c0ba-7760-aa7b-f75cbfd810cd"
+        },
+        {
+          "type": "text",
+          "text": "DONE",
+          "provenance": "live",
+          "native_session_id": "01a16da6-c0ba-7760-aa7b-f75cbfd810cd"
+        },
+        {
+          "type": "usage",
+          "usage": {
+            "input_tokens": 135898,
+            "output_tokens": 366
+          },
+          "provenance": "live",
+          "native_session_id": "01a16da6-c0ba-7760-aa7b-f75cbfd810cd"
+        },
+        {
+          "type": "result",
+          "provenance": "live",
+          "success": true,
+          "native_session_id": "01a16da6-c0ba-7760-aa7b-f75cbfd810cd"
+        }
+      ]
+    },
+    {
+      "name": "interrupt",
+      "interrupted": true,
+      "result": {
+        "provider": "codex",
+        "provenance": "live",
+        "native_session_id": "01a16da7-3469-72d3-a400-65dd03d25e1b",
+        "exit_code": 1,
+        "signal": "SIGINT",
+        "success": false,
+        "text": "I’ll run the command in the current directory, with the file creation after the 30-second sleep.",
+        "error": {
+          "kind": "process",
+          "message": "Native provider interrupted with SIGINT"
+        }
+      },
+      "events": [
+        {
+          "type": "session",
+          "native_session_id": "01a16da7-3469-72d3-a400-65dd03d25e1b",
+          "provenance": "live"
+        },
+        {
+          "type": "text",
+          "text": "I’ll run the command in the current directory, with the file creation after the 30-second sleep.",
+          "provenance": "live",
+          "native_session_id": "01a16da7-3469-72d3-a400-65dd03d25e1b"
+        },
+        {
+          "type": "tool",
+          "text": "command_execution item_1 (in_progress)\n/bin/zsh -lc 'sleep 30 && touch interrupted.txt'\nexit_code: unavailable\n",
+          "provenance": "live",
+          "native_session_id": "01a16da7-3469-72d3-a400-65dd03d25e1b"
+        },
+        {
+          "type": "unknown",
+          "provenance": "live",
+          "text": "stderr: 2026-10-24T11:24:00.888257Z ERROR codex_core::session: failed to record rollout items: thread 01a16da7-3469-72d3-a400-65dd03d25e1b not found\n",
+          "native_session_id": "01a16da7-3469-72d3-a400-65dd03d25e1b"
+        },
+        {
+          "type": "result",
+          "provenance": "live",
+          "success": false,
+          "error": {
+            "kind": "process",
+            "message": "Native provider interrupted with SIGINT"
+          },
+          "native_session_id": "01a16da7-3469-72d3-a400-65dd03d25e1b"
+        }
+      ]
+    },
+    {
+      "name": "resume-interrupted",
+      "interrupted": false,
+      "result": {
+        "provider": "codex",
+        "provenance": "live",
+        "native_session_id": "01a16da7-3469-72d3-a400-65dd03d25e1b",
+        "exit_code": 0,
+        "signal": null,
+        "success": true,
+        "text": "I’ll create `recovered.txt` now without repeating the sleep.DONE",
+        "error": null
+      },
+      "events": [
+        {
+          "type": "session",
+          "native_session_id": "01a16da7-3469-72d3-a400-65dd03d25e1b",
+          "provenance": "live"
+        },
+        {
+          "type": "text",
+          "text": "I’ll create `recovered.txt` now without repeating the sleep.",
+          "provenance": "live",
+          "native_session_id": "01a16da7-3469-72d3-a400-65dd03d25e1b"
+        },
+        {
+          "type": "tool",
+          "text": "file_change item_1 (in_progress)\n[{\"path\":\"/private/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-MbdhWj/avity codex live nKEY7n/recovered.txt\",\"kind\":\"add\"}]",
+          "provenance": "live",
+          "native_session_id": "01a16da7-3469-72d3-a400-65dd03d25e1b"
+        },
+        {
+          "type": "tool",
+          "text": "file_change item_1 (completed)\n[{\"path\":\"/private/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-MbdhWj/avity codex live nKEY7n/recovered.txt\",\"kind\":\"add\"}]",
+          "provenance": "live",
+          "native_session_id": "01a16da7-3469-72d3-a400-65dd03d25e1b"
+        },
+        {
+          "type": "text",
+          "text": "DONE",
+          "provenance": "live",
+          "native_session_id": "01a16da7-3469-72d3-a400-65dd03d25e1b"
+        },
+        {
+          "type": "usage",
+          "usage": {
+            "input_tokens": 84752,
+            "output_tokens": 127
+          },
+          "provenance": "live",
+          "native_session_id": "01a16da7-3469-72d3-a400-65dd03d25e1b"
+        },
+        {
+          "type": "result",
+          "provenance": "live",
+          "success": true,
+          "native_session_id": "01a16da7-3469-72d3-a400-65dd03d25e1b"
+        }
+      ]
+    },
+    {
+      "name": "permission-read-only",
+      "interrupted": false,
+      "result": {
+        "provider": "codex",
+        "provenance": "live",
+        "native_session_id": "01a16da7-65a0-7893-b5cb-e0bc22b6d8ee",
+        "exit_code": 0,
+        "signal": null,
+        "success": true,
+        "text": "I’ll attempt once to create `denied.txt` in the current directory and report the result.The sandbox refused the write: `operation not permitted: denied.txt`. No retry or escalation was attempted.",
+        "error": null
+      },
+      "events": [
+        {
+          "type": "session",
+          "native_session_id": "01a16da7-65a0-7893-b5cb-e0bc22b6d8ee",
+          "provenance": "live"
+        },
+        {
+          "type": "text",
+          "text": "I’ll attempt once to create `denied.txt` in the current directory and report the result.",
+          "provenance": "live",
+          "native_session_id": "01a16da7-65a0-7893-b5cb-e0bc22b6d8ee"
+        },
+        {
+          "type": "text",
+          "text": "The sandbox refused the write: `operation not permitted: denied.txt`. No retry or escalation was attempted.",
+          "provenance": "live",
+          "native_session_id": "01a16da7-65a0-7893-b5cb-e0bc22b6d8ee"
+        },
+        {
+          "type": "usage",
+          "usage": {
+            "input_tokens": 36688,
+            "output_tokens": 86
+          },
+          "provenance": "live",
+          "native_session_id": "01a16da7-65a0-7893-b5cb-e0bc22b6d8ee"
+        },
+        {
+          "type": "result",
+          "provenance": "live",
+          "success": true,
+          "native_session_id": "01a16da7-65a0-7893-b5cb-e0bc22b6d8ee"
+        }
+      ]
+    }
+  ],
+  "success": true
+}

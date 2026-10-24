@@ -1,0 +1,17 @@
+✔ MCP ping declares its diagnostic read-only policy over the real local protocol (40.997167ms)
+✔ Codex normalizes session, tool IDs, text, usage and completion (0.298333ms)
+✔ Codex preserves unknown diagnostics and classifies provider errors (0.374792ms)
+✔ Codex probe is bounded and reports unsupported interactive operations (100.605833ms)
+✔ Codex passes prompt on stdin, preserves argv, model, permissions and bridge env (167.715625ms)
+✔ Codex inherits native defaults and refreshes its scoped MCP inventory every turn (207.542375ms)
+✔ Codex refuses invalid or unreadable MCP inventories without exposing diagnostics (330.535208ms)
+✔ Codex sessions remain isolated and resume only the requested UUID with new input (209.323875ms)
+✔ Codex process rejects truncation, errors, bad exits and unsupported updates (1099.191958ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2238.992916

@@ -1,0 +1,34 @@
+{
+  "summary": "L06 corrigé après revue indépendante : périmètre documentaire canonique et timeout des descendants protégés, deux régressions rouges puis vertes. Relecture indépendante du commit corrigé sans finding ; combinaison exacte vérifiée 82/82 sur Node 24 et 26 par le coordinateur.",
+  "revision": "git:355b32a61d8e64576c1a61e039c5fd48f2abfd4d",
+  "artifacts": [{ "commit": "355b32a61d8e64576c1a61e039c5fd48f2abfd4d" }],
+  "tests": [
+    {
+      "name": "Contrôles du coordinateur sur combinaison corrigée Node 26",
+      "command": "npm run check",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L06/final-checks.md",
+      "revision": "git:355b32a61d8e64576c1a61e039c5fd48f2abfd4d"
+    },
+    {
+      "name": "82 tests Node 24 de la combinaison exécutés par le coordinateur",
+      "command": "npm exec --yes --package=node@24.22.1 -- node --test 'dist/tests/**/*.test.js'",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L06/final-checks.md",
+      "revision": "git:355b32a61d8e64576c1a61e039c5fd48f2abfd4d"
+    },
+    {
+      "name": "15 tests workspace exécutés par le relecteur indépendant",
+      "command": "npm exec -- node --test dist/tests/workspace.test.js",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L06/independent-review.md",
+      "revision": "git:355b32a61d8e64576c1a61e039c5fd48f2abfd4d"
+    }
+  ],
+  "limitations": [],
+  "next_steps": [],
+  "live_verification": "not_applicable"
+}

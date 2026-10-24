@@ -1,0 +1,28 @@
+{
+  "checked_at": "2026-10-24T11:52:01.737Z",
+  "version": "0.163.0",
+  "mechanism": "Per-run documented stable features.plugins=false and root table; mcp list --json, no LLM/server start",
+  "rows": [
+    {
+      "name": "plugins-off-crew",
+      "exit_code": 0,
+      "hasAmbient": false,
+      "hasCrew": true,
+      "otherCount": 6
+    },
+    {
+      "name": "plugins-off-empty",
+      "exit_code": 0,
+      "hasAmbient": false,
+      "hasCrew": false,
+      "otherCount": 6
+    },
+    {
+      "name": "apps-and-plugins-off-crew",
+      "exit_code": 0,
+      "hasAmbient": false,
+      "hasCrew": true,
+      "otherCount": 6
+    }
+  ]
+}

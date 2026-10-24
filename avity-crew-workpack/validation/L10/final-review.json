@@ -1,0 +1,49 @@
+{
+  "handoff_id": "handoff-a9aa5042673e4a3e9b7aa341c87773cd",
+  "outcome": "accepted",
+  "source_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "tested_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "verification_scope": "combined_code",
+  "summary": "Revue indépendante bornée de l00_provider_audit : aucun finding bloquant L10 sur la combinaison 537d3c4. Les contrôles source Node26 et les 182 tests Node24 viennent d'être exécutés à cette même révision. Les traces natives, relues avec SQLite en lecture seule et Git réel, confirment interruption avant passation, anciens fichiers préservés, nouvelle tentative, contexte inspectable v2, remplacement Claude vers Codex et clôture du même objectif. Les gardes de déduplication, tentatives périmées et préparation sont couvertes par les tests actuels et les deux revues ciblées des correctifs. Quota/auth réels non provoqués, processus ambigus et import d'une capture incertaine soumis à un ordre explicite ; aucun succès inventé. Aucun modèle lancé pendant cette revue.",
+  "findings": [],
+  "integration": {
+    "base_revision": "git:f0d0d077e1ed5464f9dc6e476403e6e349c39bf7",
+    "source_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+    "candidate_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+    "evidence_ref": "avity-crew-workpack/validation/L10/final-review.md"
+  },
+  "checks": [
+    {
+      "name": "Contrôles source indépendants Node26.12.0 au même SHA, exécutés pendant la revue L08 immédiatement précédente",
+      "command": "npm run check",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L10/final-review.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Suite indépendante Node24.22.1 au même SHA : 182/182, zéro skip",
+      "command": "npm exec --yes --package=node@24.22.1 -- node --test --test-reporter=tap 'dist/tests/**/*.test.js'",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L10/final-review.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Relecture indépendante SQLite/Git des traces de reprise natives enregistrées, sans nouveau fournisseur",
+      "command": "node /Users/zeldris/avity-crew/avity-crew-workpack/validation/L11/assert-native-recipe.mjs /Users/zeldris/.codex/avity-crew-validation/20261024/data/avity-crew/project-1a121d7e95c2fc3d1965e22469d3c29b/state.sqlite '/Users/zeldris/.codex/avity-crew-validation/20261024/native new app final' run:71469044-5ca6-473e-8e78-de2f4ad719e6",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L10/final-review.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    }
+  ],
+  "evidence_refs": [
+    "avity-crew-workpack/validation/L10/recovery-delivery-review.md",
+    "avity-crew-workpack/validation/L10/recovery-preparation-review.md",
+    "avity-crew-workpack/validation/L11/new-app-native-report.json",
+    "avity-crew-workpack/validation/L11/new-app-browser-qa.json",
+    "avity-crew-workpack/validation/L11/native-process-observation.json",
+    "avity-crew-workpack/validation/L08/final-review.md"
+  ]
+}

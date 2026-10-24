@@ -1,0 +1,37 @@
+{
+  "subtask": "L07-T",
+  "lot_claimed": false,
+  "summary": "Preparation transport L07-T livree : HTTP loopback authentifie, propriete locale exclusive et nonce, client reconnectable, pont MCP stdio 2025-11-25 vers la meme API injectee. Principal issu seulement de la capability ; projet/run/liste outils/admin bornes ; ToolCall contractuel preserve entre MCP et fallback. Aucun moteur metier ni provider LLM remplace par les callbacks de test.",
+  "revision": "git:5a8e23e0037696cf03c2cf8fd70ca7c8e2b7afee",
+  "artifacts": [
+    { "commit": "5a8e23e0037696cf03c2cf8fd70ca7c8e2b7afee" },
+    { "ref": "validation/L07/transport-checks.md", "sha256": "bba503d9bb9390fc035e27a5dcd07a75f83d564cbc43755a59d8afc81cf6290b" }
+  ],
+  "tests": [
+    {
+      "name": "Typage format build et 65 tests Node 26.12.0",
+      "command": "npm run check",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L07/transport-checks.md",
+      "revision": "git:5a8e23e0037696cf03c2cf8fd70ca7c8e2b7afee"
+    },
+    {
+      "name": "Huit tests transport avec sockets HTTP SQLite et subprocess MCP reels sur Node 24.22.1",
+      "command": "npm exec --yes --package=node@24.22.1 -- node --test dist/tests/supervisor-transport.test.js",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L07/transport-checks.md",
+      "revision": "git:5a8e23e0037696cf03c2cf8fd70ca7c8e2b7afee"
+    }
+  ],
+  "limitations": [],
+  "next_steps": [],
+  "documented_limits": [
+    "MCP initialize 2025-11-25 pris en charge ; revision stateless 2026-07-28 non revendiquee.",
+    "Un garde de demarrage interrompu/ambigu est conserve pour reconciliation explicite, sans retrait speculatif.",
+    "Recette provider, daemonisation, CLI principale et regles metier du lot L07 hors de cette preparation ; aucun provider reel lance.",
+    "Runtime teste macOS arm64 Node24/26 ; Windows/Linux non executes."
+  ],
+  "live_verification": "not_applicable"
+}

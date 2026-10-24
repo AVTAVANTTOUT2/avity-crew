@@ -1,0 +1,5 @@
+- Actor authority comes from the authenticated supervisor channel, never prompt JSON; Store is an internal typed domain API, not an authenticated RPC endpoint.
+- Separate task/attempt/internal session/native session/process identities. Revocation/reassignment changes generation; same-session continuation does not. A stale attempt cannot submit even if its own Handoff fields are consistent.
+- Source delivery, independent review, combined candidate tests and live-provider evidence are separate. Process exit0 and model satisfaction do not accept work. Simulation stays explicitly fake/simulated and cannot satisfy a live proof.
+- Mutations use an idempotency key and optimistic run version. Mutation/event/dedup response commit together. Expired heartbeat requires reconciliation, never automatic release.
+- Spawn native CLIs with argv arrays and prompt stdin, no shell interpolation/bypass. Consume events concurrently with result; native runner applies bounded output/backpressure. Unsupported mid-turn send must fail explicitly; supervisor owns durable message queues.

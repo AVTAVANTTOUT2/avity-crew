@@ -1,0 +1,53 @@
+{
+  "summary": "L08 : orchestration persistante, missions bornées et sources versionnées, auteurs natifs Claude/Codex réellement simultanés, reprise d'un travail partiel, remplacement du chef dans le même objectif, actualisation ciblée du contrat, combinaison testée, corrections de passation puis revues et acceptations. Le run applicatif propre est completed sur le paquet installé de cette révision. Le refus de clôture pour références impropres a été résolu avec les preuves existantes, sans modification des critères.",
+  "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "artifacts": [
+    {
+      "commit": "537d3c40f673eb2ca7b0984d695bfed90282e746"
+    }
+  ],
+  "tests": [
+    {
+      "name": "Combinaison finale182tests Node26",
+      "command": "npm run check",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L11/final-checks.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Combinaison finale182tests Node24",
+      "command": "npm exec --yes --package=node@24.22.1 -- node --test 'dist/tests/**/*.test.js'",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L11/final-checks.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Chef Claude et auteur Claude réels dans recette mixte",
+      "command": "node validation/L11/assert-native-recipe.mjs <data-dir>/state.sqlite '<project-root>' run:71469044-5ca6-473e-8e78-de2f4ad719e6",
+      "kind": "live",
+      "provider": "claude",
+      "exit_code": 0,
+      "evidence_ref": "validation/L11/new-app-native-report.json",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Auteur Codex puis chef Codex réels dans même recette",
+      "command": "node validation/L11/assert-native-recipe.mjs <data-dir>/state.sqlite '<project-root>' run:71469044-5ca6-473e-8e78-de2f4ad719e6",
+      "kind": "live",
+      "provider": "codex",
+      "exit_code": 0,
+      "evidence_ref": "validation/L11/new-app-native-report.json",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    }
+  ],
+  "limitations": [],
+  "next_steps": [],
+  "documented_limits": [
+    "Une réponse technique de diagnostic a été fournie aux bonnes références ; aucun arbitrage business ni règle de preuve n'a été changé.",
+    "La recette documentaire sans Git historique garde ses sources exactes et ses preuves distinctes ; tests actuels documentaires présents dans la suite182.",
+    "macOS arm64 qualifié localement ; Linux/WSL et CI distante non exécutés."
+  ],
+  "live_verification": "passed"
+}

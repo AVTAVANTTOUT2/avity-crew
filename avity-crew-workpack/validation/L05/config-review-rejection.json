@@ -1,0 +1,8 @@
+{
+  "handoff_id":"handoff-86454a6073ca4d0687359659dab60d28",
+  "source_revision":"git:f1d594a488438dbee12f546f4bdab28a44b42c9b",
+  "outcome":"changes_requested",
+  "summary":"Avant intégration, aligner le démarrage produit sur les préférences et protections natives, tout en isolant strictement les outils MCP du run.",
+  "findings":["argumentsFor impose --ignore-user-config, choix initial d'isolation de tests selon l'audit L00. Il exclut aussi le modèle et les permissions du config.toml utilisateur ; avec model:null les préférences natives ne sont donc pas héritées. Préserver cet héritage pour le produit en limitant explicitement le périmètre MCP à crew, sans réactiver les serveurs ambiants ni ajouter un auto-approve global."],
+  "evidence_refs":["avity-crew-workpack/validation/L05/config-review.md"]
+}

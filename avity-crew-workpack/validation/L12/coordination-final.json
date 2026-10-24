@@ -1,0 +1,85 @@
+{
+  "project": "Avity Crew",
+  "state_revision": 83,
+  "all_lots_accepted": true,
+  "tasks": [
+    {
+      "id": "L00",
+      "status": "accepted",
+      "accepted_revision": "sha256:20416bcacece8c37d36de325ae79d9555f5f66c8405ae8141467d750b6c56f4d",
+      "review_id": "review-4e30dea31d4c4389ae33f1f6987116ec"
+    },
+    {
+      "id": "L01",
+      "status": "accepted",
+      "accepted_revision": "git:4767e10e03806309bc629d4dc1e65cedc0604f0a",
+      "review_id": "review-4a2dc33f1508401d9115c6678e8a31db"
+    },
+    {
+      "id": "L02",
+      "status": "accepted",
+      "accepted_revision": "git:cff8ef66ad33bf0e103e9192d868baabcd7a220d",
+      "review_id": "review-4b75b20dde364b1db8ce2d977ec52c3d"
+    },
+    {
+      "id": "L03",
+      "status": "accepted",
+      "accepted_revision": "git:19b32f19578ee59d563e25250b74d35a05815139",
+      "review_id": "review-168a36ea9d7244da8ea1a98e4660fffe"
+    },
+    {
+      "id": "L04",
+      "status": "accepted",
+      "accepted_revision": "git:b30b3301a826513ed706d248962df1baf44e8354",
+      "review_id": "review-36fc4b3aa3ed4166a0786da8984a7269"
+    },
+    {
+      "id": "L05",
+      "status": "accepted",
+      "accepted_revision": "git:355b32a61d8e64576c1a61e039c5fd48f2abfd4d",
+      "review_id": "review-154142381c7a4330aff49bb8144e6376"
+    },
+    {
+      "id": "L06",
+      "status": "accepted",
+      "accepted_revision": "git:355b32a61d8e64576c1a61e039c5fd48f2abfd4d",
+      "review_id": "review-be8a267d7d2d4bd2977b1c0f4de570ec"
+    },
+    {
+      "id": "L07",
+      "status": "accepted",
+      "accepted_revision": "git:ccbab6f1551c2f54056bece878b229377f1ef52f",
+      "review_id": "review-2d4364c710214a4dbee32a6cd46fa243"
+    },
+    {
+      "id": "L08",
+      "status": "accepted",
+      "accepted_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+      "review_id": "review-5f9aabe550ad482cba857ecdb5b472b1"
+    },
+    {
+      "id": "L09",
+      "status": "accepted",
+      "accepted_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+      "review_id": "review-3154d34788d44e9ebe7f4041fe8747ee"
+    },
+    {
+      "id": "L10",
+      "status": "accepted",
+      "accepted_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+      "review_id": "review-1fd4866d2e2a43b4a1f07bea66b6fc4d"
+    },
+    {
+      "id": "L11",
+      "status": "accepted",
+      "accepted_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+      "review_id": "review-7bd6ebd25d4e4e8ca147f54601a2ce8d"
+    },
+    {
+      "id": "L12",
+      "status": "accepted",
+      "accepted_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+      "review_id": "review-12e6ebaeac5b434d82936c24733d1bbc"
+    }
+  ]
+}

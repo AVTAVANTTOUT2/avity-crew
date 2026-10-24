@@ -1,0 +1,20 @@
+{
+  "engine_source_revision":"537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "run_id":"run:858ac152-b0d8-4b3f-8720-7ebec5b0a36e",
+  "tested_revision":"git:6be7d7e2d26e5b2aed86b73ad687a3a14a03963f",
+  "mode":"manual",
+  "browser":"Codex in-app browser",
+  "server":"Exact accepted createApp implementation, localhost ephemeral port and private temporary SQLite database outside candidate",
+  "observations":[
+    "French chauffeur form with labelled date field loaded; empty planning list visible.",
+    "Selected2026-11-10 and clicked Créer mon planning; success text and new brouillon row appeared, list refreshed.",
+    "Set date2026-11-11 without submitting; used the explicit local fixture employer API to create that same day for alice in fixture-a; HTTP201, origin employer, state active.",
+    "Submitted the already-open chauffeur form; visible French conflict error described the planning created since form opening. Existing draft and employer active planning both remained available.",
+    "Reloaded the page; both rows remained visible.",
+    "Independent GET and assertions confirmed exactly2 rows, one conflicting day, employer origin and original driver draft retained.",
+    "Screenshot captured the conflict message and both rows. Temporary tab closed and test server stopped using observed process identity plus verified POSIX process-group cleanup."
+  ],
+  "result":"passed",
+  "api_state_assertion_exit_code":0,
+  "production":"No production application, person or account involved. Header-based authentication is the declared fixture harness only."
+}

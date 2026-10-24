@@ -1,0 +1,20 @@
+{
+  "single_source": "d5e07c1d82656add5f9f41a49a9ea3d8eed4f6ab",
+  "final_source": "7fb39c6ca135eddab75c1581843cd13965bf3f42",
+  "changed_files": [
+    "scripts/live-codex.mjs"
+  ],
+  "change": "Only test nonce excludes private PORT sentinel 1; provider/runner byte-identical",
+  "product_files": [
+    {
+      "path": "packages/providers/src/codex.ts",
+      "sha256": "b52f5f0b195d8b0c4f7893ff6100fa19f39949664929950b1dadb9e80e0f969c",
+      "identical": true
+    },
+    {
+      "path": "packages/providers/src/process.ts",
+      "sha256": "a24f3d6e9da8f369ff647a55257392356397512798c23006d449c68694dc7835",
+      "identical": true
+    }
+  ]
+}

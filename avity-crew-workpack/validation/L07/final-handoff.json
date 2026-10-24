@@ -1,0 +1,47 @@
+{
+  "summary": "L07 raccordé : service propriétaire unique, HTTP loopback authentifié, bridge MCP stdio, identité issue des capacités privées et fencing de génération/tentative, ordonnanceur borné, persistance et vues reconnectables. Les requêtes en file et les effets après await revalident l'autorité ; la promotion Git ne précède pas cette validation. Les tests de révocation ont été rouges avant les correctifs puis verts.",
+  "revision": "git:ccbab6f1551c2f54056bece878b229377f1ef52f",
+  "artifacts": [
+    {
+      "commit": "ccbab6f1551c2f54056bece878b229377f1ef52f"
+    },
+    {
+      "ref": "validation/L07/final-checks.md",
+      "sha256": "f14bf8c98a773103536991a776cc45ce5e51da517a574aac4edb8f943b604475"
+    },
+    {
+      "ref": "validation/L07/queued-authority-review.md",
+      "sha256": "900f4e23b13072c79e1f0abf5e8cff3e9d3025831ea7e2d5778d90768b104034"
+    },
+    {
+      "ref": "validation/L07/native-doc-claude-report.json",
+      "sha256": "ae833ca8ebb828e24594379eb550d8b390163b7f9e689014fb3f4e401404403f"
+    }
+  ],
+  "tests": [
+    {
+      "name": "Contrôles complets Node26, 177 tests",
+      "command": "npm run check",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L07/final-checks.md",
+      "revision": "git:ccbab6f1551c2f54056bece878b229377f1ef52f"
+    },
+    {
+      "name": "177 tests Node24.22.1",
+      "command": "npm exec --yes --package=node@24.22.1 -- node --test 'dist/tests/**/*.test.js'",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L07/final-checks.md",
+      "revision": "git:ccbab6f1551c2f54056bece878b229377f1ef52f"
+    }
+  ],
+  "limitations": [],
+  "next_steps": [],
+  "documented_limits": [
+    "Recette locale macOS arm64 ; Linux/WSL et CI distante non exécutés.",
+    "La recette documentaire native de développement référencée conserve ses révisions historiques ; elle n'est pas la qualification finale L11/L12.",
+    "La fin d'un tour fournisseur ne vaut pas acceptation métier ; les preuves/revues restent requises."
+  ],
+  "live_verification": "passed"
+}

@@ -1,0 +1,534 @@
+{
+  "schema_version": 1,
+  "level": "live-development-validation",
+  "recorded_at": "2026-10-24T14:54:54.357Z",
+  "project_root": "/Users/zeldris/.codex/avity-crew-validation/20261024/native-doc-claude",
+  "run_id": "run:6eb68e3b-a22b-4920-9ab7-b4d0a10f37e6",
+  "final_status": "completed",
+  "final_version": 229,
+  "final_event_seq": 739,
+  "goal_criteria": [
+    {
+      "id": "criterion:1",
+      "description": "Le fichier docs/recette.md contient AVITY_CREW_NATIVE_CLAUDE et une explication française de la recette.",
+      "required": true,
+      "verification": "independent review and observed checks"
+    },
+    {
+      "id": "criterion:2",
+      "description": "Une revue indépendante et des preuves observées permettent l’acceptation du document et la clôture du run.",
+      "required": true,
+      "verification": "independent review and observed checks"
+    }
+  ],
+  "chief_provider": "claude",
+  "chief_generation": 2,
+  "configured_max_active_agents": 1,
+  "observed_native_interval_peak": 1,
+  "interval_definition": "First reported session event through terminal normalized result. Only intervals with an observed terminal result are counted; incomplete early hook observation is listed separately and excluded from this metric.",
+  "incomplete_native_turn_ids": ["turn:25b86fef-bf7e-4dc6-af82-3bafa6903f47"],
+  "turns": [
+    {
+      "turn_id": "turn:25b86fef-bf7e-4dc6-af82-3bafa6903f47",
+      "session_id": "chief:dee6f43a6d4880ba2e47b86962bcf8e9",
+      "task_id": null,
+      "provider": "claude",
+      "native_session_id": "a6e18708-ef9b-4f82-bc47-e7bdb650cc4e",
+      "started_observation": "2026-10-24T13:35:39.144Z",
+      "result": null
+    },
+    {
+      "turn_id": "turn:3da457b9-fef9-4154-93d8-43d2116ffb91",
+      "session_id": "chief:dee6f43a6d4880ba2e47b86962bcf8e9",
+      "task_id": null,
+      "provider": "claude",
+      "native_session_id": "a6e18708-ef9b-4f82-bc47-e7bdb650cc4e",
+      "started_observation": "2026-10-24T13:40:28.740Z",
+      "result": {
+        "success": false,
+        "error": {
+          "kind": "process",
+          "message": "No conversation found with session ID: a6e18708-ef9b-4f82-bc47-e7bdb650cc4e"
+        },
+        "at": "2026-10-24T13:40:29.562Z"
+      }
+    },
+    {
+      "turn_id": "turn:82ba5871-31d5-48cc-9bbe-0fbc467957e0",
+      "session_id": "chief:a7645879f0577b72206c4ec9fade6465",
+      "task_id": null,
+      "provider": "claude",
+      "native_session_id": "382478c4-0f6d-47e1-8ffb-237bcaa2a2ac",
+      "started_observation": "2026-10-24T13:42:18.638Z",
+      "result": {
+        "success": true,
+        "error": null,
+        "at": "2026-10-24T13:42:46.660Z"
+      }
+    },
+    {
+      "turn_id": "turn:4152eeae-513a-4357-941e-a0b695964f75",
+      "session_id": "session:5b8eb87a8f9f0419f01dceff9da1b88c",
+      "task_id": "task-doc-recette",
+      "provider": "claude",
+      "native_session_id": "46bb68bd-39ae-479b-af49-50b1e3ed7842",
+      "started_observation": "2026-10-24T13:42:47.476Z",
+      "result": {
+        "success": false,
+        "error": {
+          "kind": "permission",
+          "message": "Claude Code denied a requested tool"
+        },
+        "at": "2026-10-24T13:44:03.612Z"
+      }
+    },
+    {
+      "turn_id": "turn:bc8bc8e6-a20e-4523-8026-bb79d999da1e",
+      "session_id": "chief:a7645879f0577b72206c4ec9fade6465",
+      "task_id": null,
+      "provider": "claude",
+      "native_session_id": "382478c4-0f6d-47e1-8ffb-237bcaa2a2ac",
+      "started_observation": "2026-10-24T13:44:04.381Z",
+      "result": {
+        "success": true,
+        "error": null,
+        "at": "2026-10-24T13:44:22.910Z"
+      }
+    },
+    {
+      "turn_id": "turn:f4ccb38a-c97d-43db-b99d-d3737d7b356b",
+      "session_id": "chief:a7645879f0577b72206c4ec9fade6465",
+      "task_id": null,
+      "provider": "claude",
+      "native_session_id": "382478c4-0f6d-47e1-8ffb-237bcaa2a2ac",
+      "started_observation": "2026-10-24T13:44:24.072Z",
+      "result": {
+        "success": true,
+        "error": null,
+        "at": "2026-10-24T13:44:35.870Z"
+      }
+    },
+    {
+      "turn_id": "turn:d7884996-f13b-4adf-91c4-21640cf846a1",
+      "session_id": "session:2f65552ab50f55dede2ff77d4af256fe",
+      "task_id": "task-doc-recette",
+      "provider": "claude",
+      "native_session_id": "46bb68bd-39ae-479b-af49-50b1e3ed7842",
+      "started_observation": "2026-10-24T13:53:57.016Z",
+      "result": {
+        "success": true,
+        "error": null,
+        "at": "2026-10-24T13:54:27.727Z"
+      }
+    },
+    {
+      "turn_id": "turn:152c21e7-37ee-4e09-918f-19706f66d20e",
+      "session_id": "chief:a7645879f0577b72206c4ec9fade6465",
+      "task_id": null,
+      "provider": "claude",
+      "native_session_id": "382478c4-0f6d-47e1-8ffb-237bcaa2a2ac",
+      "started_observation": "2026-10-24T13:54:28.468Z",
+      "result": {
+        "success": true,
+        "error": null,
+        "at": "2026-10-24T13:55:03.474Z"
+      }
+    },
+    {
+      "turn_id": "turn:3a5ffefa-48ec-462a-b702-3a5fc71cedf0",
+      "session_id": "session:fb4eb3a89e2a012c38fb3de1242dc415",
+      "task_id": "task-review-recette",
+      "provider": "codex",
+      "native_session_id": "01a16e31-9382-7243-bae6-812c8f7ab526",
+      "started_observation": "2026-10-24T13:55:06.041Z",
+      "result": {
+        "success": true,
+        "error": null,
+        "at": "2026-10-24T13:55:55.375Z"
+      }
+    },
+    {
+      "turn_id": "turn:10310a75-2e65-47c9-8b49-135844ea3e29",
+      "session_id": "chief:a7645879f0577b72206c4ec9fade6465",
+      "task_id": null,
+      "provider": "claude",
+      "native_session_id": "382478c4-0f6d-47e1-8ffb-237bcaa2a2ac",
+      "started_observation": "2026-10-24T13:55:56.835Z",
+      "result": {
+        "success": true,
+        "error": null,
+        "at": "2026-10-24T13:56:37.201Z"
+      }
+    },
+    {
+      "turn_id": "turn:3140d86d-4acc-48eb-894a-7a41552c3340",
+      "session_id": "chief:a7645879f0577b72206c4ec9fade6465",
+      "task_id": null,
+      "provider": "claude",
+      "native_session_id": "382478c4-0f6d-47e1-8ffb-237bcaa2a2ac",
+      "started_observation": "2026-10-24T13:56:37.976Z",
+      "result": {
+        "success": true,
+        "error": null,
+        "at": "2026-10-24T13:57:00.890Z"
+      }
+    },
+    {
+      "turn_id": "turn:6d556210-9c46-4c0c-8653-2ab3d459b9a5",
+      "session_id": "chief:a7645879f0577b72206c4ec9fade6465",
+      "task_id": null,
+      "provider": "claude",
+      "native_session_id": "382478c4-0f6d-47e1-8ffb-237bcaa2a2ac",
+      "started_observation": "2026-10-24T14:26:42.244Z",
+      "result": {
+        "success": true,
+        "error": null,
+        "at": "2026-10-24T14:27:25.798Z"
+      }
+    },
+    {
+      "turn_id": "turn:77eb5200-2349-449b-857f-4a79667213de",
+      "session_id": "session:a8c2a5dd66dde525e921f125dbfeb630",
+      "task_id": "task-doc-recette",
+      "provider": "claude",
+      "native_session_id": "46bb68bd-39ae-479b-af49-50b1e3ed7842",
+      "started_observation": "2026-10-24T14:27:26.409Z",
+      "result": {
+        "success": true,
+        "error": null,
+        "at": "2026-10-24T14:27:54.150Z"
+      }
+    },
+    {
+      "turn_id": "turn:9bbaa7d8-3884-4553-bfa5-b7918d8dcde4",
+      "session_id": "chief:a7645879f0577b72206c4ec9fade6465",
+      "task_id": null,
+      "provider": "claude",
+      "native_session_id": "382478c4-0f6d-47e1-8ffb-237bcaa2a2ac",
+      "started_observation": "2026-10-24T14:27:54.783Z",
+      "result": {
+        "success": true,
+        "error": null,
+        "at": "2026-10-24T14:28:33.864Z"
+      }
+    },
+    {
+      "turn_id": "turn:1dbe8792-5291-4c6d-92ad-f12591908e20",
+      "session_id": "session:6782b711443ed1abc7169ae400555cff",
+      "task_id": "task-review-recette-v2",
+      "provider": "codex",
+      "native_session_id": "01a16e50-405f-7421-98ba-a17743d37e68",
+      "started_observation": "2026-10-24T14:28:36.168Z",
+      "result": {
+        "success": true,
+        "error": null,
+        "at": "2026-10-24T14:29:39.320Z"
+      }
+    },
+    {
+      "turn_id": "turn:cb27cae1-adc3-4eae-9014-74b9aad3befd",
+      "session_id": "chief:a7645879f0577b72206c4ec9fade6465",
+      "task_id": null,
+      "provider": "claude",
+      "native_session_id": "382478c4-0f6d-47e1-8ffb-237bcaa2a2ac",
+      "started_observation": "2026-10-24T14:37:05.169Z",
+      "result": {
+        "success": true,
+        "error": null,
+        "at": "2026-10-24T14:38:02.706Z"
+      }
+    }
+  ],
+  "sessions": [
+    {
+      "id": "chief:dee6f43a6d4880ba2e47b86962bcf8e9",
+      "task_id": null,
+      "provider": "claude",
+      "model_requested": null,
+      "cli_version": "2.1.304 (Claude Code)",
+      "native_session_id": "a6e18708-ef9b-4f82-bc47-e7bdb650cc4e"
+    },
+    {
+      "id": "chief:a7645879f0577b72206c4ec9fade6465",
+      "task_id": null,
+      "provider": "claude",
+      "model_requested": null,
+      "cli_version": "2.1.304 (Claude Code)",
+      "native_session_id": "382478c4-0f6d-47e1-8ffb-237bcaa2a2ac"
+    },
+    {
+      "id": "session:5b8eb87a8f9f0419f01dceff9da1b88c",
+      "task_id": "task-doc-recette",
+      "provider": "claude",
+      "model_requested": null,
+      "cli_version": "2.1.304 (Claude Code)",
+      "native_session_id": "46bb68bd-39ae-479b-af49-50b1e3ed7842"
+    },
+    {
+      "id": "session:2f65552ab50f55dede2ff77d4af256fe",
+      "task_id": "task-doc-recette",
+      "provider": "claude",
+      "model_requested": null,
+      "cli_version": "2.1.304 (Claude Code)",
+      "native_session_id": "46bb68bd-39ae-479b-af49-50b1e3ed7842"
+    },
+    {
+      "id": "session:fb4eb3a89e2a012c38fb3de1242dc415",
+      "task_id": "task-review-recette",
+      "provider": "codex",
+      "model_requested": null,
+      "cli_version": "0.163.0",
+      "native_session_id": "01a16e31-9382-7243-bae6-812c8f7ab526"
+    },
+    {
+      "id": "session:a8c2a5dd66dde525e921f125dbfeb630",
+      "task_id": "task-doc-recette",
+      "provider": "claude",
+      "model_requested": null,
+      "cli_version": "2.1.304 (Claude Code)",
+      "native_session_id": "46bb68bd-39ae-479b-af49-50b1e3ed7842"
+    },
+    {
+      "id": "session:6782b711443ed1abc7169ae400555cff",
+      "task_id": "task-review-recette-v2",
+      "provider": "codex",
+      "model_requested": null,
+      "cli_version": "0.163.0",
+      "native_session_id": "01a16e50-405f-7421-98ba-a17743d37e68"
+    }
+  ],
+  "mcp_tools_observed": [
+    "accept_delivery",
+    "amend_task",
+    "collect_delivery",
+    "create_task",
+    "delegate_task",
+    "finish_run",
+    "get_status",
+    "inspect_project",
+    "publish_note",
+    "record_decision",
+    "report_blocker",
+    "send_message",
+    "submit_handoff",
+    "submit_review"
+  ],
+  "tasks": [
+    {
+      "id": "task-doc-recette",
+      "status": "accepted",
+      "generation": 6,
+      "criterion_ids": [
+        "criterion:1"
+      ],
+      "accepted_revision": "sha256:88402fd2d4118062b0c7893cbe617311409dab29b5d105196a0964b95428bb12"
+    },
+    {
+      "id": "task-review-recette",
+      "status": "accepted",
+      "generation": 1,
+      "criterion_ids": [
+        "criterion:1",
+        "criterion:2"
+      ],
+      "accepted_revision": null
+    },
+    {
+      "id": "task-review-recette-v2",
+      "status": "accepted",
+      "generation": 1,
+      "criterion_ids": [
+        "criterion:2"
+      ],
+      "accepted_revision": "sha256:88402fd2d4118062b0c7893cbe617311409dab29b5d105196a0964b95428bb12"
+    }
+  ],
+  "final_handoff": {
+    "schema_version": 1,
+    "id": "handoff-doc-recette-g6",
+    "task_id": "task-doc-recette",
+    "run_id": "run:6eb68e3b-a22b-4920-9ab7-b4d0a10f37e6",
+    "attempt_id": "attempt:a49ed2fb-ab49-4145-ae02-46ef77b2d759",
+    "generation": 6,
+    "status": "delivered",
+    "summary": "Resoumission inchangée de docs/recette.md (20 lignes, français, marqueur littéral AVITY_CREW_NATIVE_CLAUDE, déroulement chef → documenter Claude → reviewer Codex indépendant → acceptation et clôture par le chef). Contenu identique à la source observée source:d329805571517f45dfc7b4b46ab877a7085b378e (sha256:8e9b55ce8d7cbe07994524c6e72a76ecdb621b4d26b743a625f46aa78d1db270). Conformément à decision-criteria-split, seul criterion:1 est revendiqué ; message:0b5b425258e337bf594bf051022334ab est remplacé par cette décision et n'est pas appliqué ; message:450eab377fac76c1abba519967085872 est déjà couvert par la livraison via document_paths.",
+    "source_revision": "sha256:88402fd2d4118062b0c7893cbe617311409dab29b5d105196a0964b95428bb12",
+    "artifacts": [
+      {
+        "id": "artifact:c2b1335d9d300c3bbc52986501048268",
+        "kind": "file",
+        "reference": "artifacts/8e9b55ce8d7cbe07994524c6e72a76ecdb621b4d26b743a625f46aa78d1db270",
+        "revision": "sha256:8e9b55ce8d7cbe07994524c6e72a76ecdb621b4d26b743a625f46aa78d1db270",
+        "producer_attempt_id": "attempt:a49ed2fb-ab49-4145-ae02-46ef77b2d759",
+        "created_at": "2026-10-24T14:28:00Z"
+      },
+      {
+        "id": "artifact:372ac38d55a3b842eca997334e137c4c",
+        "kind": "report",
+        "reference": "artifacts/88402fd2d4118062b0c7893cbe617311409dab29b5d105196a0964b95428bb12",
+        "revision": "sha256:88402fd2d4118062b0c7893cbe617311409dab29b5d105196a0964b95428bb12",
+        "producer_attempt_id": "attempt:a49ed2fb-ab49-4145-ae02-46ef77b2d759",
+        "created_at": "2026-10-24T14:28:00Z"
+      }
+    ],
+    "verifications": [],
+    "criteria_claimed": [
+      "criterion:1"
+    ],
+    "limitations": [],
+    "next_information": [
+      "criterion:2 (revue indépendante, acceptation, clôture) relève de la mission reviewer Codex distincte et du chef, selon decision-criteria-split.",
+      "Empreintes et preuves calculées par le serveur via document_paths ; aucun hash fourni par le documenter.",
+      "Le reviewer Codex peut relire le nouveau snapshot via collect_delivery (task-doc-recette)."
+    ],
+    "created_at": "2026-10-24T14:28:00Z"
+  },
+  "acceptances": [
+    {
+      "id": "acceptance:9d71926b-4924-4eb4-8e7f-825c16c6e1b5",
+      "run_id": "run:6eb68e3b-a22b-4920-9ab7-b4d0a10f37e6",
+      "task_id": "task-doc-recette",
+      "handoff_id": "handoff-doc-recette-g6",
+      "accepted_revision": "sha256:88402fd2d4118062b0c7893cbe617311409dab29b5d105196a0964b95428bb12",
+      "review_ids": [
+        "review-recette-g6-codex-v2"
+      ],
+      "verification_ids": [
+        "verification:a9dda91d176d3ee1958bac3bc930f61e"
+      ],
+      "artifact_ids": [
+        "artifact:c2b1335d9d300c3bbc52986501048268",
+        "artifact:372ac38d55a3b842eca997334e137c4c",
+        "artifact:be797dddc932e54deaee0c0781d8b206"
+      ],
+      "accepted_by": "chief:a7645879f0577b72206c4ec9fade6465",
+      "created_at": "2026-10-24T14:37:18.547Z"
+    }
+  ],
+  "reviews": [
+    {
+      "schema_version": 1,
+      "id": "review-recette-codex-v1",
+      "run_id": "run:6eb68e3b-a22b-4920-9ab7-b4d0a10f37e6",
+      "review_task_id": "task-review-recette",
+      "review_of_task_id": "task-doc-recette",
+      "handoff_id": "handoff-doc-recette-g3",
+      "outcome": "approved",
+      "verification_scope": "documentation",
+      "source_revision": "sha256:88402fd2d4118062b0c7893cbe617311409dab29b5d105196a0964b95428bb12",
+      "tested_revision": "sha256:88402fd2d4118062b0c7893cbe617311409dab29b5d105196a0964b95428bb12",
+      "summary": "Revue indépendante v1 approuvée pour criterion:1 et la contribution de revue à criterion:2. Lecture intégrale via collect_delivery du manifeste exact et du fichier docs/recette.md sha256:8e9b55ce8d7cbe07994524c6e72a76ecdb621b4d26b743a625f46aa78d1db270. Réussi : cohérence manifeste/fichier ; 20 lignes ; une occurrence littérale AVITY_CREW_NATIVE_CLAUDE ; explication française du chef, du documenter Claude, du reviewer Codex indépendant, de l'acceptation puis de la clôture conditionnées. Aucun secret, contenu hors périmètre ou défaut relevé. Vérification observée verification:23b17b37786af95bcff66053fee2bbbd : passed, code 0, empreintes des deux snapshots vérifiées sur cette révision. Non exécuté : tests fonctionnels, build, CI et Git, hors périmètre documentaire ; aucun fichier modifié. Cette approbation documentaire n'effectue ni l'acceptation de livraison ni la clôture du run, réservées au chef.",
+      "findings": [],
+      "verification_ids": [
+        "verification:23b17b37786af95bcff66053fee2bbbd"
+      ],
+      "created_at": "2026-10-24T13:55:47.688Z"
+    },
+    {
+      "schema_version": 1,
+      "id": "review-recette-g6-codex-v2",
+      "run_id": "run:6eb68e3b-a22b-4920-9ab7-b4d0a10f37e6",
+      "review_task_id": "task-review-recette-v2",
+      "review_of_task_id": "task-doc-recette",
+      "handoff_id": "handoff-doc-recette-g6",
+      "outcome": "approved",
+      "verification_scope": "documentation",
+      "source_revision": "sha256:88402fd2d4118062b0c7893cbe617311409dab29b5d105196a0964b95428bb12",
+      "tested_revision": "sha256:88402fd2d4118062b0c7893cbe617311409dab29b5d105196a0964b95428bb12",
+      "summary": "Revue documentaire indépendante approuvée pour criterion:2. Lecture intégrale des artefacts immuables de handoff-doc-recette-g6 : le manifeste du snapshot exact référence uniquement docs/recette.md à sha256:8e9b55ce8d7cbe07994524c6e72a76ecdb621b4d26b743a625f46aa78d1db270. Le document contient le marqueur littéral AVITY_CREW_NATIVE_CLAUDE, explique en français les rôles du chef, du documenter Claude et du reviewer Codex indépendant, puis l'acceptation et la clôture. Il reste court (20 lignes), sans secret ni contenu hors périmètre observé. Aucun finding établi. Contrôle automatisé statique observé verification:a9dda91d176d3ee1958bac3bc930f61e : passed, code 0, deux empreintes vérifiées, tested_revision exactement égale à source_revision ; preuve artifact:be797dddc932e54deaee0c0781d8b206. Aucun test supplémentaire exécuté par le reviewer ; aucun fichier modifié, aucun Git, aucun submit_handoff. Cette approbation porte sur le snapshot documentaire ; l'acceptation de la livraison et la clôture du run restent au chef.",
+      "findings": [],
+      "verification_ids": [
+        "verification:a9dda91d176d3ee1958bac3bc930f61e"
+      ],
+      "created_at": "2026-10-24T14:29:33.405Z"
+    }
+  ],
+  "verifications": [
+    {
+      "id": "verification:23b17b37786af95bcff66053fee2bbbd",
+      "criterion_ids": [
+        "criterion:1",
+        "criterion:2"
+      ],
+      "mode": "static",
+      "execution": "automated",
+      "command": [
+        "/opt/homebrew/Cellar/node/26.12.0/bin/node",
+        "-e",
+        "const fs=require('node:fs'),c=require('node:crypto');for(const [p,h]of JSON.parse(process.argv[1])){if(c.createHash('sha256').update(fs.readFileSync(p)).digest('hex')!==h)process.exit(1)}console.log('Immutable document snapshots verified')",
+        "[[\"/Users/zeldris/.codex/avity-crew-validation/20261024/data/avity-crew/project-e81eef58f3cd5c2fd14f17f79aa7e3f4/artifacts/8e9b55ce8d7cbe07994524c6e72a76ecdb621b4d26b743a625f46aa78d1db270\",\"8e9b55ce8d7cbe07994524c6e72a76ecdb621b4d26b743a625f46aa78d1db270\"],[\"/Users/zeldris/.codex/avity-crew-validation/20261024/data/avity-crew/project-e81eef58f3cd5c2fd14f17f79aa7e3f4/artifacts/88402fd2d4118062b0c7893cbe617311409dab29b5d105196a0964b95428bb12\",\"88402fd2d4118062b0c7893cbe617311409dab29b5d105196a0964b95428bb12\"]]"
+      ],
+      "cwd": "/Users/zeldris/.codex/avity-crew-validation/20261024/native-doc-claude",
+      "result": "passed",
+      "exit_code": 0,
+      "tested_revision": "sha256:88402fd2d4118062b0c7893cbe617311409dab29b5d105196a0964b95428bb12",
+      "evidence_artifact_ids": [
+        "artifact:53723f89187069276326a0851db59f79"
+      ],
+      "started_at": "2026-10-24T13:54:27.732Z",
+      "ended_at": "2026-10-24T13:54:27.787Z",
+      "provider": null
+    },
+    {
+      "id": "verification:a9dda91d176d3ee1958bac3bc930f61e",
+      "criterion_ids": [
+        "criterion:1"
+      ],
+      "mode": "static",
+      "execution": "automated",
+      "command": [
+        "/opt/homebrew/Cellar/node/26.12.0/bin/node",
+        "-e",
+        "const fs=require('node:fs'),c=require('node:crypto');for(const [p,h]of JSON.parse(process.argv[1])){if(c.createHash('sha256').update(fs.readFileSync(p)).digest('hex')!==h)process.exit(1)}console.log('Immutable document snapshots verified')",
+        "[[\"/Users/zeldris/.codex/avity-crew-validation/20261024/data/avity-crew/project-e81eef58f3cd5c2fd14f17f79aa7e3f4/artifacts/8e9b55ce8d7cbe07994524c6e72a76ecdb621b4d26b743a625f46aa78d1db270\",\"8e9b55ce8d7cbe07994524c6e72a76ecdb621b4d26b743a625f46aa78d1db270\"],[\"/Users/zeldris/.codex/avity-crew-validation/20261024/data/avity-crew/project-e81eef58f3cd5c2fd14f17f79aa7e3f4/artifacts/88402fd2d4118062b0c7893cbe617311409dab29b5d105196a0964b95428bb12\",\"88402fd2d4118062b0c7893cbe617311409dab29b5d105196a0964b95428bb12\"]]"
+      ],
+      "cwd": "/Users/zeldris/.codex/avity-crew-validation/20261024/native-doc-claude",
+      "result": "passed",
+      "exit_code": 0,
+      "tested_revision": "sha256:88402fd2d4118062b0c7893cbe617311409dab29b5d105196a0964b95428bb12",
+      "evidence_artifact_ids": [
+        "artifact:be797dddc932e54deaee0c0781d8b206"
+      ],
+      "started_at": "2026-10-24T14:27:54.154Z",
+      "ended_at": "2026-10-24T14:27:54.210Z",
+      "provider": null
+    },
+    {
+      "id": "verification:679b0ea4-4654-4ac8-b9ea-083955712c7c",
+      "criterion_ids": [
+        "criterion:2"
+      ],
+      "mode": "static",
+      "execution": "manual",
+      "command": null,
+      "cwd": "/Users/zeldris/.codex/avity-crew-validation/20261024/native-doc-claude",
+      "result": "passed",
+      "exit_code": null,
+      "tested_revision": "sha256:88402fd2d4118062b0c7893cbe617311409dab29b5d105196a0964b95428bb12",
+      "evidence_artifact_ids": [
+        "artifact:ec709ffe-d89f-4bc0-b5ac-eccafa82ff91"
+      ],
+      "started_at": "2026-10-24T14:29:33.423Z",
+      "ended_at": "2026-10-24T14:29:33.423Z",
+      "provider": "codex"
+    }
+  ],
+  "sources": {
+    "final_chief": "git:166403ec7e5baf1f469a2f070e107e1251c2ac1e",
+    "development_revisions": [
+      "4c003ca",
+      "8443136",
+      "76fe256",
+      "f0d0d07",
+      "166403e"
+    ],
+    "qualification": "Spans multiple development revisions; does not qualify a single final L11/L12 release candidate."
+  },
+  "limitations": [
+    "Initial repeated identity effects failed before correction; the early hook UUID was not resumable and the chief was explicitly replaced.",
+    "Initial handoff input required a hash before server capture; corrected to document_paths, then plan amendment separated writing and review criteria without removing a run criterion.",
+    "A context budget failure was surfaced and current-delivery/incremental-message context was corrected before final continuation.",
+    "This successful mixed documentary run is not the required simultaneous mixed-code application scenario or inverse-chief final-candidate qualification.",
+    "No external publication, production deployment, remote CI, Linux or Windows qualification."
+  ]
+}

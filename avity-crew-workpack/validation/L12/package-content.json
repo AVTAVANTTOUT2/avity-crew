@@ -1,0 +1,12 @@
+{
+  "source_revision":"537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "tarball_sha256":"947da88b8cede34df6a50d1e3b5c0fed3db006d001c976ca35b8df20550c47d1",
+  "file_count":130,
+  "method":"tar list then extraction to memory for each entry, compared byte-for-byte to the installed file; paths checked before access.",
+  "installed_mismatches":[],
+  "forbidden_package_paths":[],
+  "absolute_development_paths":[],
+  "bin_target_matches":true,
+  "required_runtime_assets":["CLI binary and modules","MCP bridge and supervisor","compiled context templates","embedded SQLite schema/migrations","canonical JSON schemas"],
+  "limits":"This is an explicit package-content check, not a claim of exhaustive malware or secret scanning. Dependencies are installed by npm from exact declared versions."
+}

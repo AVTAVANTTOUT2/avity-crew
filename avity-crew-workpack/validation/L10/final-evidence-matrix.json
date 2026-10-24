@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "formal_submission": false,
+  "lot": "L10",
+  "reviewer": "l00_provider_audit",
+  "source_revision": "git:ccbab6f1551c2f54056bece878b229377f1ef52f",
+  "tested_revision": "git:ccbab6f1551c2f54056bece878b229377f1ef52f",
+  "outcome": "implementation_and_invariants_reviewed",
+  "source_blocking_findings": [],
+  "evidence_ref": "avity-crew-workpack/validation/L10/final-evidence-matrix.md",
+  "tests": {
+    "node26": 177,
+    "node24": 177,
+    "failed": 0,
+    "skipped": 0
+  },
+  "native_complement": "Reprises exactes et permission/refus sur run documentaire historique ; chef Claude, reviewer Codex.",
+  "native_not_executed": [
+    "Passage natif Claude↔Codex en chef du même objectif sur paquet final",
+    "Qualification applicative native simultanée mixte"
+  ],
+  "formal_acceptance": "Non soumise : matrice sans handoff_id futur ; dépendance L08 encore ouverte."
+}
+

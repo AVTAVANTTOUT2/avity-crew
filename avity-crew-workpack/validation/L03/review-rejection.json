@@ -1,0 +1,8 @@
+{
+  "handoff_id":"handoff-1edd91b8dc4543b690ead7b70ec39de0",
+  "source_revision":"git:6559d41750fc139081916d9e0840235e248a9baa",
+  "outcome":"changes_requested",
+  "summary":"Le compilateur préserve correctement les couches et budgets, mais une forme courante de secret JSON traverse l'expurgation des sources.",
+  "findings":["packages/context/src/project.ts redactContext ne reconnaît pas les clés sensibles entre guillemets : un fichier config.json contenant {\"api_key\":\"valeur synthétique\"} laisse sa valeur en clair, alors que api_key=valeur est expurgé. Corriger les clés/valeurs citées (y compris espaces/échappements), conserver le code non sensible et ajouter une régression de prompt compilé depuis une vraie source JSON."],
+  "evidence_refs":["avity-crew-workpack/validation/L03/privacy-review.md"]
+}

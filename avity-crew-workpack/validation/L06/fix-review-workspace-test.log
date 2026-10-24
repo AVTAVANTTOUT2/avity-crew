@@ -1,0 +1,23 @@
+✔ real worktrees isolate two deliveries and promote only their exact checked combination (420.829417ms)
+✔ immutable collection retains its snapshot and refuses scope escapes or later-work cleanup (311.343083ms)
+✔ merge conflicts preserve both sources and a candidate worktree for a resolution task (295.663916ms)
+✔ two isolated passing changes can fail their combination without advancing stable (414.60075ms)
+✔ external ref advancement and a checked-out target are refused without changing user work (355.090583ms)
+✔ restart reconciles a Git promotion whose database outcome was not yet recorded (268.576375ms)
+✔ clean accepted workspaces are removed explicitly while ignored files prevent data loss (285.3885ms)
+✔ document snapshots reject traversal and symlink ancestors that escape the assigned scope (9.814ms)
+✔ a timed out command kills surviving process-group descendants before returning (2258.735833ms)
+✔ documentary snapshots and read-only work do not initialize Git or remove the user directory (72.633708ms)
+✔ Git initialization needs explicit authorization and its empty baseline does not commit user files (87.920833ms)
+✔ ports remain actually reserved and temporary databases are distinct until release (2.870417ms)
+✔ resource assignments persist with their workspace and named resources have one owner (60.307ms)
+✔ one integration writer is enforced across manager instances (466.221625ms)
+✔ a killed integration writer leaves its candidate intact and requires reconciliation before replay (385.295125ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5773.941209

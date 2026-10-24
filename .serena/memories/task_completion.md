@@ -1,0 +1,5 @@
+- Run npm run check on the integrated candidate: strict typecheck, Prettier, build and offline contracts/integration tests. npm test builds first.
+- Reference-runtime verification after build: npm exec --yes --package=node@24.22.1 -- node --test 'dist/tests/**/*.test.js'. Runtime selection should track .nvmrc if intentionally updated.
+- Real SQLite tests use temporary disk databases and actual child processes, including SIGKILL/migration/claim races; do not replace these boundaries with mocks.
+- Provider live scripts are explicit local tests using native accounts and disposable projects, separated from offline CI; record exact revision/CLI/session and genuine observed effects. Never count verbal refusal as native permission evidence.
+- Final delivery additionally requires workpack ACCEPTANCE E2E scenarios, npm pack/clean-prefix installation/two-project checks and independent review per lot. No remote CI/production/publication claim without actual evidence.

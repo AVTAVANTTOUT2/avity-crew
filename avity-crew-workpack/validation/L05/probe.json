@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "provider": "codex",
+  "binary_path": "/Users/zeldris/.local/bin/codex",
+  "version": "0.163.0",
+  "checked_at": "2026-10-24T11:08:44.287Z",
+  "native_resume": {
+    "status": "supported",
+    "evidence_ref": "codex:0.163.0:exec-help",
+    "note": "Explicit session ID and new stdin prompt"
+  },
+  "structured_events": {
+    "status": "supported",
+    "evidence_ref": "codex:0.163.0:exec-help",
+    "note": "JSONL exec events"
+  },
+  "mid_turn_input": {
+    "status": "unsupported",
+    "evidence_ref": null,
+    "note": "Exec accepts one stdin prompt; finish or interrupt, then resume the exact session"
+  },
+  "permission_requests": {
+    "status": "unsupported",
+    "evidence_ref": null,
+    "note": "Exec has no interactive approval response transport; denials are surfaced"
+  },
+  "mcp_tools": {
+    "status": "supported",
+    "evidence_ref": "codex:0.163.0:exec-help",
+    "note": "Per-session stdio MCP via config overrides; verified version only"
+  },
+  "usage_reporting": {
+    "status": "supported",
+    "evidence_ref": "codex:0.163.0:exec-help",
+    "note": "Native token counts only; monetary cost unavailable"
+  }
+}

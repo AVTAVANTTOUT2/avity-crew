@@ -1,0 +1,20 @@
+{
+  "engine_source_revision":"537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "package_sha256":"947da88b8cede34df6a50d1e3b5c0fed3db006d001c976ca35b8df20550c47d1",
+  "run_id":"run:e8fb4f37-7e29-4112-90c3-4e70fd4daf1d",
+  "status":"cancelled",
+  "counts_as_successful_recipe":false,
+  "retained_observations":[
+    "Isolated A23ec9758 and Bc85c5959 passed; combined0814fdf8 failed exit1 with2>1 before policy correction.",
+    "Claude quota occurred naturally: error seq450 quota/rate_limit, seq452 session-limit message, seq454 process exit1. The run waited. Owner explicitly replaced chief with Codex generation2 and resumed.",
+    "Initial blocked reviews placed producers blocked; fresh review attempts of the same handoffs were rejected STALE_REVIEW. Independent diagnosis confirmed public producer resubmission was necessary.",
+    "New cumulative passations and all three independent reviews approved candidate23a0104421a85bffa98647998cc94450c9460a2b.",
+    "Accumulated mandatory context exceeded the configured24000 budget. Launch was blocked, no information silently removed. Owner stopped the service, observed old PID86458 exit, raised the fixture budget explicitly to64000 and restarted.",
+    "A/B were accepted at23a01044. Policy acceptance then failed INCOMPLETE_DELIVERY because its historical handoff listed author tests NON EXÉCUTÉS as a blocking limitation although supervisor checks passed. The chief had not checked completeness of the entire batch before partial acceptance.",
+    "Independent source review found no public authenticated route to replace that handoff/snapshot while retaining the terminal A/B acceptances at one identical SHA. No database, guard, artifact or criterion was changed. The owner answered the question and cancelled only this recipe run; all traces and acceptances remain."
+  ],
+  "owner_responses":["response:bb3ed42a-97d1-4fd5-ad86-0f031d70b646","response:9d803baa-8a65-46f8-94e4-2305e32cb605"],
+  "followup_run":"run:f57b56fc-ab6a-47af-b1d1-b446174f1d63",
+  "followup_protocol":"Same source, independent tests, business criteria and staged failure/correction; Codex while Claude quota is unavailable. Require all three complete handoffs before acceptance. Personal checks not run remain explicit in next_information, without invented successes.",
+  "limit":"A native planner may need operator guidance or a fresh run after accepting only part of an inconsistent batch. This incident is not presented as autonomous successful completion."
+}

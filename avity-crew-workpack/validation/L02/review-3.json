@@ -1,0 +1,41 @@
+{
+  "handoff_id": "handoff-1071db1c21fb4d49ad55ae3fb40e490e",
+  "outcome": "accepted",
+  "source_revision": "git:cff8ef66ad33bf0e103e9192d868baabcd7a220d",
+  "tested_revision": "git:cff8ef66ad33bf0e103e9192d868baabcd7a220d",
+  "verification_scope": "combined_code",
+  "summary": "L02 accepted after independent clean installation, final targeted review and all 43 combined tests passing on Node 24/26. Current project location/Git metadata refreshes durably while preferences, creation time, map version and run survive. Earlier event-correlation, artifact-integrity and root-identity fixes remain covered. No remaining L02 finding; later RPC, orchestration, UI, live provider and release scopes are not claimed.",
+  "findings": [],
+  "integration": {
+    "base_revision": "git:ea8ac7a9c6d23d077f9239d12ad634b564e05856",
+    "source_revision": "git:cff8ef66ad33bf0e103e9192d868baabcd7a220d",
+    "candidate_revision": "git:cff8ef66ad33bf0e103e9192d868baabcd7a220d",
+    "evidence_ref": "avity-crew-workpack/validation/L02/review-3.md"
+  },
+  "checks": [
+    {
+      "name": "Final independent lockfile installation",
+      "command": "npm ci",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L02/review-3.md",
+      "revision": "git:cff8ef66ad33bf0e103e9192d868baabcd7a220d"
+    },
+    {
+      "name": "Final strict types, format, build and 43 combined offline tests on Node 26",
+      "command": "npm run check",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L02/review-3.md",
+      "revision": "git:cff8ef66ad33bf0e103e9192d868baabcd7a220d"
+    },
+    {
+      "name": "Final 43 combined offline tests on Node 24.22.1",
+      "command": "npm exec --yes --package=node@24.22.1 -- node --test 'dist/tests/**/*.test.js'",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L02/review-3.md",
+      "revision": "git:cff8ef66ad33bf0e103e9192d868baabcd7a220d"
+    }
+  ]
+}

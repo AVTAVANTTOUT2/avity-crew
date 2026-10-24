@@ -1,0 +1,38 @@
+{
+  "summary": "L06 livre les worktrees par tentative, snapshots immuables sous scope, ressources effectivement réservées, préparation du candidat et promotion CAS séparées, conflits conservés, reprise contrôlée des issues inconnues et nettoyage sans perte. 56 tests passent sur Node 24/26, dont 13 nouveaux scénarios Git/processus/ressources réels.",
+  "revision": "git:f8b2177e0749ad577127b34f2b62bbe63a3fbe53",
+  "artifacts": [{ "commit": "f8b2177e0749ad577127b34f2b62bbe63a3fbe53" }],
+  "tests": [
+    {
+      "name": "Contrôles complets et 56 tests sur Node 26",
+      "command": "npm run check",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L06/checks.md",
+      "revision": "git:f8b2177e0749ad577127b34f2b62bbe63a3fbe53"
+    },
+    {
+      "name": "56 tests sur Node 24.22.1",
+      "command": "npm exec --yes --package=node@24.22.1 -- node --test 'dist/tests/**/*.test.js'",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L06/checks.md",
+      "revision": "git:f8b2177e0749ad577127b34f2b62bbe63a3fbe53"
+    },
+    {
+      "name": "Vérification du diff staged avant commit",
+      "command": "git diff --cached --check",
+      "kind": "doc_validation",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L06/checks.md",
+      "revision": "git:f8b2177e0749ad577127b34f2b62bbe63a3fbe53"
+    }
+  ],
+  "limitations": [
+    "Validation locale macOS arm64 ; Linux/WSL et CI distante non exécutés.",
+    "La promotion refuse une cible checkoutée ; elle n'avance pas le dossier principal utilisateur.",
+    "La reprise d'un candidat partiel exige inspection/réconciliation ; son travail reste conservé."
+  ],
+  "next_steps": [],
+  "live_verification": "not_applicable"
+}

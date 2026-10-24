@@ -1,0 +1,5 @@
+- Avity Crew is the product at repository root. `avity-crew-workpack/` is the preserved construction specification/ledger, never the runtime implementation.
+- All construction workers use the canonical absolute workpack `/Users/zeldris/avity-crew/avity-crew-workpack` for coordination.py --root, including from worktrees. Never edit STATE.json directly.
+- Product schemas live in `packages/contracts/schema`; generated TypeScript is ignored and rebuilt. Build/runtime must not depend on workpack location.
+- Read `mem:tech_stack` for compilation/runtime boundaries; `mem:conventions` for authority/proof rules; `mem:suggested_commands` for local entrypoints; `mem:task_completion` for verification.
+- Module details: docs/STORAGE.md; docs/providers/claude.md; architecture and lot criteria remain in workpack docs/lots.

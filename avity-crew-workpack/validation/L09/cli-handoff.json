@@ -1,0 +1,37 @@
+{
+  "subtask": "L09-CLI",
+  "lot_claimed": false,
+  "summary": "CLI async et vue terminal FR preparees : commandes convenues, parsing avant mutation, creation explicite de run, controles et inspection, client/service detache, stdin/fichier, conversation TTY reconnectable avec saisie Unicode preservee, JSON/codes stables et canaux internes communs. Cette preparation ne revendique pas la recette LLM du runtime integre.",
+  "revision": "git:cc13943e8fe96d8614b82c57a133095e83ff1f20",
+  "artifacts": [
+    { "commit": "89e35f88bc2c133708573c6be833499d80d5989b" },
+    { "commit": "cc13943e8fe96d8614b82c57a133095e83ff1f20" },
+    { "ref": "validation/L09/cli-checks.md", "sha256": "79af6102fab3765015c8912e7a0d0261fba6c4b647144a7bbc3ec51fb35ab9bc" }
+  ],
+  "tests": [
+    {
+      "name": "Typage format build et101 tests Node26",
+      "command": "npm run check",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L09/cli-checks.md",
+      "revision": "git:cc13943e8fe96d8614b82c57a133095e83ff1f20"
+    },
+    {
+      "name": "Onze tests CLI Node24 dont trois parcours PTY reels sans skip",
+      "command": "npm exec --yes --package=node@24.22.1 -- node --test dist/tests/cli.test.js",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L09/cli-checks.md",
+      "revision": "git:cc13943e8fe96d8614b82c57a133095e83ff1f20"
+    }
+  ],
+  "limitations": [],
+  "next_steps": [],
+  "documented_limits": [
+    "Callbacks metier fake explicitement identifies ; aucun provider LLM lance dans cette preparation.",
+    "Runtime de production, parcours manuel integre et recette Claude/Codex a verifier par le coordinateur avant acceptation L09.",
+    "macOS arm64 Node24/26 et PTY POSIX verifies ; Linux/Windows non executes."
+  ],
+  "live_verification": "not_applicable"
+}

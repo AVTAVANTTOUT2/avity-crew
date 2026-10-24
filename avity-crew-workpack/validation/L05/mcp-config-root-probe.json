@@ -1,0 +1,35 @@
+{
+  "checked_at": "2026-10-24T11:46:13.624Z",
+  "version": "0.163.0",
+  "mechanism": "Official codex -c overrides then mcp list --json; no model or server start",
+  "rows": [
+    {
+      "name": "ambient-only",
+      "exit_code": 0,
+      "hasAmbient": true,
+      "hasCrew": false,
+      "otherCount": 10
+    },
+    {
+      "name": "root-crew-after-ambient",
+      "exit_code": 0,
+      "hasAmbient": false,
+      "hasCrew": true,
+      "otherCount": 10
+    },
+    {
+      "name": "root-empty-after-ambient",
+      "exit_code": 0,
+      "hasAmbient": false,
+      "hasCrew": false,
+      "otherCount": 10
+    },
+    {
+      "name": "ambient-after-root-crew",
+      "exit_code": 0,
+      "hasAmbient": true,
+      "hasCrew": true,
+      "otherCount": 10
+    }
+  ]
+}

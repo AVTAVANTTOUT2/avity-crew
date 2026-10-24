@@ -1,0 +1,64 @@
+{
+  "handoff_id": "handoff-d898032f48804dfca401a49b9cc519e3",
+  "outcome": "accepted",
+  "source_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "tested_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "verification_scope": "combined_code",
+  "summary": "L12 accepté après revue indépendante : tarball 947da88b vérifié, 130 fichiers complets et identiques au programme installé, imports runtime et assets présents, aucun état privé ou chemin de développement détecté. Le cycle réel désinstallation/réinstallation et les smokes Node 24/26 sont documentés ; le contrôle indépendant readonly retrouve exactement 911 fichiers et 7 projets, empreintes source/SQLite inchangées, bin lié et exécutable. Les checks live sont explicitement des relectures vérifiées d'observations natives Claude/Codex déjà enregistrées du paquet installé, sans nouveau tour modèle. Linux/WSL et CI distante restent non exécutés ; cible complète de portabilité non atteinte. Aucun finding restant dans le périmètre L12, aucune mutation produit/service/coordination par le relecteur.",
+  "findings": [],
+  "integration": {
+    "base_revision": "git:f0d0d077e1ed5464f9dc6e476403e6e349c39bf7",
+    "source_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+    "candidate_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+    "evidence_ref": "validation/L12/final-review.md"
+  },
+  "live_verification": "passed",
+  "checks": [
+    {
+      "name": "Inventaire indépendant des 130 fichiers du tarball final",
+      "command": "tar -tzf /Users/zeldris/.codex/avity-crew-validation/20261024/release-final/avity-crew-0.1.0.tgz",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L12/final-review.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Conservation indépendante readonly : état courant strictement égal aux snapshots avant/après",
+      "command": "node /Users/zeldris/avity-crew/avity-crew-workpack/validation/L12/snapshot-package-state.mjs /Users/zeldris/.codex/avity-crew-validation/20261024",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L12/final-review.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Relecture readonly des observations live Claude enregistrées du paquet installé, sans nouvel appel modèle",
+      "command": "node /Users/zeldris/avity-crew/avity-crew-workpack/validation/L11/assert-native-recipe.mjs /Users/zeldris/.codex/avity-crew-validation/20261024/data/avity-crew/project-1a121d7e95c2fc3d1965e22469d3c29b/state.sqlite '/Users/zeldris/.codex/avity-crew-validation/20261024/native new app final' run:71469044-5ca6-473e-8e78-de2f4ad719e6",
+      "kind": "live",
+      "provider": "claude",
+      "exit_code": 0,
+      "evidence_ref": "validation/L11/new-app-native-report.json",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Relecture readonly des observations live Codex enregistrées du paquet installé, sans nouvel appel modèle",
+      "command": "node /Users/zeldris/avity-crew/avity-crew-workpack/validation/L11/assert-native-recipe.mjs /Users/zeldris/.codex/avity-crew-validation/20261024/data/avity-crew/project-4125dcc47d867f92f1d8b61235deef81/state.sqlite '/Users/zeldris/.codex/avity-crew-validation/20261024/native transport fixture' run:858ac152-b0d8-4b3f-8720-7ebec5b0a36e",
+      "kind": "live",
+      "provider": "codex",
+      "exit_code": 0,
+      "evidence_ref": "validation/L11/transport-native-report.json",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    }
+  ],
+  "evidence_refs": [
+    "validation/L12/final-review.md",
+    "validation/L12/package-content.json",
+    "validation/L12/package-installation.json",
+    "validation/L12/lifecycle-report.json",
+    "validation/L12/lifecycle-before.json",
+    "validation/L12/lifecycle-after.json",
+    "validation/L11/new-app-native-report.json",
+    "validation/L11/transport-native-report.json",
+    "validation/L11/final-checks.md",
+    "validation/RELEASE_REPORT.md"
+  ]
+}

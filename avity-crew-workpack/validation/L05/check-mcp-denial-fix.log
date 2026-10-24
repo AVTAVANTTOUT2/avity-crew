@@ -1,0 +1,66 @@
+
+> avity-crew@0.1.0 check
+> npm run typecheck && npm run lint && npm test
+
+
+> avity-crew@0.1.0 typecheck
+> npm run generate && tsc --noEmit
+
+
+> avity-crew@0.1.0 generate
+> node scripts/generate-contracts.mjs
+
+
+> avity-crew@0.1.0 lint
+> prettier --check .
+
+Checking formatting...
+All matched files use Prettier code style!
+
+> avity-crew@0.1.0 test
+> npm run build && node --test 'dist/tests/**/*.test.js'
+
+
+> avity-crew@0.1.0 build
+> npm run generate && tsc
+
+
+> avity-crew@0.1.0 generate
+> node scripts/generate-contracts.mjs
+
+✔ published runtime examples validate without provider-specific types (53.965875ms)
+✔ missing IDs, unsupported versions and extra fields are rejected (0.354917ms)
+✔ project configuration follows the published schema and rejects an impossible capacity (1.934375ms)
+✔ process success cannot directly accept a task, and acceptance is terminal (0.08025ms)
+✔ stale and foreign delivery attempts cannot advance the task (0.19825ms)
+✔ an interrupted stream cannot report its previously planned success (0.1355ms)
+✔ run completion requires accepted tasks and passing criterion evidence (0.156792ms)
+✔ simulation cannot satisfy a required live verification (0.078125ms)
+✔ cycles and missing dependencies are rejected with a useful path (0.110209ms)
+✔ fake events and result always remain simulated; unknown native event is representable (2.620209ms)
+✔ an interrupted simulated process cannot report success (0.069ms)
+✔ a simulated error without provider details still prevents success (0.066458ms)
+✔ Codex normalizes session, tool IDs, text, usage and completion (0.818917ms)
+✔ Codex preserves unknown diagnostics and classifies provider errors (0.401667ms)
+✔ Codex probe is bounded and reports unsupported interactive operations (133.978208ms)
+✔ Codex passes prompt on stdin, preserves argv, model, permissions and bridge env (88.57875ms)
+✔ Codex sessions remain isolated and resume only the requested UUID with new input (131.386208ms)
+✔ Codex process rejects truncation, errors, bad exits and unsupported updates (850.289917ms)
+✔ native requests reject malformed runtime input before process launch (0.598708ms)
+✔ native JSONL preserves UTF-8 fragments, stdin and unknown diagnostics (121.506541ms)
+✔ simulated simultaneous native sessions keep their prompts and identities separate (46.441ms)
+✔ native backpressure retains every event for a slow consumer (57.811292ms)
+✔ provider errors and secrets never become a successful or raw result (44.570417ms)
+✔ missing binaries, missing terminal result and nonzero exit fail explicitly (82.042125ms)
+✔ malformed or oversized JSONL and changed session identity fail closed (165.219ms)
+✔ exact native resume rejects a different reported session (39.900166ms)
+✔ interruption cannot expose an earlier native success and stops POSIX children (682.982709ms)
+✔ native error classification distinguishes actionable failures (0.629292ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1335.969791

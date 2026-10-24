@@ -1,0 +1,11 @@
+{
+  "source_revision":"537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "package_sha256":"947da88b8cede34df6a50d1e3b5c0fed3db006d001c976ca35b8df20550c47d1",
+  "node":"26.12.0",
+  "method":"Only the child process PATH was prefixed with /Users/zeldris/.codex/avity-crew-validation/20261024/install prefix/bin; no shell profile or global PATH modified.",
+  "commands":["avity-crew --version","avity-crew --help"],
+  "working_directories":["/Users/zeldris/.codex/avity-crew-validation/20261024/native new app final","/Users/zeldris/.codex/avity-crew-validation/20261024/native transport fixture"],
+  "all_four_exit_codes":0,
+  "version_observed":"0.1.0",
+  "service_or_llm_started":false
+}

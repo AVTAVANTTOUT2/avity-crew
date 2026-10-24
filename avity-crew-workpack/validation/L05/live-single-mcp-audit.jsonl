@@ -1,0 +1,3 @@
+{"method":"initialize","tool":null}
+{"method":"tools/list","tool":null}
+{"method":"tools/call","tool":"ping"}

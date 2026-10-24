@@ -1,0 +1,10 @@
+{
+  "summary":"Stockage final corrigé : la réouverture actualise la détection Git tout en conservant préférences, carte, date et travail durable. Régression reproduite avant correction puis 43 tests intégrés verts sur Node24/26.",
+  "revision":"git:cff8ef66ad33bf0e103e9192d868baabcd7a220d",
+  "artifacts":[{"commit":"cff8ef66ad33bf0e103e9192d868baabcd7a220d"}],
+  "tests":[
+    {"name":"Contrôles intégrés Node26", "command":"npm run check", "kind":"integration", "exit_code":0, "evidence_ref":"avity-crew-workpack/validation/L02/checks-3.md", "revision":"git:cff8ef66ad33bf0e103e9192d868baabcd7a220d"},
+    {"name":"43 tests Node24", "command":"npm exec --yes --package=node@24.22.1 -- node --test 'dist/tests/**/*.test.js'", "kind":"integration", "exit_code":0, "evidence_ref":"avity-crew-workpack/validation/L02/checks-3.md", "revision":"git:cff8ef66ad33bf0e103e9192d868baabcd7a220d"}
+  ],
+  "limitations":[], "next_steps":[], "live_verification":"not_applicable"
+}

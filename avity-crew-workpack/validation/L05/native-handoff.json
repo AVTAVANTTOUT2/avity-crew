@@ -1,0 +1,104 @@
+{
+  "summary": "Codex natif livré avec préférences/auth conservées, MCP limités à crew par préflight borné sans cache, reprises UUID exactes, interruption récupérée, refus natif sans faux succès et diagnostics visibles. Neuf tours réels finaux sur la même révision et 34 tests Node26/24 passent ; cinq copies réelles avec SHA256 revérifiés.",
+  "revision": "git:7fb39c6ca135eddab75c1581843cd13965bf3f42",
+  "artifacts": [
+    {
+      "commit": "7fb39c6ca135eddab75c1581843cd13965bf3f42"
+    },
+    {
+      "ref": "validation/L05/native-report.md",
+      "sha256": "26257e5c671b6cf3ffc118f3b6ea34e6ee3c91fa84cd10529cff7841a54e15cd"
+    },
+    {
+      "ref": "validation/L05/native-single-final.json",
+      "sha256": "358c2c2b688ba4e0b0539449c97987e8c8f6679ee15f6e6467455ca6354dae1b"
+    },
+    {
+      "ref": "validation/L05/native-parallel.json",
+      "sha256": "ee401fe4f32a0ad08d9b882b6e7579d9c6e724bd6bb37f9bf34c05d50b4b33ec"
+    },
+    {
+      "ref": "validation/L05/native-config-final-probe.json",
+      "sha256": "f3b59cb0d0c0142d94927d5afa277398f6c2f8dba68bbd2f02baf5994bd5ef4b"
+    },
+    {
+      "ref": "validation/L05/native-warning-shape-probe.json",
+      "sha256": "dd10fe2893819fa51784b6c0b72d4abe893811e8a4f8a939429c560e42b9f18e"
+    },
+    {
+      "ref": "validation/L05/shared-redaction-review.md",
+      "sha256": "7ac56907359f86aec9d3811abffedd5a0eab2f14d5914cb06fc238d7159e37a9"
+    },
+    {
+      "ref": "validation/L05/native-source-equivalence.json",
+      "sha256": "cfecccfed17f0d7595651c713d94c0ca064beb4b42502ae476140055ee8685aa"
+    },
+    {
+      "ref": "validation/L05/native-single-final-proof-first.txt",
+      "sha256": "75ababf0104a69a803881a10e4ee00bbbfdc06ff0bc201b279db66bfbc22b4b3"
+    },
+    {
+      "ref": "validation/L05/native-single-final-mcp-audit.jsonl",
+      "sha256": "77f86f04cc88c383b81f40a15a53647b37f1442ab5793eb5c652380926708dc0"
+    },
+    {
+      "ref": "validation/L05/native-single-final-proof-resumed.txt",
+      "sha256": "2970ee1c9d88d598bee89457a409cfca9c45a951679e6e16eea0e04b2978727d"
+    },
+    {
+      "ref": "validation/L05/native-single-final-recovered.txt",
+      "sha256": "2197338f7a0600b495bf402df6d7b71759c9509bc6b7a400bf209f06a38cf873"
+    },
+    {
+      "ref": "validation/L05/native-single-final-permission-audit.jsonl",
+      "sha256": "9843b1ae8011db0204eec5fae6cd14e277111006db00d964f23f15478a3cef63"
+    }
+  ],
+  "tests": [
+    {
+      "name": "Contrôles locaux finaux et 34 tests",
+      "command": "npm run check",
+      "kind": "unit",
+      "exit_code": 0,
+      "evidence_ref": "validation/L05/native-check-final.log",
+      "revision": "git:7fb39c6ca135eddab75c1581843cd13965bf3f42"
+    },
+    {
+      "name": "34 tests Node 24.22.1",
+      "command": "npm exec --yes --package=node@24.22.1 -- node --test 'dist/tests/**/*.test.js'",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L05/native-node24-final.log",
+      "revision": "git:7fb39c6ca135eddab75c1581843cd13965bf3f42"
+    },
+    {
+      "name": "Codex natif SINGLE, édition/MCP/reprise/interruption/refus",
+      "command": "node scripts/live-codex.mjs /Users/zeldris/avity-crew/avity-crew-workpack/validation/L05/native-single-final.json single",
+      "kind": "live",
+      "provider": "codex",
+      "exit_code": 0,
+      "evidence_ref": "validation/L05/native-single-final.json",
+      "revision": "git:7fb39c6ca135eddab75c1581843cd13965bf3f42"
+    },
+    {
+      "name": "Codex natif deux sessions et reprises simultanées sans mélange",
+      "command": "node scripts/live-codex.mjs /Users/zeldris/avity-crew/avity-crew-workpack/validation/L05/native-parallel.json parallel",
+      "kind": "live",
+      "provider": "codex",
+      "exit_code": 0,
+      "evidence_ref": "validation/L05/native-parallel.json",
+      "revision": "git:7fb39c6ca135eddab75c1581843cd13965bf3f42"
+    }
+  ],
+  "limitations": [
+    "Modèle effectif/coût non exposés par exec JSONL ; modèle demandé null ; autre modèle explicite non essayé en live.",
+    "Préflight synchrone borné à 10 s / maxBuffer 1 MiB, configuration native supposée stable entre lecture et lancement ; noms MCP ASCII lettres/chiffres/_/- uniquement.",
+    "Refus réel de fichier read-only non observé : déclarations sans outils exclues ; refus MCP natif réel vérifié. Pannes réelles quota/auth/réseau, autres versions, Linux/Windows et CI distante non exécutés.",
+    "Outils mutants/ACL HTTP-MCP L07 hors scope ; politique native étroite autorisée nécessaire. Scratch hôte éphémère ; copies de preuves disponibles."
+  ],
+  "next_steps": [
+    "Coordinateur : revue indépendante de git:7fb39c6ca135eddab75c1581843cd13965bf3f42, intégration après shared originels, export CodexProvider et contrôles de la combinaison finale.",
+    "L07 : lire events pendant result, conserver les updates avant reprise exacte et appliquer ACL/politique native par outil mutant ; aucune auto-approbation globale."
+  ],
+  "live_verification": "passed"
+}

@@ -1,0 +1,22 @@
+{
+  "source_revision":"ccbab6f1551c2f54056bece878b229377f1ef52f",
+  "version":"0.1.0",
+  "platform":"darwin-arm64",
+  "node":"26.12.0",
+  "package":"/Users/zeldris/.codex/avity-crew-validation/20261024/release-final/avity-crew-0.1.0.tgz",
+  "sha256":"5bafe43252c360d584c72a6b8cc6fe9e5734b73f128047a96381e47afe1acf3a",
+  "files":130,
+  "prefix":"/Users/zeldris/.codex/avity-crew-validation/20261024/install prefix",
+  "private_paths_detected":[],
+  "development_absolute_paths_detected":[],
+  "required_assets":{"bin":true,"bridge":true,"prompt_templates":true,"embedded_sql_schema":true,"contract_json_schemas":true},
+  "previous_test_package":{"source_revision":"db33d66b8ac077d542c3239af19e01ea26062bf5","version":"0.1.0","sha256":"e0027e42c5f76ffffa3497d37b52ba11668559f1ab19cfc4b8fc5f2de45952e7","scope":"Earlier development test revision of the same prerelease version; no historical public release claimed."},
+  "intermediate_test_package":{"source_revision":"c71b31360d3e62e791e8c09007606b5cbe12ac90","sha256":"88d2297f5907b5e556fa226033cd307fdb4182a5a4ad0c6f2e924452e0fc90ef","native_run":"run:050e045a-f750-4f50-939b-88b030fdf8da","result":"cancelled after discovering required instruction provenance bug before worker execution; not a passed application recipe"},
+  "preservation":{"projects":2,"distinct_project_ids":true,"path_with_spaces":true,"runs":true,"tasks":true,"decisions":true,"criteria":true,"paused_status":true,"script":"package-state.mjs","seed_exit_code":0,"check_after_both_upgrades_exit_code":0},
+  "installed_commands":{"init_two_projects_exit_codes":[0,0],"doctor_two_projects_exit_codes":[0,0]},
+  "native_objectives":"pending",
+  "uninstall_preservation":"pending",
+  "linux":"not_verified",
+  "windows_wsl":"not_verified",
+  "remote_ci":"not_run"
+}

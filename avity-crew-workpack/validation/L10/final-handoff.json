@@ -1,0 +1,54 @@
+{
+  "summary": "L10 : reprise persistante et explicite, identité des processus POSIX vérifiée, pause/arrêt clôturant les tours observés, générations et capacités révoquées, captures cumulatives de mission préservant le scope, délégations de récupération consommées avant effets faillibles. Une erreur de préparation bloque sa seule tâche et n'entrave pas le travail indépendant. La recette native actuelle a interrompu l'UI avant passation, conservé ses fichiers lors du redémarrage, changé le chef Claude vers Codex puis atteint l'acceptation et la clôture sans changer les critères.",
+  "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "artifacts": [
+    {
+      "commit": "537d3c40f673eb2ca7b0984d695bfed90282e746"
+    }
+  ],
+  "tests": [
+    {
+      "name": "182tests dont reprise, fencing, déduplication, erreurs et processus POSIX",
+      "command": "npm run check",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L11/final-checks.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "182tests Node24.22.1",
+      "command": "npm exec --yes --package=node@24.22.1 -- node --test 'dist/tests/**/*.test.js'",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L11/final-checks.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Interruption et remplacement réels dans recette mixte installée",
+      "command": "node /Users/zeldris/avity-crew/avity-crew-workpack/validation/L11/assert-native-recipe.mjs /Users/zeldris/.codex/avity-crew-validation/20261024/data/avity-crew/project-1a121d7e95c2fc3d1965e22469d3c29b/state.sqlite '/Users/zeldris/.codex/avity-crew-validation/20261024/native new app final' run:71469044-5ca6-473e-8e78-de2f4ad719e6",
+      "kind": "live",
+      "provider": "claude",
+      "exit_code": 0,
+      "evidence_ref": "validation/L11/new-app-native-report.json",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Reprise du même objectif et clôture par Codex réel",
+      "command": "node /Users/zeldris/avity-crew/avity-crew-workpack/validation/L11/assert-native-recipe.mjs /Users/zeldris/.codex/avity-crew-validation/20261024/data/avity-crew/project-1a121d7e95c2fc3d1965e22469d3c29b/state.sqlite '/Users/zeldris/.codex/avity-crew-validation/20261024/native new app final' run:71469044-5ca6-473e-8e78-de2f4ad719e6",
+      "kind": "live",
+      "provider": "codex",
+      "exit_code": 0,
+      "evidence_ref": "validation/L11/new-app-native-report.json",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    }
+  ],
+  "limitations": [],
+  "next_steps": [],
+  "documented_limits": [
+    "Les issues de processus ambiguës exigent inspection ; aucun PID n'est tué sur son seul numéro.",
+    "Une capture de contenu incertaine reste conservée et bloquée ; son import automatique n'est pas promis, un nouvel ordre explicite est nécessaire.",
+    "Quota/auth/réseau réels non provoqués ; cas déterministes simulés. Refus MCP natifs contrôlés et refus Bash auteur observés.",
+    "POSIX/macOS arm64 qualifié localement ; Windows/WSL/Linux et CI distante non exécutés."
+  ],
+  "live_verification": "passed"
+}

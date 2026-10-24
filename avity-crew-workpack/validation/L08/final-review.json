@@ -1,0 +1,49 @@
+{
+  "handoff_id": "handoff-d643c212ae3f415f9d8cf074200a2107",
+  "outcome": "accepted",
+  "source_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "tested_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "verification_scope": "combined_code",
+  "summary": "Revue indépendante bornée de l00_provider_audit : source537, tarball947da88b et traces applicatives cohérents. Contrôles source et182tests Node24 rejoués, assertions SQLite/Git réelles réussies ; deux auteurs natifs Claude/Codex se chevauchent, le même objectif passe du chef Claude au chef Codex, cinq tâches et deux livraisons sont acceptées sur un candidat commun avec les preuves finales courantes. Les critères correctifs, max1 et documentaire restent étayés par les tests actuels et les preuves historiques explicitement distinguées. Aucun finding bloquant. Aucun fournisseur lancé pendant cette revue.",
+  "findings": [],
+  "integration": {
+    "base_revision": "git:f0d0d077e1ed5464f9dc6e476403e6e349c39bf7",
+    "source_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+    "candidate_revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+    "evidence_ref": "avity-crew-workpack/validation/L08/final-review.md"
+  },
+  "checks": [
+    {
+      "name": "Contrôles source indépendants Node26.12.0",
+      "command": "npm run check",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L08/final-review.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Suite indépendante Node24.22.1 :182/182, zéro skip",
+      "command": "npm exec --yes --package=node@24.22.1 -- node --test --test-reporter=tap 'dist/tests/**/*.test.js'",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L08/final-review.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Relecture indépendante SQLite/Git de la recette native enregistrée, sans nouveau fournisseur",
+      "command": "node /Users/zeldris/avity-crew/avity-crew-workpack/validation/L11/assert-native-recipe.mjs /Users/zeldris/.codex/avity-crew-validation/20261024/data/avity-crew/project-1a121d7e95c2fc3d1965e22469d3c29b/state.sqlite '/Users/zeldris/.codex/avity-crew-validation/20261024/native new app final' run:71469044-5ca6-473e-8e78-de2f4ad719e6",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L08/final-review.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    }
+  ],
+  "evidence_refs": [
+    "avity-crew-workpack/validation/L11/new-app-native-report.json",
+    "avity-crew-workpack/validation/L11/new-app-browser-qa.json",
+    "avity-crew-workpack/validation/L11/native-process-observation.json",
+    "avity-crew-workpack/validation/L10/recovery-delivery-review.md",
+    "avity-crew-workpack/validation/L10/recovery-preparation-review.md",
+    "avity-crew-workpack/validation/L07/native-doc-claude-report.json"
+  ]
+}

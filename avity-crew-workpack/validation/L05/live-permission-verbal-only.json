@@ -1,0 +1,99 @@
+{
+  "mode": "permission",
+  "checked_at": "2026-10-24T11:25:53.852Z",
+  "source_revision": "3e7f48d0d58166bec0348af6cea517b48c37698f",
+  "requested_model": null,
+  "effective_model": null,
+  "model_evidence": "Exec JSONL does not expose the selected model",
+  "cwd": "/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-Nbj8pz/avity codex live 1SMKkT",
+  "capabilities": {
+    "schema_version": 1,
+    "provider": "codex",
+    "binary_path": "/Users/zeldris/.local/bin/codex",
+    "version": "0.163.0",
+    "checked_at": "2026-10-24T11:25:53.896Z",
+    "native_resume": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "Explicit session ID and new stdin prompt"
+    },
+    "structured_events": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "JSONL exec events"
+    },
+    "mid_turn_input": {
+      "status": "unsupported",
+      "evidence_ref": null,
+      "note": "Exec accepts one stdin prompt; finish or interrupt, then resume the exact session"
+    },
+    "permission_requests": {
+      "status": "unsupported",
+      "evidence_ref": null,
+      "note": "Exec has no interactive approval response transport; denials are surfaced"
+    },
+    "mcp_tools": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "Per-session stdio MCP via config overrides; verified version only"
+    },
+    "usage_reporting": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "Native token counts only; monetary cost unavailable"
+    }
+  },
+  "records": [
+    {
+      "name": "permission-read-only",
+      "permissions": {
+        "sandbox": "read-only",
+        "approval": "never"
+      },
+      "interrupted": false,
+      "result": {
+        "provider": "codex",
+        "provenance": "live",
+        "native_session_id": "01a16da8-fe55-74b3-99c7-db0ff0dbabd2",
+        "exit_code": 0,
+        "signal": null,
+        "success": true,
+        "text": "Refused by the sandbox: `zsh:1: operation not permitted: denied.txt`. No retry or permission change attempted.",
+        "error": null
+      },
+      "events": [
+        {
+          "type": "session",
+          "native_session_id": "01a16da8-fe55-74b3-99c7-db0ff0dbabd2",
+          "provenance": "live"
+        },
+        {
+          "type": "text",
+          "text": "Refused by the sandbox: `zsh:1: operation not permitted: denied.txt`. No retry or permission change attempted.",
+          "provenance": "live",
+          "native_session_id": "01a16da8-fe55-74b3-99c7-db0ff0dbabd2"
+        },
+        {
+          "type": "usage",
+          "usage": {
+            "input_tokens": 55514,
+            "output_tokens": 66
+          },
+          "provenance": "live",
+          "native_session_id": "01a16da8-fe55-74b3-99c7-db0ff0dbabd2"
+        },
+        {
+          "type": "result",
+          "provenance": "live",
+          "success": true,
+          "native_session_id": "01a16da8-fe55-74b3-99c7-db0ff0dbabd2"
+        }
+      ]
+    }
+  ],
+  "success": false,
+  "failure": {
+    "message": "A native tool attempt must be observed",
+    "stack": "AssertionError [ERR_ASSERTION]: A native tool attempt must be observed\n    at verifyPermission (file:///Users/zeldris/.codex/worktrees/avity-crew-l05/scripts/live-codex.mjs:108:10)\n    at async file:///Users/zeldris/.codex/worktrees/avity-crew-l05/scripts/live-codex.mjs:184:5"
+  }
+}

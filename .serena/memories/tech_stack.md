@@ -1,0 +1,4 @@
+- ESM TypeScript strict; root tsc build preserves packages/apps/tests topology under dist. Internal imports are relative .ts and rewritten by tsc. Private npm workspaces are development modules; installable package is the root.
+- Runtime node:sqlite supplies the SQLite driver: no third-party native driver. Reference runtime is .nvmrc; package.json sets the minimum. CLI integrates native authenticated Claude/Codex processes, not API-key copies.
+- `npm run generate` derives runtime/config types, schema constants and name-to-type mapping from product schemas; never edit packages/contracts/src/generated.
+- Exact direct npm versions and lockfile are centrally owned during parallel work.

@@ -1,0 +1,22 @@
+{
+  "revision": "7fb39c6ca135eddab75c1581843cd13965bf3f42",
+  "version": "0.163.0",
+  "mode": "native-preferences-scoped-mcp",
+  "no_llm": true,
+  "no_server_start": true,
+  "model_null_has_no_override": true,
+  "rows": [
+    {
+      "bridge": true,
+      "hasAmbient": false,
+      "hasCrew": true,
+      "otherCount": 0
+    },
+    {
+      "bridge": false,
+      "hasAmbient": false,
+      "hasCrew": false,
+      "otherCount": 0
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+✔ Codex normalizes session, tool IDs, text, usage and completion (0.735667ms)
+✔ Codex preserves unknown diagnostics and classifies provider errors (0.4025ms)
+✔ Codex probe is bounded and reports unsupported interactive operations (60.374083ms)
+✔ Codex passes prompt on stdin, preserves argv, model, permissions and bridge env (102.048042ms)
+✔ Codex sessions remain isolated and resume only the requested UUID with new input (141.914333ms)
+✔ Codex process rejects truncation, errors, bad exits and unsupported updates (824.392958ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1228.638958

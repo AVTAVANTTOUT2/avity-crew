@@ -1,0 +1,21 @@
+{
+  "checked_at": "2026-10-24T11:52:32.829Z",
+  "version": "0.163.0",
+  "mechanism": "features.plugins=false, then native names-only MCP discovery, then enabled=false per non-allowed server; no LLM/server start",
+  "cases": [
+    {
+      "name": "plugins-off-and-allow-crew",
+      "exit_code": 0,
+      "hasAmbient": false,
+      "hasCrew": true,
+      "otherCount": 0
+    },
+    {
+      "name": "plugins-off-and-no-bridge",
+      "exit_code": 0,
+      "hasAmbient": false,
+      "hasCrew": false,
+      "otherCount": 0
+    }
+  ]
+}

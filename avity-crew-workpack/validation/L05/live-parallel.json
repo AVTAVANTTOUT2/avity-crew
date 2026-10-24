@@ -1,0 +1,234 @@
+{
+  "mode": "parallel",
+  "checked_at": "2026-10-24T11:31:13.130Z",
+  "source_revision": "f1d594a488438dbee12f546f4bdab28a44b42c9b",
+  "requested_model": null,
+  "effective_model": null,
+  "model_evidence": "Exec JSONL does not expose the selected model",
+  "cwd": "/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-WVLQCh/avity codex live yzbvvA",
+  "capabilities": {
+    "schema_version": 1,
+    "provider": "codex",
+    "binary_path": "/Users/zeldris/.local/bin/codex",
+    "version": "0.163.0",
+    "checked_at": "2026-10-24T11:31:13.146Z",
+    "native_resume": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "Explicit session ID and new stdin prompt"
+    },
+    "structured_events": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "JSONL exec events"
+    },
+    "mid_turn_input": {
+      "status": "unsupported",
+      "evidence_ref": null,
+      "note": "Exec accepts one stdin prompt; finish or interrupt, then resume the exact session"
+    },
+    "permission_requests": {
+      "status": "unsupported",
+      "evidence_ref": null,
+      "note": "Exec has no interactive approval response transport; denials are surfaced"
+    },
+    "mcp_tools": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "Per-session stdio MCP via config overrides; verified version only"
+    },
+    "usage_reporting": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "Native token counts only; monetary cost unavailable"
+    }
+  },
+  "records": [
+    {
+      "name": "parallel-b",
+      "permissions": {
+        "sandbox": "workspace-write",
+        "approval": "never"
+      },
+      "interrupted": false,
+      "result": {
+        "provider": "codex",
+        "provenance": "live",
+        "native_session_id": "01a16dad-dca7-7b50-a6cb-3477a3f17c15",
+        "exit_code": 0,
+        "signal": null,
+        "success": true,
+        "text": "BETA_2a6017c5-1d2e-48aa-8f31-913ee36a76bb",
+        "error": null
+      },
+      "events": [
+        {
+          "type": "session",
+          "native_session_id": "01a16dad-dca7-7b50-a6cb-3477a3f17c15",
+          "provenance": "live"
+        },
+        {
+          "type": "text",
+          "text": "BETA_2a6017c5-1d2e-48aa-8f31-913ee36a76bb",
+          "provenance": "live",
+          "native_session_id": "01a16dad-dca7-7b50-a6cb-3477a3f17c15"
+        },
+        {
+          "type": "usage",
+          "usage": {
+            "input_tokens": 28129,
+            "output_tokens": 32
+          },
+          "provenance": "live",
+          "native_session_id": "01a16dad-dca7-7b50-a6cb-3477a3f17c15"
+        },
+        {
+          "type": "result",
+          "provenance": "live",
+          "success": true,
+          "native_session_id": "01a16dad-dca7-7b50-a6cb-3477a3f17c15"
+        }
+      ]
+    },
+    {
+      "name": "parallel-a",
+      "permissions": {
+        "sandbox": "workspace-write",
+        "approval": "never"
+      },
+      "interrupted": false,
+      "result": {
+        "provider": "codex",
+        "provenance": "live",
+        "native_session_id": "01a16dad-dcae-7761-b833-4f9e7784db95",
+        "exit_code": 0,
+        "signal": null,
+        "success": true,
+        "text": "ALPHA_2a6017c5-1d2e-48aa-8f31-913ee36a76bb",
+        "error": null
+      },
+      "events": [
+        {
+          "type": "session",
+          "native_session_id": "01a16dad-dcae-7761-b833-4f9e7784db95",
+          "provenance": "live"
+        },
+        {
+          "type": "text",
+          "text": "ALPHA_2a6017c5-1d2e-48aa-8f31-913ee36a76bb",
+          "provenance": "live",
+          "native_session_id": "01a16dad-dcae-7761-b833-4f9e7784db95"
+        },
+        {
+          "type": "usage",
+          "usage": {
+            "input_tokens": 28129,
+            "output_tokens": 32
+          },
+          "provenance": "live",
+          "native_session_id": "01a16dad-dcae-7761-b833-4f9e7784db95"
+        },
+        {
+          "type": "result",
+          "provenance": "live",
+          "success": true,
+          "native_session_id": "01a16dad-dcae-7761-b833-4f9e7784db95"
+        }
+      ]
+    },
+    {
+      "name": "parallel-resume-b",
+      "permissions": {
+        "sandbox": "workspace-write",
+        "approval": "never"
+      },
+      "interrupted": false,
+      "result": {
+        "provider": "codex",
+        "provenance": "live",
+        "native_session_id": "01a16dad-dca7-7b50-a6cb-3477a3f17c15",
+        "exit_code": 0,
+        "signal": null,
+        "success": true,
+        "text": "BETA_2a6017c5-1d2e-48aa-8f31-913ee36a76bb DELTA_B",
+        "error": null
+      },
+      "events": [
+        {
+          "type": "session",
+          "native_session_id": "01a16dad-dca7-7b50-a6cb-3477a3f17c15",
+          "provenance": "live"
+        },
+        {
+          "type": "text",
+          "text": "BETA_2a6017c5-1d2e-48aa-8f31-913ee36a76bb DELTA_B",
+          "provenance": "live",
+          "native_session_id": "01a16dad-dca7-7b50-a6cb-3477a3f17c15"
+        },
+        {
+          "type": "usage",
+          "usage": {
+            "input_tokens": 56917,
+            "output_tokens": 67
+          },
+          "provenance": "live",
+          "native_session_id": "01a16dad-dca7-7b50-a6cb-3477a3f17c15"
+        },
+        {
+          "type": "result",
+          "provenance": "live",
+          "success": true,
+          "native_session_id": "01a16dad-dca7-7b50-a6cb-3477a3f17c15"
+        }
+      ]
+    },
+    {
+      "name": "parallel-resume-a",
+      "permissions": {
+        "sandbox": "workspace-write",
+        "approval": "never"
+      },
+      "interrupted": false,
+      "result": {
+        "provider": "codex",
+        "provenance": "live",
+        "native_session_id": "01a16dad-dcae-7761-b833-4f9e7784db95",
+        "exit_code": 0,
+        "signal": null,
+        "success": true,
+        "text": "ALPHA_2a6017c5-1d2e-48aa-8f31-913ee36a76bb DELTA_A",
+        "error": null
+      },
+      "events": [
+        {
+          "type": "session",
+          "native_session_id": "01a16dad-dcae-7761-b833-4f9e7784db95",
+          "provenance": "live"
+        },
+        {
+          "type": "text",
+          "text": "ALPHA_2a6017c5-1d2e-48aa-8f31-913ee36a76bb DELTA_A",
+          "provenance": "live",
+          "native_session_id": "01a16dad-dcae-7761-b833-4f9e7784db95"
+        },
+        {
+          "type": "usage",
+          "usage": {
+            "input_tokens": 56917,
+            "output_tokens": 67
+          },
+          "provenance": "live",
+          "native_session_id": "01a16dad-dcae-7761-b833-4f9e7784db95"
+        },
+        {
+          "type": "result",
+          "provenance": "live",
+          "success": true,
+          "native_session_id": "01a16dad-dcae-7761-b833-4f9e7784db95"
+        }
+      ]
+    }
+  ],
+  "artifacts": [],
+  "success": true
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "formal_submission": false,
+  "lot": "L08",
+  "reviewer": "l00_provider_audit",
+  "source_revision": "git:ccbab6f1551c2f54056bece878b229377f1ef52f",
+  "tested_revision": "git:ccbab6f1551c2f54056bece878b229377f1ef52f",
+  "outcome": "changes_requested",
+  "blocking_findings": [
+    {
+      "criterion_id": "AC-L08-02",
+      "severity": "blocking",
+      "description": "Deux exécutants mixtes réellement simultanés non démontrés ; recette applicative annulée avant leurs lancements. Les processus simulés et le run documentaire natif max=1 ne remplacent pas cette preuve."
+    }
+  ],
+  "evidence_ref": "avity-crew-workpack/validation/L08/final-evidence-matrix.md",
+  "tests": {
+    "node26": 177,
+    "node24": 177,
+    "failed": 0,
+    "skipped": 0
+  },
+  "next_acceptance_requires": "Recette native simultanée mixte sur candidat identifié, puis revue après arrêt des CLI."
+}
+

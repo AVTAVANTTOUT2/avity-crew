@@ -1,0 +1,9 @@
+{
+  "handoff_id": "handoff-34591afafea146c094d26217bf93efae",
+  "source_revision": "git:7fb39c6ca135eddab75c1581843cd13965bf3f42",
+  "summary": "Source et preuves natives relues ; clarifier les champs de blocage de la passation avant l’acceptation par le registre.",
+  "outcome": "changes_requested",
+  "findings": [
+    "limitations et next_steps sont interprétés comme travail restant bloquant par validate_review. Conserver les limites réelles hors critères dans le rapport et les docs, puis resoumettre des tableaux de blocage vides seulement si tous les critères L05 sont satisfaits. Aucun critère ni preuve live ne doit être retiré ou relabellisé."
+  ]
+}

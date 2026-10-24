@@ -1,0 +1,104 @@
+{
+  "summary": "L12 : paquet local 0.1.0 à empreinte947da88, source537d3c4,130 fichiers autonomes inspectés et comparés aux fichiers installés. Le binaire installé a exécuté les recettes natives depuis plusieurs projets avec espaces. Mise à jour de deux anciens projets de test préservée ; désinstallation/réinstallation exacte conserve911 fichiers d'état de7 projets, toutes les lignes métier SQLite et tous les arbres source. Aide/diagnostic/service/état/arrêt passent sous Node24.22.1 et26.12.0. Les écarts de plateformes/CI, le quota et les incidents de planification restent explicitement documentés. Aucun registre ou environnement de production modifié.",
+  "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "artifacts": [
+    {
+      "commit": "537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "ref": "validation/L12/package-installation.json",
+      "sha256": "f9d604222d1a0fdec8a30a67a98a1637eea806cf9c06ee8549b991c513ffd236"
+    },
+    {
+      "ref": "validation/L12/lifecycle-report.json",
+      "sha256": "513dfea1243f13cca49c56ae9efaadac0a7fcbe0480b2c44e0f3ad210aec507c"
+    },
+    {
+      "ref": "validation/L12/package-content.json",
+      "sha256": "68fa06df972e79e886d1ddd07ddff3a9cc9e41d2312bb9699d8b9cdcd5aca92c"
+    }
+  ],
+  "tests": [
+    {
+      "name": "Paquet source construit et inspecté",
+      "command": "npm pack --pack-destination '/Users/zeldris/.codex/avity-crew-validation/20261024/release-final'",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L12/package-content.json",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Désinstallation avec données conservées",
+      "command": "npm uninstall --global --prefix '/Users/zeldris/.codex/avity-crew-validation/20261024/install prefix' avity-crew",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L12/lifecycle-report.json",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Réinstallation du tarball exact",
+      "command": "npm install --global --prefix '/Users/zeldris/.codex/avity-crew-validation/20261024/install prefix' '/Users/zeldris/.codex/avity-crew-validation/20261024/release-final/avity-crew-0.1.0.tgz'",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L12/lifecycle-report.json",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Empreintes des sept projets après cycle",
+      "command": "node /Users/zeldris/avity-crew/avity-crew-workpack/validation/L12/snapshot-package-state.mjs /Users/zeldris/.codex/avity-crew-validation/20261024",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L12/lifecycle-after.json",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Anciennes missions/décisions/critères conservés dans deux projets",
+      "command": "node /Users/zeldris/avity-crew/avity-crew-workpack/validation/L12/package-state.mjs check '/Users/zeldris/.codex/avity-crew-validation/20261024/install prefix' /Users/zeldris/.codex/avity-crew-validation/20261024/data /Users/zeldris/.codex/avity-crew-validation/20261024/native-new-app '/Users/zeldris/.codex/avity-crew-validation/20261024/native transport fixture'",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L12/lifecycle-report.json",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Binaire installé sous Node24 de référence",
+      "command": "npm exec --yes --package=node@24.22.1 -- node '/Users/zeldris/.codex/avity-crew-validation/20261024/install prefix/bin/avity-crew' --version",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L12/lifecycle-report.json",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Traces de l'objectif natif installé, Claude réel",
+      "command": "node /Users/zeldris/avity-crew/avity-crew-workpack/validation/L11/assert-native-recipe.mjs /Users/zeldris/.codex/avity-crew-validation/20261024/data/avity-crew/project-1a121d7e95c2fc3d1965e22469d3c29b/state.sqlite '/Users/zeldris/.codex/avity-crew-validation/20261024/native new app final' run:71469044-5ca6-473e-8e78-de2f4ad719e6",
+      "kind": "live",
+      "provider": "claude",
+      "exit_code": 0,
+      "evidence_ref": "validation/L11/new-app-native-report.json",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Traces de l'objectif natif installé, Codex réel",
+      "command": "node /Users/zeldris/avity-crew/avity-crew-workpack/validation/L11/assert-native-recipe.mjs /Users/zeldris/.codex/avity-crew-validation/20261024/data/avity-crew/project-4125dcc47d867f92f1d8b61235deef81/state.sqlite '/Users/zeldris/.codex/avity-crew-validation/20261024/native transport fixture' run:858ac152-b0d8-4b3f-8720-7ebec5b0a36e",
+      "kind": "live",
+      "provider": "codex",
+      "exit_code": 0,
+      "evidence_ref": "validation/L11/transport-native-report.json",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    }
+  ],
+  "limitations": [],
+  "next_steps": [],
+  "documented_limits": [
+    "macOS arm64 uniquement qualifié ; Linux et Windows/WSL not_verified, cible complète de portabilité non atteinte.",
+    "CI distante non exécutée faute de push demandé ; contrôles locaux et workflow fournis.",
+    "Sept places simulées ; pic natif observé trois.",
+    "Versions natives qualifiées Claude2.1.304/Codex0.163.0, aucun modèle effectif particulier revendiqué ; comptes et quotas natifs nécessaires.",
+    "Le planificateur peut nécessiter une aide opérateur ou un nouveau run après acceptation partielle incohérente ; incident conservé dans le rapport."
+  ],
+  "live_verification": "passed",
+  "package": {
+    "version": "0.1.0",
+    "path": "/Users/zeldris/.codex/avity-crew-validation/20261024/release-final/avity-crew-0.1.0.tgz",
+    "sha256": "947da88b8cede34df6a50d1e3b5c0fed3db006d001c976ca35b8df20550c47d1"
+  }
+}

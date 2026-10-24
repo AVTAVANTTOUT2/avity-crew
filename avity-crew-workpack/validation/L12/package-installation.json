@@ -1,0 +1,20 @@
+{
+  "source_revision":"537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "version":"0.1.0",
+  "package":"/Users/zeldris/.codex/avity-crew-validation/20261024/release-final/avity-crew-0.1.0.tgz",
+  "sha256":"947da88b8cede34df6a50d1e3b5c0fed3db006d001c976ca35b8df20550c47d1",
+  "prefix":"/Users/zeldris/.codex/avity-crew-validation/20261024/install prefix",
+  "platform":"darwin-arm64",
+  "node":"26.12.0",
+  "files":130,
+  "pack_exit_code":0,
+  "install_exit_code":0,
+  "preserved_after_upgrade":{"projects":2,"runs":true,"tasks":true,"decisions":true,"criteria":true,"paused_status":true,"check_exit_code":0,"script":"package-state.mjs"},
+  "prior_packages":"Earlier development test packages and exact hashes remain in package-installation-b0571ad.json, package-installation-ccbab6f.json and release-old/; same prerelease version, no previous public release claimed.",
+  "native_objectives":"completed; new app, transport, documentary and controlled correction reports in validation/L11",
+  "uninstall_preservation":"passed; lifecycle-report.json and exact before/after snapshots",
+  "installed_node24_smoke":"passed; help/version/service/doctor/status/stop, no new LLM turn",
+  "linux":"not_verified",
+  "windows_wsl":"not_verified",
+  "remote_ci":"not_run"
+}

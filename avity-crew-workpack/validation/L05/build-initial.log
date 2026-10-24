@@ -1,0 +1,8 @@
+
+> avity-crew@0.1.0 build
+> npm run generate && tsc
+
+
+> avity-crew@0.1.0 generate
+> node scripts/generate-contracts.mjs
+

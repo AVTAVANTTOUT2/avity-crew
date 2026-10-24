@@ -1,0 +1,417 @@
+{
+  "mode": "single",
+  "checked_at": "2026-10-24T11:29:49.756Z",
+  "source_revision": "f1d594a488438dbee12f546f4bdab28a44b42c9b",
+  "requested_model": null,
+  "effective_model": null,
+  "model_evidence": "Exec JSONL does not expose the selected model",
+  "cwd": "/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-URj8BH/avity codex live 1Q75IO",
+  "capabilities": {
+    "schema_version": 1,
+    "provider": "codex",
+    "binary_path": "/Users/zeldris/.local/bin/codex",
+    "version": "0.163.0",
+    "checked_at": "2026-10-24T11:29:49.807Z",
+    "native_resume": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "Explicit session ID and new stdin prompt"
+    },
+    "structured_events": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "JSONL exec events"
+    },
+    "mid_turn_input": {
+      "status": "unsupported",
+      "evidence_ref": null,
+      "note": "Exec accepts one stdin prompt; finish or interrupt, then resume the exact session"
+    },
+    "permission_requests": {
+      "status": "unsupported",
+      "evidence_ref": null,
+      "note": "Exec has no interactive approval response transport; denials are surfaced"
+    },
+    "mcp_tools": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "Per-session stdio MCP via config overrides; verified version only"
+    },
+    "usage_reporting": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "Native token counts only; monetary cost unavailable"
+    }
+  },
+  "records": [
+    {
+      "name": "edit-and-mcp",
+      "permissions": {
+        "sandbox": "workspace-write",
+        "approval": "never"
+      },
+      "interrupted": false,
+      "result": {
+        "provider": "codex",
+        "provenance": "live",
+        "native_session_id": "01a16dac-9828-7de2-9213-cfb8872b4888",
+        "exit_code": 0,
+        "signal": null,
+        "success": true,
+        "text": "I’ll call crew.ping, then create proof.txt with the exact content.\nDONE",
+        "error": null
+      },
+      "events": [
+        {
+          "type": "session",
+          "native_session_id": "01a16dac-9828-7de2-9213-cfb8872b4888",
+          "provenance": "live"
+        },
+        {
+          "type": "text",
+          "text": "I’ll call crew.ping, then create proof.txt with the exact content.\n",
+          "provenance": "live",
+          "native_session_id": "01a16dac-9828-7de2-9213-cfb8872b4888"
+        },
+        {
+          "type": "tool",
+          "text": "mcp_tool_call item_1 (in_progress)\ncrew.ping\nnull",
+          "provenance": "live",
+          "native_session_id": "01a16dac-9828-7de2-9213-cfb8872b4888"
+        },
+        {
+          "type": "tool",
+          "text": "mcp_tool_call item_1 (completed)\ncrew.ping\n{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"pong\\\":\\\"L05_FIRST\\\",\\\"token_present\\\":true}\"}],\"structured_content\":null}",
+          "provenance": "live",
+          "native_session_id": "01a16dac-9828-7de2-9213-cfb8872b4888"
+        },
+        {
+          "type": "tool",
+          "text": "file_change item_2 (in_progress)\n[{\"path\":\"/private/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-URj8BH/avity codex live 1Q75IO/proof.txt\",\"kind\":\"add\"}]",
+          "provenance": "live",
+          "native_session_id": "01a16dac-9828-7de2-9213-cfb8872b4888"
+        },
+        {
+          "type": "tool",
+          "text": "file_change item_2 (completed)\n[{\"path\":\"/private/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-URj8BH/avity codex live 1Q75IO/proof.txt\",\"kind\":\"add\"}]",
+          "provenance": "live",
+          "native_session_id": "01a16dac-9828-7de2-9213-cfb8872b4888"
+        },
+        {
+          "type": "text",
+          "text": "DONE",
+          "provenance": "live",
+          "native_session_id": "01a16dac-9828-7de2-9213-cfb8872b4888"
+        },
+        {
+          "type": "usage",
+          "usage": {
+            "input_tokens": 113217,
+            "output_tokens": 149
+          },
+          "provenance": "live",
+          "native_session_id": "01a16dac-9828-7de2-9213-cfb8872b4888"
+        },
+        {
+          "type": "result",
+          "provenance": "live",
+          "success": true,
+          "native_session_id": "01a16dac-9828-7de2-9213-cfb8872b4888"
+        }
+      ]
+    },
+    {
+      "name": "resume-new-note",
+      "permissions": {
+        "sandbox": "workspace-write",
+        "approval": "never"
+      },
+      "interrupted": false,
+      "result": {
+        "provider": "codex",
+        "provenance": "live",
+        "native_session_id": "01a16dac-9828-7de2-9213-cfb8872b4888",
+        "exit_code": 0,
+        "signal": null,
+        "success": true,
+        "text": "I’ll append the new line to proof.txt and preserve the existing line.\nDONE",
+        "error": null
+      },
+      "events": [
+        {
+          "type": "session",
+          "native_session_id": "01a16dac-9828-7de2-9213-cfb8872b4888",
+          "provenance": "live"
+        },
+        {
+          "type": "text",
+          "text": "I’ll append the new line to proof.txt and preserve the existing line.\n",
+          "provenance": "live",
+          "native_session_id": "01a16dac-9828-7de2-9213-cfb8872b4888"
+        },
+        {
+          "type": "tool",
+          "text": "file_change item_1 (in_progress)\n[{\"path\":\"/private/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-URj8BH/avity codex live 1Q75IO/proof.txt\",\"kind\":\"update\"}]",
+          "provenance": "live",
+          "native_session_id": "01a16dac-9828-7de2-9213-cfb8872b4888"
+        },
+        {
+          "type": "tool",
+          "text": "file_change item_1 (completed)\n[{\"path\":\"/private/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-URj8BH/avity codex live 1Q75IO/proof.txt\",\"kind\":\"update\"}]",
+          "provenance": "live",
+          "native_session_id": "01a16dac-9828-7de2-9213-cfb8872b4888"
+        },
+        {
+          "type": "text",
+          "text": "DONE",
+          "provenance": "live",
+          "native_session_id": "01a16dac-9828-7de2-9213-cfb8872b4888"
+        },
+        {
+          "type": "usage",
+          "usage": {
+            "input_tokens": 170400,
+            "output_tokens": 265
+          },
+          "provenance": "live",
+          "native_session_id": "01a16dac-9828-7de2-9213-cfb8872b4888"
+        },
+        {
+          "type": "result",
+          "provenance": "live",
+          "success": true,
+          "native_session_id": "01a16dac-9828-7de2-9213-cfb8872b4888"
+        }
+      ]
+    },
+    {
+      "name": "interrupt",
+      "permissions": {
+        "sandbox": "workspace-write",
+        "approval": "never"
+      },
+      "interrupted": true,
+      "result": {
+        "provider": "codex",
+        "provenance": "live",
+        "native_session_id": "01a16dac-e949-7483-b9ab-08abed65d72a",
+        "exit_code": 1,
+        "signal": "SIGINT",
+        "success": false,
+        "text": "I’ll run the command in the current directory, with file creation occurring only after the 30-second sleep finishes.",
+        "error": {
+          "kind": "process",
+          "message": "Native provider interrupted with SIGINT"
+        }
+      },
+      "events": [
+        {
+          "type": "session",
+          "native_session_id": "01a16dac-e949-7483-b9ab-08abed65d72a",
+          "provenance": "live"
+        },
+        {
+          "type": "text",
+          "text": "I’ll run the command in the current directory, with file creation occurring only after the 30-second sleep finishes.",
+          "provenance": "live",
+          "native_session_id": "01a16dac-e949-7483-b9ab-08abed65d72a"
+        },
+        {
+          "type": "tool",
+          "text": "command_execution item_1 (in_progress)\n/bin/zsh -lc 'sleep 30 && touch interrupted.txt'\nexit_code: unavailable\n",
+          "provenance": "live",
+          "native_session_id": "01a16dac-e949-7483-b9ab-08abed65d72a"
+        },
+        {
+          "type": "unknown",
+          "provenance": "live",
+          "text": "stderr: 2026-10-24T11:30:16.174761Z ERROR codex_core::session: failed to record rollout items: thread 01a16dac-e949-7483-b9ab-08abed65d72a not found\n",
+          "native_session_id": "01a16dac-e949-7483-b9ab-08abed65d72a"
+        },
+        {
+          "type": "result",
+          "provenance": "live",
+          "success": false,
+          "error": {
+            "kind": "process",
+            "message": "Native provider interrupted with SIGINT"
+          },
+          "native_session_id": "01a16dac-e949-7483-b9ab-08abed65d72a"
+        }
+      ]
+    },
+    {
+      "name": "resume-interrupted",
+      "permissions": {
+        "sandbox": "workspace-write",
+        "approval": "never"
+      },
+      "interrupted": false,
+      "result": {
+        "provider": "codex",
+        "provenance": "live",
+        "native_session_id": "01a16dac-e949-7483-b9ab-08abed65d72a",
+        "exit_code": 0,
+        "signal": null,
+        "success": true,
+        "text": "I’ll create `recovered.txt` with the requested contents.DONE",
+        "error": null
+      },
+      "events": [
+        {
+          "type": "session",
+          "native_session_id": "01a16dac-e949-7483-b9ab-08abed65d72a",
+          "provenance": "live"
+        },
+        {
+          "type": "text",
+          "text": "I’ll create `recovered.txt` with the requested contents.",
+          "provenance": "live",
+          "native_session_id": "01a16dac-e949-7483-b9ab-08abed65d72a"
+        },
+        {
+          "type": "tool",
+          "text": "command_execution item_1 (in_progress)\n/bin/zsh -lc \"printf 'RECOVERED\\\\n' > recovered.txt\"\nexit_code: unavailable\n",
+          "provenance": "live",
+          "native_session_id": "01a16dac-e949-7483-b9ab-08abed65d72a"
+        },
+        {
+          "type": "tool",
+          "text": "command_execution item_1 (completed)\n/bin/zsh -lc \"printf 'RECOVERED\\\\n' > recovered.txt\"\nexit_code: 0\n",
+          "provenance": "live",
+          "native_session_id": "01a16dac-e949-7483-b9ab-08abed65d72a"
+        },
+        {
+          "type": "text",
+          "text": "DONE",
+          "provenance": "live",
+          "native_session_id": "01a16dac-e949-7483-b9ab-08abed65d72a"
+        },
+        {
+          "type": "usage",
+          "usage": {
+            "input_tokens": 84813,
+            "output_tokens": 130
+          },
+          "provenance": "live",
+          "native_session_id": "01a16dac-e949-7483-b9ab-08abed65d72a"
+        },
+        {
+          "type": "result",
+          "provenance": "live",
+          "success": true,
+          "native_session_id": "01a16dac-e949-7483-b9ab-08abed65d72a"
+        }
+      ]
+    },
+    {
+      "name": "permission-mcp",
+      "permissions": {
+        "sandbox": "read-only",
+        "approval": "never"
+      },
+      "interrupted": false,
+      "result": {
+        "provider": "codex",
+        "provenance": "live",
+        "native_session_id": "01a16dad-27a8-7eb0-9e66-41ccda210ffc",
+        "exit_code": 0,
+        "signal": null,
+        "success": false,
+        "text": "I’ll look for `crew.ping` and call it once with `L05_DENIAL` if available.`crew.ping` was refused: “MCP tool call requires approval, but approval policy is never.”\n\nNo retry, escalation, or permission changes were attempted.",
+        "error": {
+          "kind": "permission",
+          "message": "MCP tool call requires approval, but approval policy is never"
+        }
+      },
+      "events": [
+        {
+          "type": "session",
+          "native_session_id": "01a16dad-27a8-7eb0-9e66-41ccda210ffc",
+          "provenance": "live"
+        },
+        {
+          "type": "text",
+          "text": "I’ll look for `crew.ping` and call it once with `L05_DENIAL` if available.",
+          "provenance": "live",
+          "native_session_id": "01a16dad-27a8-7eb0-9e66-41ccda210ffc"
+        },
+        {
+          "type": "tool",
+          "text": "mcp_tool_call item_1 (in_progress)\ncrew.ping\nnull",
+          "provenance": "live",
+          "native_session_id": "01a16dad-27a8-7eb0-9e66-41ccda210ffc"
+        },
+        {
+          "type": "tool",
+          "text": "mcp_tool_call item_1 (failed)\ncrew.ping\n{\"message\":\"MCP tool call requires approval, but approval policy is never\"}",
+          "provenance": "live",
+          "native_session_id": "01a16dad-27a8-7eb0-9e66-41ccda210ffc"
+        },
+        {
+          "type": "permission",
+          "text": "MCP tool call requires approval, but approval policy is never",
+          "provenance": "live",
+          "native_session_id": "01a16dad-27a8-7eb0-9e66-41ccda210ffc"
+        },
+        {
+          "type": "error",
+          "error": {
+            "kind": "permission",
+            "message": "MCP tool call requires approval, but approval policy is never"
+          },
+          "provenance": "live",
+          "native_session_id": "01a16dad-27a8-7eb0-9e66-41ccda210ffc"
+        },
+        {
+          "type": "text",
+          "text": "`crew.ping` was refused: “MCP tool call requires approval, but approval policy is never.”\n\nNo retry, escalation, or permission changes were attempted.",
+          "provenance": "live",
+          "native_session_id": "01a16dad-27a8-7eb0-9e66-41ccda210ffc"
+        },
+        {
+          "type": "usage",
+          "usage": {
+            "input_tokens": 55261,
+            "output_tokens": 165
+          },
+          "provenance": "live",
+          "native_session_id": "01a16dad-27a8-7eb0-9e66-41ccda210ffc"
+        },
+        {
+          "type": "result",
+          "provenance": "live",
+          "success": false,
+          "error": {
+            "kind": "permission",
+            "message": "MCP tool call requires approval, but approval policy is never"
+          },
+          "native_session_id": "01a16dad-27a8-7eb0-9e66-41ccda210ffc"
+        }
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "/Users/zeldris/avity-crew/avity-crew-workpack/validation/L05/live-single-proof-first.txt",
+      "sha256": "e1d5ae27b3b4eb9208e96b6ec38ce5f774c1c03acdd5ed6e108da206dcc321a2"
+    },
+    {
+      "path": "/Users/zeldris/avity-crew/avity-crew-workpack/validation/L05/live-single-mcp-audit.jsonl",
+      "sha256": "77f86f04cc88c383b81f40a15a53647b37f1442ab5793eb5c652380926708dc0"
+    },
+    {
+      "path": "/Users/zeldris/avity-crew/avity-crew-workpack/validation/L05/live-single-proof-resumed.txt",
+      "sha256": "6523305dc519d9218eea442e567307a45eb48692beb8a444cfebe62f313e6df2"
+    },
+    {
+      "path": "/Users/zeldris/avity-crew/avity-crew-workpack/validation/L05/live-single-recovered.txt",
+      "sha256": "2197338f7a0600b495bf402df6d7b71759c9509bc6b7a400bf209f06a38cf873"
+    },
+    {
+      "path": "/Users/zeldris/avity-crew/avity-crew-workpack/validation/L05/live-single-permission-audit.jsonl",
+      "sha256": "9843b1ae8011db0204eec5fae6cd14e277111006db00d964f23f15478a3cef63"
+    }
+  ],
+  "success": true
+}

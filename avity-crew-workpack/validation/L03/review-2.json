@@ -1,0 +1,19 @@
+{
+  "handoff_id":"handoff-cc4b6d41a4ae4b3c872c443e9b77331e",
+  "outcome":"accepted",
+  "source_revision":"git:cbb6d4d43af2a3eb5711d281eba5ddcf3a724b35",
+  "tested_revision":"git:19b32f19578ee59d563e25250b74d35a05815139",
+  "verification_scope":"combined_code",
+  "summary":"Scanner, sélection et compilation revus indépendamment ; finding JSON corrigé avec régression ; prompt inspecté lié au prompt transmis en simulation. Combinaison intégrée : 55 tests et contrôles réussis, 9 tests contexte référence Node24 réussis.",
+  "findings":[],
+  "integration":{
+    "base_revision":"git:ec41b48e1020f6baabe9c60ef1ea98e3894547c8",
+    "source_revision":"git:cbb6d4d43af2a3eb5711d281eba5ddcf3a724b35",
+    "candidate_revision":"git:19b32f19578ee59d563e25250b74d35a05815139",
+    "evidence_ref":"avity-crew-workpack/validation/L03/integration-review.md"
+  },
+  "checks":[
+    {"name":"55 tests de combinaison, types format et build", "command":"npm run check", "kind":"integration", "exit_code":0, "evidence_ref":"avity-crew-workpack/validation/L03/integration-review.md", "revision":"git:19b32f19578ee59d563e25250b74d35a05815139"},
+    {"name":"9 tests contexte Node24", "command":"npm exec --yes --package=node@24.22.1 -- node --test dist/tests/context.test.js", "kind":"integration", "exit_code":0, "evidence_ref":"avity-crew-workpack/validation/L03/integration-review.md", "revision":"git:19b32f19578ee59d563e25250b74d35a05815139"}
+  ]
+}

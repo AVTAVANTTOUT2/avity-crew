@@ -1,0 +1,21 @@
+{
+  "engine_source_revision":"537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "package_sha256":"947da88b8cede34df6a50d1e3b5c0fed3db006d001c976ca35b8df20550c47d1",
+  "proof_level":"installed_cli_real_pty_without_llm",
+  "platform":"darwin-arm64",
+  "node":"26.12.0",
+  "project_root":"/Users/zeldris/.codex/avity-crew-validation/20261024/native transport fixture",
+  "run_id":"run:package-upgrade",
+  "command":"XDG_DATA_HOME='/Users/zeldris/.codex/avity-crew-validation/20261024/data' '/Users/zeldris/.codex/avity-crew-validation/20261024/install prefix/bin/avity-crew' attach --run run:package-upgrade",
+  "observations":[
+    "Started the local service explicitly before attach.",
+    "First real PTY rendered the paused goal, one ready task, one decision, zero active/queued turns and its five retained events.",
+    "Typed q and Enter; view detached with documented paused-state exit code4.",
+    "Opened a second PTY on the same run, observed the same paused goal/task/decision, then detached with q and exit4.",
+    "Installed status --json afterward returned exit0, paused version4, one task, one decision, active0 and queued0; no task/run mutation.",
+    "The empty multiline objective prompt was separately cancelled with Ctrl-C, exit130 and explicit no-objective-sent message."
+  ],
+  "diagnostics_observed":["Attach with no service returned SUPERVISOR_UNAVAILABLE exit3.","An incorrect project/run combination returned NOT_FOUND exit1; the empty test project was preserved and no goal was submitted."],
+  "live_llm_cli_count":0,
+  "limits":["Manual terminal smoke covers open/detach/reopen; automated CLI tests cover resizing, multiline/Unicode, question routing and reconnection.","This smoke uses an existing paused seed run and does not claim another native business recipe."]
+}

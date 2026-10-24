@@ -1,0 +1,17 @@
+{
+  "source_revision": "ccbab6f1551c2f54056bece878b229377f1ef52f",
+  "package_sha256": "5bafe43252c360d584c72a6b8cc6fe9e5734b73f128047a96381e47afe1acf3a",
+  "platform": "darwin-arm64",
+  "node": "26.12.0",
+  "mode": "live",
+  "command": "node permission-probe.mjs '/Users/zeldris/.codex/avity-crew-validation/20261024/install prefix' PROVIDER",
+  "approved_tools": [],
+  "results": [
+    {"provider":"claude","version":"2.1.304 (Claude Code)","native_session_id":"eafad6a9-54f4-4399-94de-653c968e1038","exit_code":0,"success":false,"error_kind":"permission","permission_events":2,"mcp_initialized":true,"mcp_listed":true,"mcp_tool_calls":0,"probe_exit_code":0,"annotations":"readOnlyHint:false, destructiveHint:false, idempotentHint:false, openWorldHint:false"},
+    {"provider":"codex","version":"0.163.0","native_session_id":"01a16e80-f912-7ae1-911b-fda2de0b988b","exit_code":0,"success":false,"error_kind":"permission","permission_events":1,"mcp_initialized":true,"mcp_listed":true,"mcp_tool_calls":0,"probe_exit_code":0,"annotations":"absent"}
+  ],
+  "excluded_trial": {"provider":"codex","native_session_id":"01a16e80-58df-7440-808b-a20af259e07d","annotations":"readOnlyHint:false, destructiveHint:false, idempotentHint:false, openWorldHint:false","success":true,"mcp_tool_calls":1,"probe_exit_code":1,"conclusion":"The harmless annotated tool was allowed by native policy. This is not counted as a denial. The subsequent unannotated tool produced an actual denial."},
+  "requested_model": null,
+  "effective_model": "not exposed by this normalized evidence",
+  "limitations": ["No real quota exhaustion, authentication outage or network outage induced.","A bridge approval grant list does not replace the server role ACL or claim to override every native safety decision."]
+}

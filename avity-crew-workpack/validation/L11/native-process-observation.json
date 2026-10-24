@@ -1,0 +1,14 @@
+{
+  "source_revision":"537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "run_id":"run:71469044-5ca6-473e-8e78-de2f4ad719e6",
+  "at":"2026-10-24T16:26:59.754Z",
+  "mode":"live",
+  "method":"Read-only SQLite operation metadata, then ps stat for each recorded PID; zombies excluded; no argv or credentials read or printed.",
+  "observed_live_native_processes":3,
+  "turns":[
+    {"pid":97644,"role":"chief","session_id":"chief:c9989f01b8acb72b9c7d7b147954abec","live":true},
+    {"pid":96151,"role":"reviewer","task_id":"task:review-final-api","session_id":"session:37b4bc19f0a02b276c7d3241eb688bd7","live":true},
+    {"pid":96495,"role":"reviewer","task_id":"task:review-final-ui","session_id":"session:df54b05d701fb6ba911e002d72f46194","live":true}
+  ],
+  "qualification":"This observation proves a chief plus two real native worker processes simultaneously. The separate mixed writer overlap must be joined to native session/result events; it is not claimed to be this same OS sample. Seven-place capacity remains simulated."
+}

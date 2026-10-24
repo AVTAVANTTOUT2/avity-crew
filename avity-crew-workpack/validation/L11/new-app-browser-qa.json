@@ -1,0 +1,23 @@
+{
+  "engine_source_revision":"537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "run_id":"run:71469044-5ca6-473e-8e78-de2f4ad719e6",
+  "tested_revision":"git:9496620e15050159a3e82acb0542c1ae874f13e0",
+  "equivalent_revision":"git:1a82bbfb58223460449bffa2ca3cf257e4f30879",
+  "equivalence_evidence":"git diff --quiet9496620e..1a82bbfb -- src/server.mjs public/index.html README.md returned0; all application bytes identical, only snapshot/candidate commit identities changed.",
+  "mode":"manual",
+  "browser":"Codex in-app browser",
+  "server":"createApp from exact candidate, localhost ephemeral port, private temporary JSON data outside candidate",
+  "observations":[
+    "French page and labelled note form loaded; empty list visible.",
+    "Typed Recette navigateur — reprise v2, clicked Ajouter; note appeared in list.",
+    "Input was empty and remained the focused accessibility element after success.",
+    "Typed Deuxième note without focusing any element, pressed Return; second note appeared, empty input retained focus.",
+    "Reloaded browser page; both notes remained visible.",
+    "Screenshot visually confirmed two notes and the focused empty field; captured through the browser tool.",
+    "Temporary tab closed; test server stopped by SIGTERM and its temporary data removed."
+  ],
+  "result":"passed",
+  "documented_cli_startup":{"tested_revision":"git:1a82bbfb58223460449bffa2ca3cf257e4f30879","command":"node src/server.mjs --port <free-port> --data-file <temporary-path>","node":"26.12.0","http_200_observed":true,"stopped_after_check":true},
+  "scope":"Current candidate only; if a later candidate changes UI, this proof must be revisited.",
+  "external_state":"No external account or production data accessed."
+}

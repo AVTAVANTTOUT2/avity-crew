@@ -1,0 +1,41 @@
+✔ published runtime examples validate without provider-specific types (71.272667ms)
+✔ missing IDs, unsupported versions and extra fields are rejected (0.423625ms)
+✔ project configuration follows the published schema and rejects an impossible capacity (2.3485ms)
+✔ process success cannot directly accept a task, and acceptance is terminal (0.1ms)
+✔ stale and foreign delivery attempts cannot advance the task (0.231583ms)
+✔ an interrupted stream cannot report its previously planned success (0.163667ms)
+✔ run completion requires accepted tasks and passing criterion evidence (0.18975ms)
+✔ simulation cannot satisfy a required live verification (0.091ms)
+✔ cycles and missing dependencies are rejected with a useful path (0.117917ms)
+✔ fake events and result always remain simulated; unknown native event is representable (4.014417ms)
+✔ an interrupted simulated process cannot report success (0.090292ms)
+✔ a simulated error without provider details still prevents success (0.077167ms)
+✔ MCP ping declares its diagnostic read-only policy over the real local protocol (26.587042ms)
+✔ Codex normalizes session, tool IDs, text, usage and completion (0.339709ms)
+✔ Codex preserves unknown diagnostics and classifies provider errors (0.489792ms)
+✔ Codex probe is bounded and reports unsupported interactive operations (31.643417ms)
+✔ Codex passes prompt on stdin, preserves argv, model, permissions and bridge env (96.145ms)
+✔ Codex inherits native defaults and refreshes its scoped MCP inventory every turn (119.215084ms)
+✔ Codex refuses invalid or unreadable MCP inventories without exposing diagnostics (183.659375ms)
+✔ Codex sessions remain isolated and resume only the requested UUID with new input (135.811667ms)
+✔ Codex process rejects truncation, errors, bad exits and unsupported updates (869.144583ms)
+✔ native requests reject malformed runtime input before process launch (0.617667ms)
+✔ private bridge settings do not corrupt native identities and stay redacted in text (25.086875ms)
+✔ opaque bridge environment values are private even without a credential-like key name (25.749292ms)
+✔ native JSONL preserves UTF-8 fragments, stdin and unknown diagnostics (98.692ms)
+✔ simulated simultaneous native sessions keep their prompts and identities separate (24.671708ms)
+✔ native backpressure retains every event for a slow consumer (39.593083ms)
+✔ provider errors and secrets never become a successful or raw result (21.375708ms)
+✔ missing binaries, missing terminal result and nonzero exit fail explicitly (41.876458ms)
+✔ malformed or oversized JSONL and changed session identity fail closed (86.179666ms)
+✔ exact native resume rejects a different reported session (21.070834ms)
+✔ interruption cannot expose an earlier native success and stops POSIX children (658.989ms)
+✔ native error classification distinguishes actionable failures (0.502625ms)
+ℹ tests 33
+ℹ suites 0
+ℹ pass 33
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1545.554917

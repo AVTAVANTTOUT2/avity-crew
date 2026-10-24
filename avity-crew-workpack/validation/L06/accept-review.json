@@ -1,0 +1,19 @@
+{
+  "handoff_id": "handoff-2e7eeea4546e405e8a9c1006645e276c",
+  "source_revision": "git:355b32a61d8e64576c1a61e039c5fd48f2abfd4d",
+  "tested_revision": "git:355b32a61d8e64576c1a61e039c5fd48f2abfd4d",
+  "summary": "Workspaces intégrés avec préservation du dossier utilisateur, snapshots immuables, candidat contrôlé et promotion CAS. Les deux défauts indépendamment reproduits sont corrigés et revus. Les 82 tests de la combinaison passent sur Node26 et Node24, dont 15 vrais scénarios workspace sans skip.",
+  "outcome": "accepted",
+  "findings": [],
+  "verification_scope": "combined_code",
+  "integration": {
+    "base_revision": "git:6cf2a4c06c9c6e919bb7fcfcbed6da9cbcc13c1b",
+    "source_revision": "git:355b32a61d8e64576c1a61e039c5fd48f2abfd4d",
+    "candidate_revision": "git:355b32a61d8e64576c1a61e039c5fd48f2abfd4d",
+    "evidence_ref": "validation/L06/final-checks.md"
+  },
+  "checks": [
+    {"name":"Combinaison finale Node26", "command":"npm run check", "kind":"integration", "exit_code":0, "evidence_ref":"validation/L06/final-checks.md", "revision":"git:355b32a61d8e64576c1a61e039c5fd48f2abfd4d"},
+    {"name":"Combinaison finale Node24", "command":"npm exec --yes --package=node@24.22.1 -- node --test 'dist/tests/**/*.test.js'", "kind":"integration", "exit_code":0, "evidence_ref":"validation/L06/final-checks.md", "revision":"git:355b32a61d8e64576c1a61e039c5fd48f2abfd4d"}
+  ]
+}

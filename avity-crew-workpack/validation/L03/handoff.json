@@ -1,0 +1,30 @@
+{
+  "summary": "Contexte produit autonome livre : reconnaissance actuelle et exclusions, sources immuables versionnees et invalidation ciblee, templates equipe/roles v1, compilation pure sous budget, inspection egale au prompt exact, messages cibles idempotents et dossier de reprise sans transfert implicite d'autorite. Les six AC-L03 sont couverts par huit tests du composant et une preuve de transport FakeProvider explicitement simulee.",
+  "revision": "git:6559d41750fc139081916d9e0840235e248a9baa",
+  "artifacts": [
+    { "commit": "6559d41750fc139081916d9e0840235e248a9baa" },
+    { "ref": "validation/L03/checks.md", "sha256": "cd79cf1eb0e3e190a54539860231f5b21af1214b7b292f18e2ccd7f963698923" },
+    { "ref": "validation/L03/context-example.json", "sha256": "f1affbd6acb5042def4fb791885cae069223560e7c4a8d277a36643711ae3782" }
+  ],
+  "tests": [
+    {
+      "name": "Typecheck, Prettier, build et 51 tests sur Node 26.12.0",
+      "command": "npm run check",
+      "kind": "unit",
+      "exit_code": 0,
+      "evidence_ref": "validation/L03/checks.md",
+      "revision": "git:6559d41750fc139081916d9e0840235e248a9baa"
+    },
+    {
+      "name": "Huit tests contexte sur Node 24.22.1",
+      "command": "npm exec --yes --package=node@24.22.1 -- node --test dist/tests/context.test.js",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L03/checks.md",
+      "revision": "git:6559d41750fc139081916d9e0840235e248a9baa"
+    }
+  ],
+  "limitations": [],
+  "next_steps": [],
+  "live_verification": "not_applicable"
+}

@@ -1,0 +1,34 @@
+✖ simulated load exercises seven real runtime slots including chief, authenticated HTTP, isolated workspaces and owned POSIX processes (1296.025209ms)
+ℹ {"turns":[{"role":"chief","task":null,"ended":1136.971292},{"role":"developer","task":"task:load-0","ended":895.033042},{"role":"developer","task":"task:load-1","ended":1149.393792},{"role":"developer","task":"task:load-3","ended":1142.494667},{"role":"developer","task":"task:load-2","ended":1139.148542},{"role":"developer","task":"task:load-4","ended":1147.690834},{"role":"developer","task":"task:load-5","ended":1145.9465},{"role":"developer","task":"task:load-6","ended":1144.231667},{"role":"chief","ended":1330.214292}],"events":[{"type":"operation.observed","task":null},{"type":"message.updated","task":null},{"type":"message.updated","task":null},{"type":"message.updated","task":null},{"type":"message.updated","task":null},{"type":"message.updated","task":null},{"type":"message.updated","task":null},{"type":"message.updated","task":null},{"type":"session.observed","task":null},{"type":"operation.observed","task":null},{"type":"provider.session","task":null},{"type":"operation.intended","task":null},{"type":"tool.failed","task":null},{"type":"provider.result","task":null},{"type":"operation.observed","task":null}]}
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1386.00125
+
+✖ failing tests:
+
+test at dist/tests/load.test.js:147:1
+✖ simulated load exercises seven real runtime slots including chief, authenticated HTTP, isolated workspaces and owned POSIX processes (1296.025209ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + [
+  +   'simulated:load-8 chief: Supervisor rejected the request (INTERNAL_ERROR)',
+  +   'simulated:load-8 chief: Fixture exited 1'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///Users/zeldris/.codex/worktrees/l11-load-sim/avity-crew/dist/tests/load.test.js:334:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'simulated:load-8 chief: Supervisor rejected the request (INTERNAL_ERROR)', 'simulated:load-8 chief: Fixture exited 1' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

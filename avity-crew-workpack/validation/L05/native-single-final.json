@@ -1,0 +1,508 @@
+{
+  "mode": "single",
+  "config_mode": "native-preferences-scoped-mcp",
+  "checked_at": "2026-10-24T12:35:31.565Z",
+  "source_revision": "7fb39c6ca135eddab75c1581843cd13965bf3f42",
+  "requested_model": null,
+  "effective_model": null,
+  "model_evidence": "Exec JSONL does not expose the selected model",
+  "cwd": "/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-UCPRbQ/avity codex live 4xVO7b",
+  "capabilities": {
+    "schema_version": 1,
+    "provider": "codex",
+    "binary_path": "/Users/zeldris/.local/bin/codex",
+    "version": "0.163.0",
+    "checked_at": "2026-10-24T12:35:31.609Z",
+    "native_resume": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "Explicit session ID and new stdin prompt"
+    },
+    "structured_events": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "JSONL exec events"
+    },
+    "mid_turn_input": {
+      "status": "unsupported",
+      "evidence_ref": null,
+      "note": "Exec accepts one stdin prompt; finish or interrupt, then resume the exact session"
+    },
+    "permission_requests": {
+      "status": "unsupported",
+      "evidence_ref": null,
+      "note": "Exec has no interactive approval response transport; denials are surfaced"
+    },
+    "mcp_tools": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "Per-session stdio MCP via config overrides; verified version only"
+    },
+    "usage_reporting": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "Native token counts only; monetary cost unavailable"
+    }
+  },
+  "records": [
+    {
+      "name": "edit-and-mcp",
+      "permissions": {
+        "sandbox": "workspace-write",
+        "approval": "never"
+      },
+      "interrupted": false,
+      "result": {
+        "provider": "codex",
+        "provenance": "live",
+        "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177",
+        "exit_code": 0,
+        "signal": null,
+        "success": true,
+        "text": "I’ll call `crew.ping`, then create `proof.txt` in the current directory.\nDONE",
+        "error": null
+      },
+      "events": [
+        {
+          "type": "session",
+          "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177",
+          "provenance": "live"
+        },
+        {
+          "type": "unknown",
+          "text": "Codex startup warning item_0: Codex is ignoring 3 unrecognized configuration settings. Check for typos or deprecated settings.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:session_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:subagent_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:user_prompt_submit:0:0.trusted_content_hash` is ignored.",
+          "provenance": "live",
+          "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177"
+        },
+        {
+          "type": "unknown",
+          "text": "Codex startup warning item_[REDACTED]: Codex is ignoring 3 unrecognized configuration settings. Check for typos or deprecated settings.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:session_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:subagent_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:user_prompt_submit:0:0.trusted_content_hash` is ignored.",
+          "provenance": "live",
+          "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177"
+        },
+        {
+          "type": "unknown",
+          "text": "Codex startup warning item_2: Under-development features enabled: chronicle. Under-development features are incomplete and may behave unpredictably. To suppress this warning, set `suppress_unstable_features_warning = true` in /Users/zeldris/.codex/config.toml.",
+          "provenance": "live",
+          "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177"
+        },
+        {
+          "type": "text",
+          "text": "I’ll call `crew.ping`, then create `proof.txt` in the current directory.\n",
+          "provenance": "live",
+          "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177"
+        },
+        {
+          "type": "tool",
+          "text": "mcp_tool_call item_4 (in_progress)\ncrew.ping\nnull",
+          "provenance": "live",
+          "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177"
+        },
+        {
+          "type": "tool",
+          "text": "mcp_tool_call item_4 (completed)\ncrew.ping\n{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"pong\\\":\\\"L05_FIRST\\\",\\\"token_present\\\":true}\"}],\"structured_content\":null}",
+          "provenance": "live",
+          "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177"
+        },
+        {
+          "type": "tool",
+          "text": "file_change item_5 (in_progress)\n[{\"path\":\"/private/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-UCPRbQ/avity codex live 4xVO7b/proof.txt\",\"kind\":\"add\"}]",
+          "provenance": "live",
+          "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177"
+        },
+        {
+          "type": "tool",
+          "text": "file_change item_5 (completed)\n[{\"path\":\"/private/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-UCPRbQ/avity codex live 4xVO7b/proof.txt\",\"kind\":\"add\"}]",
+          "provenance": "live",
+          "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177"
+        },
+        {
+          "type": "text",
+          "text": "DONE",
+          "provenance": "live",
+          "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177"
+        },
+        {
+          "type": "usage",
+          "usage": {
+            "input_tokens": 95040,
+            "output_tokens": 217
+          },
+          "provenance": "live",
+          "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177"
+        },
+        {
+          "type": "result",
+          "provenance": "live",
+          "success": true,
+          "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177"
+        }
+      ]
+    },
+    {
+      "name": "resume-new-note",
+      "permissions": {
+        "sandbox": "workspace-write",
+        "approval": "never"
+      },
+      "interrupted": false,
+      "result": {
+        "provider": "codex",
+        "provenance": "live",
+        "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177",
+        "exit_code": 0,
+        "signal": null,
+        "success": true,
+        "text": "I’ll append the new line to `proof.txt`, preserving the existing line.\nDONE",
+        "error": null
+      },
+      "events": [
+        {
+          "type": "session",
+          "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177",
+          "provenance": "live"
+        },
+        {
+          "type": "unknown",
+          "text": "Codex startup warning item_0: Codex is ignoring 3 unrecognized configuration settings. Check for typos or deprecated settings.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:session_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:subagent_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:user_prompt_submit:0:0.trusted_content_hash` is ignored.",
+          "provenance": "live",
+          "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177"
+        },
+        {
+          "type": "unknown",
+          "text": "Codex startup warning item_[REDACTED]: Codex is ignoring 3 unrecognized configuration settings. Check for typos or deprecated settings.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:session_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:subagent_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:user_prompt_submit:0:0.trusted_content_hash` is ignored.",
+          "provenance": "live",
+          "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177"
+        },
+        {
+          "type": "unknown",
+          "text": "Codex startup warning item_2: Under-development features enabled: chronicle. Under-development features are incomplete and may behave unpredictably. To suppress this warning, set `suppress_unstable_features_warning = true` in /Users/zeldris/.codex/config.toml.",
+          "provenance": "live",
+          "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177"
+        },
+        {
+          "type": "text",
+          "text": "I’ll append the new line to `proof.txt`, preserving the existing line.\n",
+          "provenance": "live",
+          "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177"
+        },
+        {
+          "type": "tool",
+          "text": "file_change item_4 (in_progress)\n[{\"path\":\"/private/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-UCPRbQ/avity codex live 4xVO7b/proof.txt\",\"kind\":\"update\"}]",
+          "provenance": "live",
+          "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177"
+        },
+        {
+          "type": "tool",
+          "text": "file_change item_4 (completed)\n[{\"path\":\"/private/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-UCPRbQ/avity codex live 4xVO7b/proof.txt\",\"kind\":\"update\"}]",
+          "provenance": "live",
+          "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177"
+        },
+        {
+          "type": "text",
+          "text": "DONE",
+          "provenance": "live",
+          "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177"
+        },
+        {
+          "type": "usage",
+          "usage": {
+            "input_tokens": 145486,
+            "output_tokens": 330
+          },
+          "provenance": "live",
+          "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177"
+        },
+        {
+          "type": "result",
+          "provenance": "live",
+          "success": true,
+          "native_session_id": "01a16de8-c164-7912-bf61-68e8dfb22177"
+        }
+      ]
+    },
+    {
+      "name": "interrupt",
+      "permissions": {
+        "sandbox": "workspace-write",
+        "approval": "never"
+      },
+      "interrupted": true,
+      "result": {
+        "provider": "codex",
+        "provenance": "live",
+        "native_session_id": "01a16de9-0d35-7fc2-a8ff-ffdae389ddf3",
+        "exit_code": 1,
+        "signal": "SIGINT",
+        "success": false,
+        "text": "I’ll run the 30-second delay, then create `interrupted.txt` in the current directory.",
+        "error": {
+          "kind": "process",
+          "message": "Native provider interrupted with SIGINT"
+        }
+      },
+      "events": [
+        {
+          "type": "session",
+          "native_session_id": "01a16de9-0d35-7fc2-a8ff-ffdae389ddf3",
+          "provenance": "live"
+        },
+        {
+          "type": "unknown",
+          "text": "Codex startup warning item_0: Codex is ignoring 3 unrecognized configuration settings. Check for typos or deprecated settings.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:session_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:subagent_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:user_prompt_submit:0:0.trusted_content_hash` is ignored.",
+          "provenance": "live",
+          "native_session_id": "01a16de9-0d35-7fc2-a8ff-ffdae389ddf3"
+        },
+        {
+          "type": "unknown",
+          "text": "Codex startup warning item_[REDACTED]: Codex is ignoring 3 unrecognized configuration settings. Check for typos or deprecated settings.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:session_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:subagent_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:user_prompt_submit:0:0.trusted_content_hash` is ignored.",
+          "provenance": "live",
+          "native_session_id": "01a16de9-0d35-7fc2-a8ff-ffdae389ddf3"
+        },
+        {
+          "type": "unknown",
+          "text": "Codex startup warning item_2: Under-development features enabled: chronicle. Under-development features are incomplete and may behave unpredictably. To suppress this warning, set `suppress_unstable_features_warning = true` in /Users/zeldris/.codex/config.toml.",
+          "provenance": "live",
+          "native_session_id": "01a16de9-0d35-7fc2-a8ff-ffdae389ddf3"
+        },
+        {
+          "type": "text",
+          "text": "I’ll run the 30-second delay, then create `interrupted.txt` in the current directory.",
+          "provenance": "live",
+          "native_session_id": "01a16de9-0d35-7fc2-a8ff-ffdae389ddf3"
+        },
+        {
+          "type": "tool",
+          "text": "command_execution item_4 (in_progress)\n/bin/zsh -lc 'sleep 30 && touch interrupted.txt'\nexit_code: unavailable\n",
+          "provenance": "live",
+          "native_session_id": "01a16de9-0d35-7fc2-a8ff-ffdae389ddf3"
+        },
+        {
+          "type": "unknown",
+          "provenance": "live",
+          "text": "stderr: 2026-[REDACTED]0-24T[REDACTED]2:35:56.905900Z ERROR codex_core::session: failed to record rollout items: thread 0[REDACTED]a[REDACTED]6de9-0d35-7fc2-a8ff-ffdae389ddf3 not found\n",
+          "native_session_id": "01a16de9-0d35-7fc2-a8ff-ffdae389ddf3"
+        },
+        {
+          "type": "result",
+          "provenance": "live",
+          "success": false,
+          "error": {
+            "kind": "process",
+            "message": "Native provider interrupted with SIGINT"
+          },
+          "native_session_id": "01a16de9-0d35-7fc2-a8ff-ffdae389ddf3"
+        }
+      ]
+    },
+    {
+      "name": "resume-interrupted",
+      "permissions": {
+        "sandbox": "workspace-write",
+        "approval": "never"
+      },
+      "interrupted": false,
+      "result": {
+        "provider": "codex",
+        "provenance": "live",
+        "native_session_id": "01a16de9-0d35-7fc2-a8ff-ffdae389ddf3",
+        "exit_code": 0,
+        "signal": null,
+        "success": true,
+        "text": "Creating `recovered.txt` with the requested content.\nDONE",
+        "error": null
+      },
+      "events": [
+        {
+          "type": "session",
+          "native_session_id": "01a16de9-0d35-7fc2-a8ff-ffdae389ddf3",
+          "provenance": "live"
+        },
+        {
+          "type": "unknown",
+          "text": "Codex startup warning item_0: Codex is ignoring 3 unrecognized configuration settings. Check for typos or deprecated settings.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:session_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:subagent_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:user_prompt_submit:0:0.trusted_content_hash` is ignored.",
+          "provenance": "live",
+          "native_session_id": "01a16de9-0d35-7fc2-a8ff-ffdae389ddf3"
+        },
+        {
+          "type": "unknown",
+          "text": "Codex startup warning item_[REDACTED]: Codex is ignoring 3 unrecognized configuration settings. Check for typos or deprecated settings.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:session_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:subagent_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:user_prompt_submit:0:0.trusted_content_hash` is ignored.",
+          "provenance": "live",
+          "native_session_id": "01a16de9-0d35-7fc2-a8ff-ffdae389ddf3"
+        },
+        {
+          "type": "unknown",
+          "text": "Codex startup warning item_2: Under-development features enabled: chronicle. Under-development features are incomplete and may behave unpredictably. To suppress this warning, set `suppress_unstable_features_warning = true` in /Users/zeldris/.codex/config.toml.",
+          "provenance": "live",
+          "native_session_id": "01a16de9-0d35-7fc2-a8ff-ffdae389ddf3"
+        },
+        {
+          "type": "text",
+          "text": "Creating `recovered.txt` with the requested content.\n",
+          "provenance": "live",
+          "native_session_id": "01a16de9-0d35-7fc2-a8ff-ffdae389ddf3"
+        },
+        {
+          "type": "tool",
+          "text": "file_change item_4 (in_progress)\n[{\"path\":\"/private/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-UCPRbQ/avity codex live 4xVO7b/recovered.txt\",\"kind\":\"add\"}]",
+          "provenance": "live",
+          "native_session_id": "01a16de9-0d35-7fc2-a8ff-ffdae389ddf3"
+        },
+        {
+          "type": "tool",
+          "text": "file_change item_4 (completed)\n[{\"path\":\"/private/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-UCPRbQ/avity codex live 4xVO7b/recovered.txt\",\"kind\":\"add\"}]",
+          "provenance": "live",
+          "native_session_id": "01a16de9-0d35-7fc2-a8ff-ffdae389ddf3"
+        },
+        {
+          "type": "text",
+          "text": "DONE",
+          "provenance": "live",
+          "native_session_id": "01a16de9-0d35-7fc2-a8ff-ffdae389ddf3"
+        },
+        {
+          "type": "usage",
+          "usage": {
+            "input_tokens": 72931,
+            "output_tokens": 398
+          },
+          "provenance": "live",
+          "native_session_id": "01a16de9-0d35-7fc2-a8ff-ffdae389ddf3"
+        },
+        {
+          "type": "result",
+          "provenance": "live",
+          "success": true,
+          "native_session_id": "01a16de9-0d35-7fc2-a8ff-ffdae389ddf3"
+        }
+      ]
+    },
+    {
+      "name": "permission-mcp",
+      "permissions": {
+        "sandbox": "read-only",
+        "approval": "never"
+      },
+      "interrupted": false,
+      "result": {
+        "provider": "codex",
+        "provenance": "live",
+        "native_session_id": "01a16de9-53c9-7092-b240-30368263e17b",
+        "exit_code": 0,
+        "signal": null,
+        "success": false,
+        "text": "I’ll call `crew.ping` once with `L05_DENIAL` and report any refusal without retrying.`crew.ping` was refused: “MCP tool call requires approval, but approval policy is never.”\n\nNo retry, escalation, or permission change was attempted.",
+        "error": {
+          "kind": "permission",
+          "message": "MCP tool call requires approval, but approval policy is never"
+        }
+      },
+      "events": [
+        {
+          "type": "session",
+          "native_session_id": "01a16de9-53c9-7092-b240-30368263e17b",
+          "provenance": "live"
+        },
+        {
+          "type": "unknown",
+          "text": "Codex startup warning item_0: Codex is ignoring 3 unrecognized configuration settings. Check for typos or deprecated settings.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:session_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:subagent_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:user_prompt_submit:0:0.trusted_content_hash` is ignored.",
+          "provenance": "live",
+          "native_session_id": "01a16de9-53c9-7092-b240-30368263e17b"
+        },
+        {
+          "type": "unknown",
+          "text": "Codex startup warning item_[REDACTED]: Codex is ignoring 3 unrecognized configuration settings. Check for typos or deprecated settings.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:session_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:subagent_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:user_prompt_submit:0:0.trusted_content_hash` is ignored.",
+          "provenance": "live",
+          "native_session_id": "01a16de9-53c9-7092-b240-30368263e17b"
+        },
+        {
+          "type": "unknown",
+          "text": "Codex startup warning item_2: Under-development features enabled: chronicle. Under-development features are incomplete and may behave unpredictably. To suppress this warning, set `suppress_unstable_features_warning = true` in /Users/zeldris/.codex/config.toml.",
+          "provenance": "live",
+          "native_session_id": "01a16de9-53c9-7092-b240-30368263e17b"
+        },
+        {
+          "type": "text",
+          "text": "I’ll call `crew.ping` once with `L05_DENIAL` and report any refusal without retrying.",
+          "provenance": "live",
+          "native_session_id": "01a16de9-53c9-7092-b240-30368263e17b"
+        },
+        {
+          "type": "tool",
+          "text": "mcp_tool_call item_4 (in_progress)\ncrew.ping\nnull",
+          "provenance": "live",
+          "native_session_id": "01a16de9-53c9-7092-b240-30368263e17b"
+        },
+        {
+          "type": "tool",
+          "text": "mcp_tool_call item_4 (failed)\ncrew.ping\n{\"message\":\"MCP tool call requires approval, but approval policy is never\"}",
+          "provenance": "live",
+          "native_session_id": "01a16de9-53c9-7092-b240-30368263e17b"
+        },
+        {
+          "type": "permission",
+          "text": "MCP tool call requires approval, but approval policy is never",
+          "provenance": "live",
+          "native_session_id": "01a16de9-53c9-7092-b240-30368263e17b"
+        },
+        {
+          "type": "error",
+          "error": {
+            "kind": "permission",
+            "message": "MCP tool call requires approval, but approval policy is never"
+          },
+          "provenance": "live",
+          "native_session_id": "01a16de9-53c9-7092-b240-30368263e17b"
+        },
+        {
+          "type": "text",
+          "text": "`crew.ping` was refused: “MCP tool call requires approval, but approval policy is never.”\n\nNo retry, escalation, or permission change was attempted.",
+          "provenance": "live",
+          "native_session_id": "01a16de9-53c9-7092-b240-30368263e17b"
+        },
+        {
+          "type": "usage",
+          "usage": {
+            "input_tokens": 69005,
+            "output_tokens": 196
+          },
+          "provenance": "live",
+          "native_session_id": "01a16de9-53c9-7092-b240-30368263e17b"
+        },
+        {
+          "type": "result",
+          "provenance": "live",
+          "success": false,
+          "error": {
+            "kind": "permission",
+            "message": "MCP tool call requires approval, but approval policy is never"
+          },
+          "native_session_id": "01a16de9-53c9-7092-b240-30368263e17b"
+        }
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "/Users/zeldris/avity-crew/avity-crew-workpack/validation/L05/native-single-final-proof-first.txt",
+      "sha256": "75ababf0104a69a803881a10e4ee00bbbfdc06ff0bc201b279db66bfbc22b4b3"
+    },
+    {
+      "path": "/Users/zeldris/avity-crew/avity-crew-workpack/validation/L05/native-single-final-mcp-audit.jsonl",
+      "sha256": "77f86f04cc88c383b81f40a15a53647b37f1442ab5793eb5c652380926708dc0"
+    },
+    {
+      "path": "/Users/zeldris/avity-crew/avity-crew-workpack/validation/L05/native-single-final-proof-resumed.txt",
+      "sha256": "2970ee1c9d88d598bee89457a409cfca9c45a951679e6e16eea0e04b2978727d"
+    },
+    {
+      "path": "/Users/zeldris/avity-crew/avity-crew-workpack/validation/L05/native-single-final-recovered.txt",
+      "sha256": "2197338f7a0600b495bf402df6d7b71759c9509bc6b7a400bf209f06a38cf873"
+    },
+    {
+      "path": "/Users/zeldris/avity-crew/avity-crew-workpack/validation/L05/native-single-final-permission-audit.jsonl",
+      "sha256": "9843b1ae8011db0204eec5fae6cd14e277111006db00d964f23f15478a3cef63"
+    }
+  ],
+  "success": true
+}

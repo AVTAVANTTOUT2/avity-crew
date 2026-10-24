@@ -1,0 +1,44 @@
+{
+  "summary": "CLI/TUI locale installée : init/run/status/list/attach/watch/messages/réponses/pause/reprise/arrêt/remplacement/réattribution/inspection/export/doctor. Vue asynchrone détachable, Unicode et saisie multiligne, reconnexion par curseur, trois parcours PTY et isolation de projets avec espaces. Recette native de bout en bout menée avec le binaire du tarball, question réellement répondue, service redémarré sans perte et nouvelle conduite du même objectif.",
+  "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "artifacts": [
+    {
+      "commit": "537d3c40f673eb2ca7b0984d695bfed90282e746"
+    }
+  ],
+  "tests": [
+    {
+      "name": "Source finale,182tests Node26 incluant11CLI et3PTY",
+      "command": "npm run check",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L11/final-checks.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Source finale,182tests Node24",
+      "command": "npm exec --yes --package=node@24.22.1 -- node --test 'dist/tests/**/*.test.js'",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L11/final-checks.md",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    },
+    {
+      "name": "Run installé terminé et état durable cohérent",
+      "command": "node /Users/zeldris/avity-crew/avity-crew-workpack/validation/L11/assert-native-recipe.mjs /Users/zeldris/.codex/avity-crew-validation/20261024/data/avity-crew/project-1a121d7e95c2fc3d1965e22469d3c29b/state.sqlite '/Users/zeldris/.codex/avity-crew-validation/20261024/native new app final' run:71469044-5ca6-473e-8e78-de2f4ad719e6",
+      "kind": "live",
+      "provider": "codex",
+      "exit_code": 0,
+      "evidence_ref": "validation/L11/new-app-native-report.json",
+      "revision": "git:537d3c40f673eb2ca7b0984d695bfed90282e746"
+    }
+  ],
+  "limitations": [],
+  "next_steps": [],
+  "documented_limits": [
+    "VersionmacOSarm64 uniquement qualifiée ; Linux/WSL et CI distante non exécutés.",
+    "La vue détache sans arrêter le service ; absence de terminal interactif gérée par commandes JSON explicites.",
+    "Un échec intermédiaire de tests est conservé dans checks-b0571ad.md ; la fixture reconnect attend maintenant une vraie connexion sans affaiblir les assertions."
+  ],
+  "live_verification": "passed"
+}

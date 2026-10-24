@@ -1,0 +1,88 @@
+{
+  "summary": "Adaptateur Codex exec JSONL natif livré : sessions et reprises exactes, événements/usage normalisés, bridge MCP par env et permissions sans faux succès, interruption récupérée. Neuf tours réels finaux et 29 tests Node 26/24 réussis ; deux CLI concurrentes sans mélange. Fichiers de preuve réellement copiés et SHA256 vérifiés.",
+  "revision": "git:f1d594a488438dbee12f546f4bdab28a44b42c9b",
+  "artifacts": [
+    {
+      "commit": "f1d594a488438dbee12f546f4bdab28a44b42c9b"
+    },
+    {
+      "ref": "validation/L05/report.md",
+      "sha256": "b8f815176780acba502db7d391895c79de0341adc020046291c14d412a600ad6"
+    },
+    {
+      "ref": "validation/L05/live-single.json",
+      "sha256": "3a042ba0b7b8f2f75f7de606e5ca16282902d84c28aee08678bb3127361b1d27"
+    },
+    {
+      "ref": "validation/L05/live-parallel.json",
+      "sha256": "9559104d2c63513fb96b34709d52f53d771ecad5b57923e08021cebd3d8c1156"
+    },
+    {
+      "ref": "validation/L05/live-single-proof-first.txt",
+      "sha256": "e1d5ae27b3b4eb9208e96b6ec38ce5f774c1c03acdd5ed6e108da206dcc321a2"
+    },
+    {
+      "ref": "validation/L05/live-single-mcp-audit.jsonl",
+      "sha256": "77f86f04cc88c383b81f40a15a53647b37f1442ab5793eb5c652380926708dc0"
+    },
+    {
+      "ref": "validation/L05/live-single-proof-resumed.txt",
+      "sha256": "6523305dc519d9218eea442e567307a45eb48692beb8a444cfebe62f313e6df2"
+    },
+    {
+      "ref": "validation/L05/live-single-recovered.txt",
+      "sha256": "2197338f7a0600b495bf402df6d7b71759c9509bc6b7a400bf209f06a38cf873"
+    },
+    {
+      "ref": "validation/L05/live-single-permission-audit.jsonl",
+      "sha256": "9843b1ae8011db0204eec5fae6cd14e277111006db00d964f23f15478a3cef63"
+    }
+  ],
+  "tests": [
+    {
+      "name": "Contrôles locaux finaux et 29 tests",
+      "command": "npm run check",
+      "kind": "unit",
+      "exit_code": 0,
+      "evidence_ref": "validation/L05/check-final.log",
+      "revision": "git:f1d594a488438dbee12f546f4bdab28a44b42c9b"
+    },
+    {
+      "name": "29 tests référence Node 24.22.1",
+      "command": "npm exec --yes --package=node@24.22.1 -- node --test 'dist/tests/**/*.test.js'",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L05/node24-final.log",
+      "revision": "git:f1d594a488438dbee12f546f4bdab28a44b42c9b"
+    },
+    {
+      "name": "Cinq tours réels Codex séquentiels avec refus MCP",
+      "command": "node scripts/live-codex.mjs /Users/zeldris/avity-crew/avity-crew-workpack/validation/L05/live-single.json single",
+      "kind": "live",
+      "exit_code": 0,
+      "evidence_ref": "validation/L05/live-single.json",
+      "revision": "git:f1d594a488438dbee12f546f4bdab28a44b42c9b",
+      "provider": "codex"
+    },
+    {
+      "name": "Deux sessions et deux reprises réelles concurrentes",
+      "command": "node scripts/live-codex.mjs /Users/zeldris/avity-crew/avity-crew-workpack/validation/L05/live-parallel.json parallel",
+      "kind": "live",
+      "exit_code": 0,
+      "evidence_ref": "validation/L05/live-parallel.json",
+      "revision": "git:f1d594a488438dbee12f546f4bdab28a44b42c9b",
+      "provider": "codex"
+    }
+  ],
+  "limitations": [
+    "Modèle effectif et coût non exposés par exec JSONL ; modèle demandé null (défaut CLI).",
+    "Refus natif réel de fichier read-only non observé : déclarations du modèle sans outils exclues ; refus MCP natif réel vérifié à la place, politique jamais élargie.",
+    "Pannes réelles quota/auth/réseau, Linux/Windows, CI distante non exécutés ; tests hors ligne et macOS réels seulement. Arrêt d’arbre POSIX, limite Windows du runner partagée.",
+    "MCP L07 mutant : politique native par outil autorisée et ACL service à définir ; aucune extension du contrat ni auto-approve global. Scratch temporaire nettoyé par l’hôte ; copies de preuves canoniques disponibles."
+  ],
+  "next_steps": [
+    "Coordinateur : revue indépendante de git:f1d594a488438dbee12f546f4bdab28a44b42c9b, exports provider, intégration des commits propres après L04 et contrôles de la combinaison finale.",
+    "L07 : consommer events parallèlement à result, conserver les mises à jour jusqu’à reprise exacte et arbitrer la politique native des outils mutants avec ACL."
+  ],
+  "live_verification": "passed"
+}

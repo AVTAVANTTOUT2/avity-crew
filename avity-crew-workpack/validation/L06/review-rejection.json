@@ -1,0 +1,10 @@
+{
+  "handoff_id": "handoff-d43607f30b4c40f19e3d16b38424b11a",
+  "source_revision": "git:f8b2177e0749ad577127b34f2b62bbe63a3fbe53",
+  "summary": "Deux régressions reproduites par revue indépendante empêchent l’acceptation du périmètre et de l’arrêt des commandes.",
+  "outcome": "changes_requested",
+  "findings": [
+    "Document : docs/../private.txt est autorisé par la comparaison textuelle avant normalisation et capturé hors writePaths docs. Un alias de dossier vers un autre dossier du projet doit aussi respecter le périmètre réel.",
+    "Commande : close du parent annule l’escalade SIGKILL après SIGTERM ; un petit-fils du même groupe avec stdio fermé et SIGTERM ignoré continue à écrire après le retour du timeout."
+  ]
+}

@@ -1,0 +1,165 @@
+{
+  "mode": "single",
+  "config_mode": "native-preferences-scoped-mcp",
+  "checked_at": "2026-10-24T12:09:30.316Z",
+  "source_revision": "90541137a9b93e1cd8a4b1b5cfeda172998f1918",
+  "requested_model": null,
+  "effective_model": null,
+  "model_evidence": "Exec JSONL does not expose the selected model",
+  "cwd": "/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-tRf2DB/avity codex live mzDY6d",
+  "capabilities": {
+    "schema_version": 1,
+    "provider": "codex",
+    "binary_path": "/Users/zeldris/.local/bin/codex",
+    "version": "0.163.0",
+    "checked_at": "2026-10-24T12:09:30.329Z",
+    "native_resume": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "Explicit session ID and new stdin prompt"
+    },
+    "structured_events": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "JSONL exec events"
+    },
+    "mid_turn_input": {
+      "status": "unsupported",
+      "evidence_ref": null,
+      "note": "Exec accepts one stdin prompt; finish or interrupt, then resume the exact session"
+    },
+    "permission_requests": {
+      "status": "unsupported",
+      "evidence_ref": null,
+      "note": "Exec has no interactive approval response transport; denials are surfaced"
+    },
+    "mcp_tools": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "Per-session stdio MCP via config overrides; verified version only"
+    },
+    "usage_reporting": {
+      "status": "supported",
+      "evidence_ref": "codex:0.163.0:exec-help",
+      "note": "Native token counts only; monetary cost unavailable"
+    }
+  },
+  "records": [
+    {
+      "name": "edit-and-mcp",
+      "permissions": {
+        "sandbox": "workspace-write",
+        "approval": "never"
+      },
+      "interrupted": false,
+      "result": {
+        "provider": "codex",
+        "provenance": "live",
+        "native_session_id": "01a16dd0-ee06-7d60-a92a-76a4446e2f7d",
+        "exit_code": 0,
+        "signal": null,
+        "success": false,
+        "text": "I’ll call `crew.ping`, then create `proof.txt` in the current directory.\nDONE",
+        "error": {
+          "kind": "process",
+          "message": "Codex is ignoring 3 unrecognized configuration settings. Check for typos or deprecated settings.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:session_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:subagent_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:user_prompt_submit:0:0.trusted_content_hash` is ignored."
+        }
+      },
+      "events": [
+        {
+          "type": "session",
+          "native_session_id": "01a16dd0-ee06-7d60-a92a-76a4446e2f7d",
+          "provenance": "live"
+        },
+        {
+          "type": "error",
+          "error": {
+            "kind": "process",
+            "message": "Codex is ignoring 3 unrecognized configuration settings. Check for typos or deprecated settings.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:session_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:subagent_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:user_prompt_submit:0:0.trusted_content_hash` is ignored."
+          },
+          "provenance": "live",
+          "native_session_id": "01a16dd0-ee06-7d60-a92a-76a4446e2f7d"
+        },
+        {
+          "type": "error",
+          "error": {
+            "kind": "process",
+            "message": "Codex is ignoring 3 unrecognized configuration settings. Check for typos or deprecated settings.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:session_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:subagent_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:user_prompt_submit:0:0.trusted_content_hash` is ignored."
+          },
+          "provenance": "live",
+          "native_session_id": "01a16dd0-ee06-7d60-a92a-76a4446e2f7d"
+        },
+        {
+          "type": "error",
+          "error": {
+            "kind": "process",
+            "message": "Under-development features enabled: chronicle. Under-development features are incomplete and may behave unpredictably. To suppress this warning, set `suppress_unstable_features_warning = true` in /Users/zeldris/.codex/config.toml."
+          },
+          "provenance": "live",
+          "native_session_id": "01a16dd0-ee06-7d60-a92a-76a4446e2f7d"
+        },
+        {
+          "type": "text",
+          "text": "I’ll call `crew.ping`, then create `proof.txt` in the current directory.\n",
+          "provenance": "live",
+          "native_session_id": "01a16dd0-ee06-7d60-a92a-76a4446e2f7d"
+        },
+        {
+          "type": "tool",
+          "text": "mcp_tool_call item_4 (in_progress)\ncrew.ping\nnull",
+          "provenance": "live",
+          "native_session_id": "01a16dd0-ee06-7d60-a92a-76a4446e2f7d"
+        },
+        {
+          "type": "tool",
+          "text": "mcp_tool_call item_4 (completed)\ncrew.ping\n{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"pong\\\":\\\"L05_FIRST\\\",\\\"token_present\\\":true}\"}],\"structured_content\":null}",
+          "provenance": "live",
+          "native_session_id": "01a16dd0-ee06-7d60-a92a-76a4446e2f7d"
+        },
+        {
+          "type": "tool",
+          "text": "file_change item_5 (in_progress)\n[{\"path\":\"/private/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-tRf2DB/avity codex live mzDY6d/proof.txt\",\"kind\":\"add\"}]",
+          "provenance": "live",
+          "native_session_id": "01a16dd0-ee06-7d60-a92a-76a4446e2f7d"
+        },
+        {
+          "type": "tool",
+          "text": "file_change item_5 (completed)\n[{\"path\":\"/private/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/.ctx-mode-tRf2DB/avity codex live mzDY6d/proof.txt\",\"kind\":\"add\"}]",
+          "provenance": "live",
+          "native_session_id": "01a16dd0-ee06-7d60-a92a-76a4446e2f7d"
+        },
+        {
+          "type": "text",
+          "text": "DONE",
+          "provenance": "live",
+          "native_session_id": "01a16dd0-ee06-7d60-a92a-76a4446e2f7d"
+        },
+        {
+          "type": "usage",
+          "usage": {
+            "input_tokens": 94208,
+            "output_tokens": 278
+          },
+          "provenance": "live",
+          "native_session_id": "01a16dd0-ee06-7d60-a92a-76a4446e2f7d"
+        },
+        {
+          "type": "result",
+          "provenance": "live",
+          "success": false,
+          "error": {
+            "kind": "process",
+            "message": "Codex is ignoring 3 unrecognized configuration settings. Check for typos or deprecated settings.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:session_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:subagent_start:0:0.trusted_content_hash` is ignored.\n  user (/Users/zeldris/.codex/config.toml): `hooks.state.ponytail@ponytail:hooks/claude-codex-hooks.json:user_prompt_submit:0:0.trusted_content_hash` is ignored."
+          },
+          "native_session_id": "01a16dd0-ee06-7d60-a92a-76a4446e2f7d"
+        }
+      ]
+    }
+  ],
+  "artifacts": [],
+  "success": false,
+  "failure": {
+    "message": "Expected values to be strictly equal:\n\nfalse !== true\n",
+    "stack": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\nfalse !== true\n\n    at file:///Users/zeldris/.codex/worktrees/avity-crew-l05/scripts/live-codex.mjs:190:12\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)"
+  }
+}

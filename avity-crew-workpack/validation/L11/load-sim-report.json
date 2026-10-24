@@ -1,0 +1,98 @@
+{
+  "proof_level": "simulated_integration_with_real_local_processes",
+  "source_revision": "git:b6cbf2a7c49878461e7d65412323fc561937e855",
+  "test_commit": "833a534fe9bd04f9a766479d40f80cbee616e91e",
+  "test_assertions_unchanged": true,
+  "live_llm_cli_count": 0,
+  "business_completed": false,
+  "observed_metrics": [
+    {
+      "level": "simulated",
+      "provider": "fake",
+      "platform": "darwin",
+      "node": "v26.12.0",
+      "configured_slots": 7,
+      "observed_process_peak": 7,
+      "scheduler_peak": 7,
+      "worker_workspaces": 7,
+      "live_llm_cli_count": 0,
+      "final_status": "paused",
+      "business_completed": false
+    },
+    {
+      "level": "simulated",
+      "provider": "fake",
+      "platform": "darwin",
+      "node": "v24.22.1",
+      "configured_slots": 7,
+      "observed_process_peak": 7,
+      "scheduler_peak": 7,
+      "worker_workspaces": 7,
+      "live_llm_cli_count": 0,
+      "final_status": "paused",
+      "business_completed": false
+    }
+  ],
+  "checks": [
+    {
+      "command": "npm run check",
+      "node": "v26.12.0",
+      "exit_code": 0,
+      "tests_passed": 170,
+      "revision": "git:b6cbf2a7c49878461e7d65412323fc561937e855",
+      "evidence_ref": "validation/L11/load-sim-node26.log"
+    },
+    {
+      "command": "npm exec --yes --package=node@24.22.1 -- node --test 'dist/tests/**/*.test.js'",
+      "node": "v24.22.1",
+      "exit_code": 0,
+      "tests_passed": 170,
+      "revision": "git:b6cbf2a7c49878461e7d65412323fc561937e855",
+      "evidence_ref": "validation/L11/load-sim-node24.log"
+    }
+  ],
+  "cleanup": {
+    "activeOwnLoadProcesses": 0,
+    "loadDirectoriesRemaining": 0
+  },
+  "source_files": [
+    {
+      "path": "tests/load.test.ts",
+      "revision": "git:b6cbf2a7c49878461e7d65412323fc561937e855",
+      "sha256": "b66153ac243571c36ab72d13f4db6e12cd660888ebfef5878e807fe3de65988d"
+    },
+    {
+      "path": "tests/fixtures/load/session.mjs",
+      "revision": "git:b6cbf2a7c49878461e7d65412323fc561937e855",
+      "sha256": "d74ca3b915a1761436f08d8749f5c67ddfaca9d4e979128c619beda9466c95a8"
+    }
+  ],
+  "artifacts": [
+    {
+      "ref": "validation/L11/load-sim-node26.log",
+      "sha256": "c2660e6b1f62bbda1d3033afe5dc58b28eb9734e2ad31cd39411941d6dfaafcd"
+    },
+    {
+      "ref": "validation/L11/load-sim-node24.log",
+      "sha256": "259dc3836abd1d706a7048dcd5c95ed1c2e6966480a54f489d7d1e8dd694c3b4"
+    },
+    {
+      "ref": "validation/L11/load-sim-red.log",
+      "sha256": "126f1fe153bda89a1c676b33a19add6f9eb69acd8f3775bd88e898426e6edfee"
+    },
+    {
+      "ref": "validation/L11/load-sim-cleanup.json",
+      "sha256": "d476ebc26d66f1e1cefc4e712c1f56f47509f3148d1b75df07db7819a8d2698b"
+    },
+    {
+      "ref": "validation/L11/load-sim-report.md",
+      "sha256": "4ce3835d45b1f19645102a96901bd74066fe94390633ca7f9e8e4295e8da8f17"
+    }
+  ],
+  "limitations": [
+    "No real LLM/provider CLI was started; seven native provider sessions are not proved.",
+    "macOS POSIX executed; Linux/WSL and Windows not verified by this report.",
+    "The scenario pauses without handoff/acceptance/business completion.",
+    "Concurrent worker ports are distinct; later port reuse after process exit remains valid."
+  ]
+}

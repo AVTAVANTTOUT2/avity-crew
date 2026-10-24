@@ -1,0 +1,16 @@
+{
+  "source_revision":"b0571ad56aa5a63768537fbfe4bdcd9639c2954e",
+  "package_sha256":"f51a3216c854c0015ac8eff984e3d9f9e976aa2f9de98d8f470198cc1308730c",
+  "mode":"live",
+  "platform":"darwin-arm64",
+  "node":"26.12.0",
+  "requested_model":null,
+  "tool_annotations":"absent",
+  "command":"node permission-probe.mjs '/Users/zeldris/.codex/avity-crew-validation/20261024/install prefix' PROVIDER",
+  "results":[
+    {"provider":"claude","version":"2.1.304 (Claude Code)","native_session_id":"03b2b2b0-0b2f-4aba-95f4-de51c10278c3","exit_code":0,"success":false,"error_kind":"permission","permission_events":2,"mcp_initialized":true,"mcp_listed":true,"mcp_tool_calls":0,"probe_exit_code":0},
+    {"provider":"codex","version":"0.163.0","native_session_id":"01a16e9c-cc4c-7b12-9a40-61de48aec171","exit_code":0,"success":false,"error_kind":"permission","permission_events":1,"mcp_initialized":true,"mcp_listed":true,"mcp_tool_calls":0,"probe_exit_code":0}
+  ],
+  "conclusion":"Both installed native adapters surface actual permission events and reject success after native denial. A zero native CLI exit is not treated as business success.",
+  "limitations":["No real quota exhaustion or auth/network outage induced.","The prior annotated Codex trial was allowed and is retained in native-permissions-ccbab6f.json, excluded from denial evidence."]
+}

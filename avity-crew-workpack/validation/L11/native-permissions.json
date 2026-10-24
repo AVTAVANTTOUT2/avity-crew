@@ -1,0 +1,16 @@
+{
+  "source_revision":"537d3c40f673eb2ca7b0984d695bfed90282e746",
+  "package_sha256":"947da88b8cede34df6a50d1e3b5c0fed3db006d001c976ca35b8df20550c47d1",
+  "mode":"live",
+  "platform":"darwin-arm64",
+  "node":"26.12.0",
+  "requested_model":null,
+  "tool_annotations":"absent",
+  "command":"node permission-probe.mjs '/Users/zeldris/.codex/avity-crew-validation/20261024/install prefix' PROVIDER",
+  "results":[
+    {"provider":"claude","version":"2.1.304 (Claude Code)","native_session_id":"1095fe6a-2178-4d76-adc8-a1e5593d3109","exit_code":0,"success":false,"error_kind":"permission","permission_events":2,"mcp_initialized":true,"mcp_listed":true,"mcp_tool_calls":0,"probe_exit_code":0},
+    {"provider":"codex","version":"0.163.0","native_session_id":"01a16eac-74ae-72f1-baee-1a2691c3f932","exit_code":0,"success":false,"error_kind":"permission","permission_events":1,"mcp_initialized":true,"mcp_listed":true,"mcp_tool_calls":0,"probe_exit_code":0}
+  ],
+  "conclusion":"Actual native permission events observed on both installed adapters, no denied tool called, success rejected despite CLI exit0.",
+  "limitations":["No real quota exhaustion or auth/network outage induced.","Prior trials remain under their exact source names; an allowed annotated Codex trial is excluded from denial evidence."]
+}
