@@ -1,0 +1,51 @@
+{
+  "name": "avity-crew",
+  "version": "0.1.0",
+  "description": "Équipe locale Claude Code et Codex, avec contexte et preuves persistants",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=24.15.0"
+  },
+  "packageManager": "npm@11.20.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "bin": {
+    "avity-crew": "bin/avity-crew.mjs"
+  },
+  "exports": {
+    "./contracts": "./dist/packages/contracts/src/index.js",
+    "./core": "./dist/packages/core/src/index.js",
+    "./providers": "./dist/packages/providers/src/index.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "docs"
+  ],
+  "scripts": {
+    "generate": "node scripts/generate-contracts.mjs",
+    "build": "npm run generate && tsc",
+    "typecheck": "npm run generate && tsc --noEmit",
+    "test": "npm run build && node --test 'dist/tests/**/*.test.js'",
+    "lint": "prettier --check .",
+    "format": "prettier --write .",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "start": "node bin/avity-crew.mjs",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "json-schema-to-typescript": "16.0.0",
+    "prettier": "3.9.10",
+    "typescript": "6.0.3"
+  }
+}

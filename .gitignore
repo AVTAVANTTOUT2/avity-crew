@@ -13,3 +13,4 @@ dist/
 coverage/
 .serena/cache/
 .avity-crew/
+packages/contracts/src/generated/

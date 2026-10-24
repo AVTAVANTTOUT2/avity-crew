@@ -1,0 +1,10 @@
+node_modules
+dist
+package-lock.json
+avity-crew-workpack
+.serena
+packages/contracts/src/generated
+*.tgz
+AGENTS.md
+CLAUDE.md
+agent.md
