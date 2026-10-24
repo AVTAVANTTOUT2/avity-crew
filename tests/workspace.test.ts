@@ -9,6 +9,7 @@ import {
   writeFileSync,
   existsSync,
   rmSync,
+  symlinkSync,
   watch,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -30,6 +31,7 @@ import {
   reserveResources,
 } from '../packages/workspace/src/index.ts';
 import type { Check } from '../packages/workspace/src/index.ts';
+import { runCommand } from '../packages/workspace/src/git.ts';
 
 const git = (cwd: string, ...args: string[]) =>
   execFileSync('git', ['-C', cwd, ...args], {
@@ -622,6 +624,72 @@ test('clean accepted workspaces are removed explicitly while ignored files preve
     delivery.sourceRevision.slice(4),
   );
 });
+
+test('document snapshots reject traversal and symlink ancestors that escape the assigned scope', async (t) => {
+  const f = fixture(t, false);
+  mkdirSync(join(f.root, 'docs'));
+  mkdirSync(join(f.root, 'private'));
+  writeFileSync(join(f.root, 'private.txt'), 'outside assigned scope');
+  writeFileSync(
+    join(f.root, 'private', 'note.txt'),
+    'outside assigned scope through alias',
+  );
+  symlinkSync(join(f.root, 'private'), join(f.root, 'docs', 'alias'));
+  const workspace = await f.manager.createWorkspace(
+    { ...f.task(['docs']), mode: 'documentation' },
+    'workspace:scope-doc',
+  );
+  for (const [index, path] of [
+    'docs/../private.txt',
+    'docs/alias/note.txt',
+  ].entries()) {
+    await assert.rejects(
+      f.manager.collectDelivery(
+        workspace.operationId,
+        { writePaths: ['docs'], documentPaths: [path] },
+        `delivery:escape-doc-${index}`,
+      ),
+    );
+  }
+});
+
+test(
+  'a timed out command kills surviving process-group descendants before returning',
+  { skip: process.platform === 'win32' },
+  async (t) => {
+    const directory = mkdtempSync(
+      join(tmpdir(), 'avity crew process cleanup '),
+    );
+    const heartbeat = join(directory, 'heartbeat'),
+      pidFile = join(directory, 'pid');
+    t.after(() => {
+      if (existsSync(pidFile)) {
+        try {
+          process.kill(Number(readFileSync(pidFile, 'utf8')), 'SIGKILL');
+        } catch {
+          /* Already terminated. */
+        }
+      }
+      rmSync(directory, { recursive: true, force: true });
+    });
+    const grandchild = `const fs=require('node:fs');process.on('SIGTERM',()=>{});fs.writeFileSync(${JSON.stringify(pidFile)},String(process.pid));setInterval(()=>fs.appendFileSync(${JSON.stringify(heartbeat)},'.'),25);`;
+    const parent = `require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(grandchild)}],{stdio:'ignore'});setInterval(()=>{},1000);`;
+    const result = await runCommand(
+      directory,
+      [process.execPath, '-e', parent],
+      1000,
+    );
+    assert.match(result.error ?? '', /exceeded/);
+    assert.ok(existsSync(heartbeat), 'descendant was observed running');
+    const observed = readFileSync(heartbeat, 'utf8');
+    await new Promise((resolve) => setTimeout(resolve, 750));
+    assert.equal(
+      readFileSync(heartbeat, 'utf8'),
+      observed,
+      'no descendant writes after command completion',
+    );
+  },
+);
 
 test('documentary snapshots and read-only work do not initialize Git or remove the user directory', async (t) => {
   const f = fixture(t, false),

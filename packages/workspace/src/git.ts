@@ -52,10 +52,15 @@ export function runCommand(
       }
     };
     let escalation: NodeJS.Timeout | undefined;
+    let closed: CommandResult | undefined;
     const timer = setTimeout(() => {
       error = `Command exceeded ${timeoutMs} ms`;
       kill('SIGTERM');
-      escalation = setTimeout(() => kill('SIGKILL'), 500);
+      escalation = setTimeout(() => {
+        kill('SIGKILL');
+        escalation = undefined;
+        if (closed) resolve(closed);
+      }, 500);
     }, timeoutMs);
     for (const [index, stream] of [child.stdout, child.stderr].entries())
       stream.on('data', (chunk: Buffer) => {
@@ -69,15 +74,16 @@ export function runCommand(
     });
     child.on('close', (exitCode, signal) => {
       clearTimeout(timer);
-      if (escalation) clearTimeout(escalation);
-      resolve({
+      closed = {
         stdout: Buffer.concat(output[0]!).toString('utf8'),
         stderr: Buffer.concat(output[1]!).toString('utf8'),
         exitCode,
         signal,
         truncated,
         error,
-      });
+      };
+      // A closed parent can leave descendants with closed stdio in its process group.
+      if (!escalation) resolve(closed);
     });
   });
 }

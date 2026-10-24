@@ -490,6 +490,19 @@ export class WorkspaceManager {
           );
         verifyScope(paths);
         for (const path of paths) {
+          if (
+            isAbsolute(path) ||
+            /^[A-Za-z]:/.test(path) ||
+            path.includes('\\') ||
+            path.includes('\0') ||
+            path
+              .split('/')
+              .some((part) => !part || part === '.' || part === '..')
+          )
+            throw new CrewError(
+              'INVALID_DOCUMENT',
+              'Document paths must be canonical relative paths',
+            );
           const absolute = join(workspace.path, path),
             rel = relative(
               realpathSync(workspace.path),
@@ -506,6 +519,8 @@ export class WorkspaceManager {
               'INVALID_DOCUMENT',
               'Document must be a regular file inside its workspace',
             );
+          // An in-project directory alias must not bypass the assigned file scope.
+          verifyScope([rel.replaceAll('\\', '/')]);
           delivery.documents.push({
             path,
             ...this.store.writeArtifact(readFileSync(absolute)),
