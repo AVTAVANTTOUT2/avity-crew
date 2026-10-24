@@ -959,3 +959,194 @@ test('configuration explicitly applied by the locked service persists without re
   assert.deepEqual(f.store.project.config, currentConfig);
   assert.deepEqual(reopened.getRun(f.run.id), run);
 });
+
+function amendedSameSnapshot(f: ReturnType<typeof fixture>) {
+  const original = f.task('task:writer', 'documenter', f.criteria);
+  const previous = f.claim(original),
+    oldHandoff = f.deliver(original, previous, [f.criteria[0].id]);
+  f.stop(previous.attempt.id);
+  const previousEvidence = f.proof(
+    { ...original, acceptance_criteria: [f.criteria[0]] },
+    previous,
+    oldHandoff,
+  );
+  const decision = f.decision(original.id);
+  const updated = f.store.amendTask(
+    f.chief,
+    {
+      task: { ...original, acceptance_criteria: [f.criteria[0]] },
+      reason:
+        'The independent reviewer will cover the original global review criterion',
+      decision_id: decision.id,
+    },
+    f.key(),
+    f.version(),
+  );
+  f.store.reassignTask(f.user, original.id, f.key(), f.version());
+  const current = f.claim(updated.spec),
+    handoff = f.deliver(updated.spec, current);
+  f.stop(current.attempt.id);
+  assert.equal(
+    handoff.source_revision,
+    oldHandoff.source_revision,
+    'The regression must keep the actual document bytes and SHA identical',
+  );
+  assert.notEqual(current.attempt.id, previous.attempt.id);
+  assert.ok(current.attempt.generation > previous.attempt.generation);
+  assert.deepEqual(
+    f.store.getRun(f.run.id).acceptance_criteria,
+    f.run.acceptance_criteria,
+  );
+  return {
+    original,
+    previous,
+    previousEvidence,
+    current,
+    handoff,
+    spec: updated.spec,
+  };
+}
+
+test('an amended same-SHA delivery rejects previous-attempt evidence and completes only with fresh writer and linked control proofs', (t) => {
+  const f = fixture(t),
+    state = amendedSameSnapshot(f);
+  const staleControl = f.task('task:stale-proof-review', 'reviewer', [
+      f.criteria[1],
+    ]),
+    staleReviewer = f.claim(staleControl);
+  const staleReview = f.review(staleControl, staleReviewer, state.handoff, [
+    state.previousEvidence.value.id,
+  ]);
+  f.stop(staleReviewer.attempt.id);
+  const staleResult = f.store
+    .records<ControlResult>(f.run.id, 'control_result')
+    .find((item) => item.review_id === staleReview.id)!;
+  const before = f.version();
+  assert.throws(
+    () =>
+      f.store.acceptDelivery(
+        f.chief,
+        {
+          handoff_id: state.handoff.id,
+          review_ids: [staleReview.id],
+          verification_ids: [state.previousEvidence.value.id],
+          accepted_revision: state.handoff.source_revision!,
+        },
+        f.key(),
+        f.version(),
+      ),
+    code('STALE_EVIDENCE'),
+  );
+  assert.equal(f.version(), before);
+  assert.equal(f.store.getTask(state.spec.id).status, 'in_review');
+  assert.equal(f.store.records(f.run.id, 'acceptance').length, 0);
+  const currentEvidence = f.proof(state.spec, state.current, state.handoff);
+  assert.deepEqual(currentEvidence.value.criterion_ids, [f.criteria[0].id]);
+  assert.equal(
+    currentEvidence.artifact.producer_attempt_id,
+    state.current.attempt.id,
+  );
+  const control = f.task('task:fresh-proof-review', 'reviewer', [
+      f.criteria[1],
+    ]),
+    reviewer = f.claim(control);
+  const review = f.review(control, reviewer, state.handoff, [
+    currentEvidence.value.id,
+  ]);
+  f.stop(reviewer.attempt.id);
+  assert.equal(
+    f.store.acceptDelivery(
+      f.chief,
+      {
+        handoff_id: state.handoff.id,
+        review_ids: [review.id],
+        verification_ids: [currentEvidence.value.id],
+        accepted_revision: state.handoff.source_revision!,
+      },
+      f.key(),
+      f.version(),
+    ).status,
+    'accepted',
+  );
+  const currentResult = f.store
+    .records<ControlResult>(f.run.id, 'control_result')
+    .find((item) => item.review_id === review.id)!;
+  const args: FinishRunArgs = {
+    summary:
+      'Unchanged bytes still require current-attempt observations and the accepted independent control',
+    criterion_evidence: [
+      {
+        criterion_id: f.criteria[0].id,
+        evidence_artifact_ids: [currentEvidence.artifact.id],
+      },
+      {
+        criterion_id: f.criteria[1].id,
+        evidence_artifact_ids: [staleResult.artifact_id],
+      },
+    ],
+    delivered_artifact_ids: [state.handoff.artifacts[0]!.id],
+  };
+  assert.throws(
+    () => f.store.finishRun(f.chief, args, f.key(), f.version()),
+    code('MISSING_EVIDENCE'),
+  );
+  args.criterion_evidence[1]!.evidence_artifact_ids = [
+    currentResult.artifact_id,
+  ];
+  assert.equal(
+    f.store.finishRun(f.chief, args, f.key(), f.version()).status,
+    'completed',
+  );
+  assert.deepEqual(
+    f.store.getRun(f.run.id).acceptance_criteria,
+    f.run.acceptance_criteria,
+  );
+});
+
+test('current-attempt proof cannot recycle a criterion removed from the amended TaskSpec', (t) => {
+  const f = fixture(t),
+    state = amendedSameSnapshot(f);
+  const outOfScope = f.proof(state.original, state.current, state.handoff);
+  assert.deepEqual(
+    outOfScope.value.criterion_ids,
+    f.criteria.map((item) => item.id),
+  );
+  assert.equal(
+    outOfScope.artifact.producer_attempt_id,
+    state.current.attempt.id,
+    'Only criterion scope, not attempt ownership, is invalid in this case',
+  );
+  const control = f.task('task:out-of-scope-review', 'reviewer', [
+      f.criteria[1],
+    ]),
+    reviewer = f.claim(control);
+  const review = f.review(control, reviewer, state.handoff, [
+    outOfScope.value.id,
+  ]);
+  f.stop(reviewer.attempt.id);
+  const before = f.version();
+  assert.throws(
+    () =>
+      f.store.acceptDelivery(
+        f.chief,
+        {
+          handoff_id: state.handoff.id,
+          review_ids: [review.id],
+          verification_ids: [outOfScope.value.id],
+          accepted_revision: state.handoff.source_revision!,
+        },
+        f.key(),
+        f.version(),
+      ),
+    code('STALE_EVIDENCE'),
+  );
+  assert.equal(f.version(), before);
+  assert.equal(f.store.getTask(state.spec.id).status, 'in_review');
+  assert.deepEqual(f.store.getTask(state.spec.id).spec.acceptance_criteria, [
+    f.criteria[0],
+  ]);
+  assert.deepEqual(
+    f.store.getRun(f.run.id).acceptance_criteria,
+    f.run.acceptance_criteria,
+  );
+});
