@@ -455,7 +455,8 @@ export class WorkspaceManager {
         'READ_ONLY_WORKSPACE',
         'Read-only tasks do not create a delivery',
       );
-    const assigned = this.store.getTask(workspace.taskId).spec.scope;
+    const task = this.store.getTask(workspace.taskId).spec;
+    const assigned = task.scope;
     const verifyScope = (paths: readonly string[]) => {
       assertScope(paths, scope);
       assertScope(paths, {
@@ -475,7 +476,10 @@ export class WorkspaceManager {
         operationId: operation.id,
         workspaceOperationId,
         mode: workspace.mode,
-        baseRevision: workspace.baseRevision,
+        baseRevision:
+          workspace.mode === 'code'
+            ? task.base_revision
+            : workspace.baseRevision,
         sourceRevision: '',
         changedPaths: [],
         preservationRef: null,
@@ -541,7 +545,23 @@ export class WorkspaceManager {
             'WORKSPACE_CHANGED',
             'Workspace Git identity changed after assignment',
           );
-        const base = sha(workspace.baseRevision!);
+        if (!task.base_revision)
+          throw new CrewError(
+            'BASE_REQUIRED',
+            'Code delivery needs its assigned task baseline',
+          );
+        // Recovery may start from a partial snapshot; deliver the whole assigned task.
+        const base = sha(task.base_revision);
+        const ancestry = await git(
+          workspace.path,
+          ['merge-base', '--is-ancestor', base, sha(workspace.baseRevision!)],
+          true,
+        );
+        if (ancestry.exitCode !== 0)
+          throw new CrewError(
+            'BASE_CHANGED',
+            'The task baseline is not an ancestor of this workspace; reassign from the current baseline',
+          );
         const ref = `refs/avity-crew/deliveries/${digest(operation.id)}`;
         let commit = await git(this.root, ['rev-parse', '--verify', ref], true);
         if (commit.exitCode !== 0) {
