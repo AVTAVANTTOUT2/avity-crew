@@ -78,6 +78,7 @@ export class SupervisorRuntime {
   private readonly workerQueued = new Set<string>();
   private readonly chiefQueued = new Set<string>();
   private readonly cancellation = new Map<string, number>();
+  private readonly suspending = new Set<string>();
   private closing = false;
 
   initialize(): void {
@@ -204,7 +205,7 @@ export class SupervisorRuntime {
   }
 
   wake(runId: string, notifyChief = true): void {
-    if (this.closing) return;
+    if (this.closing || this.suspending.has(runId)) return;
     if (notifyChief) this.chiefNeeded.add(runId);
     setImmediate(() => {
       void this.pump(runId).catch((error: unknown) => {
@@ -218,7 +219,8 @@ export class SupervisorRuntime {
   }
 
   private async pump(runId: string): Promise<void> {
-    if (this.closing || this.pumping.has(runId)) return;
+    if (this.closing || this.suspending.has(runId) || this.pumping.has(runId))
+      return;
     const run = this.store.getRun(runId);
     if (
       terminal(run) ||
@@ -541,6 +543,7 @@ export class SupervisorRuntime {
         const current = this.store.getRun(run.id);
         return (
           !this.closing &&
+          !this.suspending.has(run.id) &&
           current.status === 'running' &&
           (actor.role !== 'chief' || current.generation === run.generation) &&
           (this.cancellation.get(fence) ?? 0) === cancellation &&
@@ -1372,6 +1375,16 @@ export class SupervisorRuntime {
       };
     const run = this.store.getRun(runId),
       user = serviceActor(this.store, runId);
+    if (
+      this.suspending.has(runId) &&
+      ['pause', 'stop', 'resume', 'replace_chief', 'reassign'].includes(
+        request.method,
+      )
+    )
+      throw new CrewError(
+        'CONTROL_IN_PROGRESS',
+        'A control operation is still observing stopped turns; retry when it settles',
+      );
     switch (request.method) {
       case 'status': {
         const after = Number(args['after_seq'] ?? 0),
@@ -1441,18 +1454,23 @@ export class SupervisorRuntime {
       }
       case 'pause':
       case 'stop': {
-        this.scheduler.cancelQueued(runId);
-        for (const task of this.store.tasks(runId))
-          this.workerQueued.delete(task.id);
-        this.chiefQueued.delete(runId);
-        this.chiefNeeded.delete(runId);
-        await this.interrupt(runId);
-        return this.store.updateRunStatus(
-          user,
-          request.method === 'pause' ? 'paused' : 'cancelled',
-          ident(request.method),
-          this.version(runId),
-        );
+        this.suspending.add(runId);
+        try {
+          this.scheduler.cancelQueued(runId);
+          for (const task of this.store.tasks(runId))
+            this.workerQueued.delete(task.id);
+          this.chiefQueued.delete(runId);
+          this.chiefNeeded.delete(runId);
+          await this.interrupt(runId);
+          return this.store.updateRunStatus(
+            user,
+            request.method === 'pause' ? 'paused' : 'cancelled',
+            ident(request.method),
+            this.version(runId),
+          );
+        } finally {
+          this.suspending.delete(runId);
+        }
       }
       case 'resume': {
         if (terminal(run))
