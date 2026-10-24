@@ -59,7 +59,7 @@ node scripts/live-codex.mjs /chemin/absolu/live-parallel.json parallel
 node scripts/live-codex.mjs /chemin/absolu/live-permission.json permission
 ```
 
-`single` utilise au plus une CLI à la fois ; `parallel` en utilise deux. `permission` rejoue seulement le refus natif sans répéter les éditions et reprises déjà vérifiées. Ce contrôle exige une tentative d'outil réelle et un refus normalisé ; une explication du modèle seule ne suffit pas. `AVITY_CREW_CODEX_BINARY` peut sélectionner un binaire local et `AVITY_CREW_CODEX_MODEL` un modèle accessible. Les répertoires jetables sont conservés pour vérifier les fichiers produits.
+`single` utilise au plus une CLI à la fois ; `parallel` en utilise deux. `permission` rejoue seulement le refus natif sans répéter les éditions et reprises déjà vérifiées. Ce contrôle exige une tentative d'outil réelle et un refus normalisé ; une explication du modèle seule ne suffit pas. Il configure le seul outil diagnostique `crew.ping` avec `approval_mode="prompt"` via le runner et le décodeur partagés, sous politique `never` inchangée : cette règle plus restrictive ne modifie pas le contrat produit et vérifie qu'aucun appel refusé n'atteint le bridge. `AVITY_CREW_CODEX_BINARY` peut sélectionner un binaire local et `AVITY_CREW_CODEX_MODEL` un modèle accessible. Les fichiers sont vérifiés pendant l'exécution ; le système hôte peut nettoyer ses répertoires temporaires ensuite.
 
 ## Sources
 

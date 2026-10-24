@@ -5,7 +5,11 @@ import { mkdtemp, readFile, writeFile, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CodexProvider } from '../dist/packages/providers/src/codex.js';
+import {
+  CodexProvider,
+  decodeCodexEvent,
+} from '../dist/packages/providers/src/codex.js';
+import { runNative } from '../dist/packages/providers/src/process.js';
 
 const [reportPath, mode = 'single'] = process.argv.slice(2);
 assert.ok(
@@ -55,10 +59,47 @@ const request = (prompt, sandbox = 'workspace-write') => ({
     env: { AVITY_CREW_MCP_AUDIT: audit, AVITY_CREW_BRIDGE_TOKEN: token },
   },
 });
-async function run(name, req, session, interrupt = false) {
-  const native = session
-    ? provider.resume({ ...req, native_session_id: session })
-    : provider.start(req);
+async function run(
+  name,
+  req,
+  session,
+  interrupt = false,
+  requirePingApproval = false,
+) {
+  // The negative probe tightens one tool's policy without changing the product contract.
+  const native = requirePingApproval
+    ? runNative(
+        'codex',
+        report.capabilities.binary_path,
+        [
+          'exec',
+          '--ignore-user-config',
+          '--json',
+          '--skip-git-repo-check',
+          '-c',
+          `sandbox_mode=${JSON.stringify(req.permissions.sandbox)}`,
+          '-c',
+          `approval_policy=${JSON.stringify(req.permissions.approval)}`,
+          ...Object.entries({
+            command: req.bridge.command,
+            args: req.bridge.args,
+            env_vars: Object.keys(req.bridge.env),
+            required: true,
+          }).flatMap(([key, value]) => [
+            '-c',
+            `mcp_servers.crew.${key}=${JSON.stringify(value)}`,
+          ]),
+          '-c',
+          'mcp_servers.crew.tools.ping.approval_mode="prompt"',
+          ...(req.model ? ['--model', req.model] : []),
+          '-',
+        ],
+        req,
+        decodeCodexEvent,
+      )
+    : session
+      ? provider.resume({ ...req, native_session_id: session })
+      : provider.start(req);
   const events = [];
   let interrupted = false;
   const cancel = async () => {
@@ -97,14 +138,13 @@ async function run(name, req, session, interrupt = false) {
   }
 }
 async function verifyPermission() {
-  const denied = await run(
-    'permission-read-only',
-    request(
-      "This test requires observing the native sandbox boundary. Use the shell tool once to execute exactly: printf 'DENIED\\n' > denied.txt . Do not substitute an explanation before trying the command. If refused, report the refusal and do not retry, request escalation, or change permissions.",
-      'read-only',
-    ),
+  const req = request(
+    'Call crew.ping once with message L05_DENIAL. If refused, report the refusal and do not retry, escalate or change permissions.',
+    'read-only',
   );
-  await assert.rejects(access(resolve(cwd, 'denied.txt')));
+  const permissionAudit = resolve(cwd, 'permission-audit.jsonl');
+  req.bridge.env.AVITY_CREW_MCP_AUDIT = permissionAudit;
+  const denied = await run('permission-mcp', req, undefined, false, true);
   assert.ok(
     denied.events.some((event) => event.type === 'tool'),
     'A native tool attempt must be observed',
@@ -117,6 +157,15 @@ async function verifyPermission() {
     'Native refusal must be normalized',
   );
   assert.equal(denied.result.success, false);
+  const audited = (await readFile(permissionAudit, 'utf8'))
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line));
+  assert.ok(audited.some((event) => event.method === 'tools/list'));
+  assert.ok(
+    !audited.some((event) => event.method === 'tools/call'),
+    'Denied ping must not reach the bridge',
+  );
 }
 try {
   if (mode === 'single') {
