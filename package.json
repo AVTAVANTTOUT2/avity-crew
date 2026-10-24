@@ -21,6 +21,7 @@
     "./storage": "./dist/packages/storage/src/index.js",
     "./context": "./dist/packages/context/src/index.js",
     "./workspace": "./dist/packages/workspace/src/index.js",
+    "./supervisor": "./dist/packages/supervisor/src/index.js",
     "./providers": "./dist/packages/providers/src/index.js",
     "./schema/runtime": "./packages/contracts/schema/runtime.schema.json",
     "./schema/project-config": "./packages/contracts/schema/project-config.schema.json"
