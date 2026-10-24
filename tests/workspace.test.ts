@@ -24,13 +24,15 @@ import type {
   Run,
   TaskSpec,
   AgentSession,
+  ArtifactRef,
+  Handoff,
 } from '../packages/contracts/src/index.ts';
 import {
   WorkspaceManager,
   inspectRepository,
   reserveResources,
 } from '../packages/workspace/src/index.ts';
-import type { Check } from '../packages/workspace/src/index.ts';
+import type { Check, Delivery } from '../packages/workspace/src/index.ts';
 import { runCommand } from '../packages/workspace/src/git.ts';
 
 const git = (cwd: string, ...args: string[]) =>
@@ -172,6 +174,332 @@ function fixture(t: TestContext, initialize = true) {
     },
   };
 }
+
+async function resumedPartialFixture(t: TestContext) {
+  const f = fixture(t),
+    initial = f.task(['ui/**', 'README.md']);
+  f.store.observeAttempt(
+    f.actor,
+    initial.attemptId,
+    { status: 'running', pid: null, exit_code: null },
+    'attempt:partial-running',
+    f.version(),
+  );
+  const first = await f.manager.createWorkspace(
+    { ...initial, mode: 'code' },
+    'workspace:partial',
+  );
+  mkdirSync(join(first.path, 'ui'));
+  writeFileSync(
+    join(first.path, 'ui/index.html'),
+    '<main>Recovered UI</main>\n',
+  );
+  writeFileSync(join(first.path, 'README.md'), 'Draft README\n');
+  const partial = await f.manager.collectDelivery(
+    first.operationId,
+    { writePaths: ['ui/**', 'README.md'] },
+    'delivery:partial',
+  );
+  const submit = (
+    delivery: Delivery,
+    attemptId: string,
+    status: Handoff['status'],
+    id: string,
+  ) => {
+    const attempt = f.store.getAttempt(attemptId);
+    const actor: Actor = {
+      ...f.actor,
+      id: attempt.session_id,
+      role: 'developer',
+      task_id: initial.taskId,
+      attempt_id: attempt.id,
+      generation: attempt.generation,
+    };
+    assert.ok(delivery.preservationRef);
+    const artifact: ArtifactRef = {
+      id: `artifact:${id}`,
+      kind: 'git_commit',
+      reference: delivery.preservationRef,
+      revision: delivery.sourceRevision,
+      producer_attempt_id: attempt.id,
+      created_at: now(),
+    };
+    const value: Handoff = {
+      schema_version: 1,
+      id,
+      task_id: initial.taskId,
+      run_id: f.run.id,
+      attempt_id: attempt.id,
+      generation: attempt.generation,
+      status,
+      summary:
+        status === 'partial'
+          ? 'UI retained; README still needs completion'
+          : 'UI and final README captured cumulatively',
+      source_revision: delivery.sourceRevision,
+      artifacts: [artifact],
+      verifications: [],
+      criteria_claimed:
+        status === 'partial'
+          ? []
+          : f.run.acceptance_criteria.map((criterion) => criterion.id),
+      limitations: status === 'partial' ? ['README remains a draft'] : [],
+      next_information: [],
+      created_at: now(),
+    };
+    f.store.submitHandoff(actor, value, `submit:${id}`, f.version());
+    return { actor, value };
+  };
+  const old = submit(partial, initial.attemptId, 'partial', 'handoff:partial');
+  f.store.observeAttempt(
+    f.actor,
+    initial.attemptId,
+    { status: 'exited', pid: null, exit_code: 0 },
+    'attempt:partial-exited',
+    f.version(),
+  );
+  f.store.reassignTask(f.actor, initial.taskId, 'task:resume', f.version());
+  const session: AgentSession = {
+    id: 'session:resumed',
+    run_id: f.run.id,
+    task_id: initial.taskId,
+    provider: 'fake',
+    model: null,
+    native_session_id: 'simulated:resume',
+    cli_version: null,
+    cwd: f.root,
+    capabilities: null,
+  };
+  const attempt = f.store.claimTask(
+    f.actor,
+    initial.taskId,
+    session,
+    'attempt:resumed',
+    f.version(),
+  );
+  f.store.observeAttempt(
+    f.actor,
+    attempt.id,
+    { status: 'running', pid: null, exit_code: null },
+    'attempt:resumed-running',
+    f.version(),
+  );
+  assert.ok(attempt.generation > old.value.generation);
+  assert.throws(
+    () =>
+      f.store.submitHandoff(
+        old.actor,
+        { ...old.value, id: 'handoff:late-old-writer' },
+        'submit:late-old-writer',
+        f.version(),
+      ),
+    code('STALE_ATTEMPT'),
+  );
+  const resumed = await f.manager.createWorkspace(
+    {
+      taskId: initial.taskId,
+      attemptId: attempt.id,
+      baseRevision: partial.sourceRevision,
+      mode: 'code',
+    },
+    'workspace:resumed',
+  );
+  assert.equal(
+    readFileSync(join(resumed.path, 'ui/index.html'), 'utf8'),
+    '<main>Recovered UI</main>\n',
+  );
+  assert.equal(
+    readFileSync(join(resumed.path, 'README.md'), 'utf8'),
+    'Draft README\n',
+  );
+  writeFileSync(join(resumed.path, 'README.md'), 'Final README\n');
+  assert.equal(
+    f.store.getTask(initial.taskId).spec.base_revision,
+    initial.baseRevision,
+  );
+  return { f, initial, first, partial, attempt, resumed, submit };
+}
+
+test('a resumed partial delivery integrates both attempts cumulatively from the original task base', async (t) => {
+  const { f, initial, first, partial, attempt, resumed, submit } =
+    await resumedPartialFixture(t);
+  writeFileSync(
+    join(f.root, 'user note.txt'),
+    'Uncommitted user work must stay intact',
+  );
+  const final = await f.manager.collectDelivery(
+    resumed.operationId,
+    { writePaths: ['ui/**', 'README.md'] },
+    'delivery:final',
+  );
+  submit(final, attempt.id, 'delivered', 'handoff:final');
+  f.store.observeAttempt(
+    f.actor,
+    attempt.id,
+    { status: 'exited', pid: null, exit_code: 0 },
+    'attempt:final-exited',
+    f.version(),
+  );
+  const candidate = await f.manager.prepareIntegration(
+    {
+      targetRef: 'refs/heads/crew-cumulative-delivery',
+      expectedBase: initial.baseRevision!,
+      deliveryOperationIds: [final.operationId],
+      checks: check(
+        "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.readFileSync('ui/index.html','utf8'),'<main>Recovered UI</main>\\n');a.equal(f.readFileSync('README.md','utf8'),'Final README\\n');a.equal(f.readFileSync('base.txt','utf8'),'baseline\\n')",
+      ),
+    },
+    'integration:cumulative',
+  );
+  assert.equal(
+    candidate.status,
+    'validated',
+    'The final delivery alone must apply cleanly to the original task base and retain the UI from attempt one',
+  );
+  assert.equal(candidate.proofs[0]!.exitCode, 0);
+  assert.equal(
+    candidate.proofs[0]!.candidateRevision,
+    candidate.candidateRevision,
+  );
+  assert.equal(final.baseRevision, initial.baseRevision);
+  assert.equal(
+    `git:${git(f.root, 'rev-parse', `${final.sourceRevision.slice(4)}^`)}`,
+    initial.baseRevision,
+  );
+  assert.deepEqual(final.changedPaths.sort(), ['README.md', 'ui/index.html']);
+  assert.equal(
+    git(f.root, 'show', `${final.sourceRevision.slice(4)}:ui/index.html`),
+    '<main>Recovered UI</main>',
+  );
+  assert.equal(
+    git(f.root, 'show', `${final.sourceRevision.slice(4)}:README.md`),
+    'Final README',
+  );
+  assert.equal(
+    git(f.root, 'show', `${partial.sourceRevision.slice(4)}:README.md`),
+    'Draft README',
+  );
+  await f.manager.promoteIntegration(
+    candidate.operationId,
+    'promote:cumulative',
+  );
+  assert.equal(
+    git(f.root, 'rev-parse', 'refs/heads/crew-cumulative-delivery'),
+    candidate.candidateRevision.slice(4),
+  );
+  assert.equal(`git:${git(f.root, 'rev-parse', 'HEAD')}`, initial.baseRevision);
+  assert.equal(existsSync(join(f.root, 'ui')), false);
+  assert.equal(existsSync(join(f.root, 'README.md')), false);
+  assert.equal(
+    readFileSync(join(f.root, 'user note.txt'), 'utf8'),
+    'Uncommitted user work must stay intact',
+  );
+  assert.equal(
+    readFileSync(join(first.path, 'README.md'), 'utf8'),
+    'Draft README\n',
+  );
+  assert.equal(
+    readFileSync(join(resumed.path, 'ui/index.html'), 'utf8'),
+    '<main>Recovered UI</main>\n',
+  );
+  assert.equal(f.store.getTask(initial.taskId).active_attempt_id, attempt.id);
+});
+
+for (const restricted of [
+  { name: 'narrowed write scope', scope: { writePaths: ['README.md'] } },
+  {
+    name: 'excluded earlier file',
+    scope: { writePaths: ['ui/**', 'README.md'], excludedPaths: ['ui/**'] },
+  },
+]) {
+  test(`resumed collection checks ${restricted.name} against cumulative changes from the task base`, async (t) => {
+    const { f, partial, resumed } = await resumedPartialFixture(t);
+    await assert.rejects(
+      f.manager.collectDelivery(
+        resumed.operationId,
+        restricted.scope,
+        'delivery:restricted-final',
+      ),
+      code('OUTSIDE_SCOPE'),
+    );
+    assert.equal(
+      readFileSync(join(resumed.path, 'ui/index.html'), 'utf8'),
+      '<main>Recovered UI</main>\n',
+    );
+    assert.equal(
+      readFileSync(join(resumed.path, 'README.md'), 'utf8'),
+      'Final README\n',
+    );
+    assert.equal(
+      git(f.root, 'show', `${partial.sourceRevision.slice(4)}:README.md`),
+      'Draft README',
+    );
+  });
+}
+
+test('collection refuses an amended task base that is not an ancestor of the resumed workspace base', async (t) => {
+  const { f, initial, partial, attempt, resumed } =
+    await resumedPartialFixture(t);
+  f.store.observeAttempt(
+    f.actor,
+    attempt.id,
+    { status: 'exited', pid: null, exit_code: 0 },
+    'attempt:stopped-before-base-change',
+    f.version(),
+  );
+  const partialSha = partial.sourceRevision.slice(4);
+  const nextBase = `git:${git(f.root, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@localhost', 'commit-tree', git(f.root, 'rev-parse', `${partialSha}^{tree}`), '-p', partialSha, '-m', 'new planned base after the resumed workspace was created')}`;
+  f.store.recordDecision(
+    f.actor,
+    {
+      schema_version: 1,
+      id: 'decision:new-base',
+      run_id: f.run.id,
+      question: 'Which baseline should the next attempt use?',
+      answer: 'Use the new planned baseline and create a compatible workspace',
+      status: 'approved',
+      approved_by: f.actor.id,
+      source_ids: [],
+      affects_task_ids: [initial.taskId],
+      supersedes: null,
+      created_at: now(),
+    },
+    'decision:record-base-change',
+    f.version(),
+  );
+  f.store.amendTask(
+    f.actor,
+    {
+      task: {
+        ...f.store.getTask(initial.taskId).spec,
+        base_revision: nextBase,
+      },
+      reason:
+        'The next attempt must use the explicitly approved newer baseline',
+      decision_id: 'decision:new-base',
+    },
+    'task:amend-base',
+    f.version(),
+  );
+  assert.equal(f.store.getTask(initial.taskId).spec.base_revision, nextBase);
+  await assert.rejects(
+    f.manager.collectDelivery(
+      resumed.operationId,
+      { writePaths: ['ui/**', 'README.md'] },
+      'delivery:incompatible-base',
+    ),
+    code('BASE_CHANGED'),
+  );
+  assert.equal(`git:${git(f.root, 'rev-parse', 'HEAD')}`, initial.baseRevision);
+  assert.equal(
+    readFileSync(join(resumed.path, 'ui/index.html'), 'utf8'),
+    '<main>Recovered UI</main>\n',
+  );
+  assert.equal(
+    readFileSync(join(resumed.path, 'README.md'), 'utf8'),
+    'Final README\n',
+  );
+});
 
 test('real worktrees isolate two deliveries and promote only their exact checked combination', async (t) => {
   const f = fixture(t),
