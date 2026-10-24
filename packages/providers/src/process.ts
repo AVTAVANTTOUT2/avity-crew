@@ -54,7 +54,9 @@ export function classifyNativeError(
           message,
         )
       ? 'authentication'
-      : /permission|denied|not allowed|EACCES|EPERM|sandbox/i.test(message)
+      : /permission|denied|not allowed|not permitted|EACCES|EPERM|sandbox/i.test(
+            message,
+          )
         ? 'permission'
         : /network|ECONN|ENOTFOUND|fetch failed|timed? ?out|ETIMEDOUT|connection/i.test(
               message,

@@ -240,6 +240,7 @@ test('native error classification distinguishes actionable failures', () => {
     ['429 rate limit', 'quota'],
     ['not logged in', 'authentication'],
     ['permission denied', 'permission'],
+    ['Operation not permitted', 'permission'],
     ['ECONNRESET', 'network'],
     ['unexpected exit', 'process'],
   ])
