@@ -552,7 +552,8 @@ export async function selectTaskSources(
           pathInScope(directory, [scope]),
       )
     )
-      paths.set(path, 'applicable_project_instruction');
+      if (!paths.get(path)?.startsWith('required_source:'))
+        paths.set(path, 'applicable_project_instruction');
   }
   for (const [path, reason] of [...paths].sort(([a], [b]) =>
     a.localeCompare(b),
