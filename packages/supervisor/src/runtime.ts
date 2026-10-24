@@ -867,10 +867,16 @@ export class SupervisorRuntime {
         this.version(run.id),
       );
     try {
+      const publishedSessions = new Set<string>();
       const reading = (async () => {
         try {
           for await (const event of native.events) {
-            if (event.type === 'session' && event.native_session_id) {
+            if (
+              event.type === 'session' &&
+              event.native_session_id &&
+              !publishedSessions.has(event.native_session_id)
+            ) {
+              publishedSessions.add(event.native_session_id);
               session.native_session_id = event.native_session_id;
               this.store.updateSession(
                 user,
@@ -881,6 +887,27 @@ export class SupervisorRuntime {
                   capabilities: capability,
                 },
                 requestId(invocation + event.native_session_id, 'session'),
+                this.version(run.id),
+              );
+              if (native.pid) {
+                try {
+                  identity = await observeProcess(native.pid);
+                } catch {
+                  /* Preserve the previous observation. */
+                }
+              }
+              this.store.observeOperation(
+                user,
+                operation.id,
+                'running',
+                {
+                  pid: native.pid,
+                  identity,
+                  actor,
+                  session_id: session.id,
+                  native_session_id: event.native_session_id,
+                },
+                requestId(invocation + event.native_session_id, 'identity'),
                 this.version(run.id),
               );
             }
@@ -894,27 +921,6 @@ export class SupervisorRuntime {
                 attempt_id: actor.attempt_id,
                 generation: actor.generation,
               },
-            );
-            if (native.pid) {
-              try {
-                identity = await observeProcess(native.pid);
-              } catch {
-                /* Preserve the previous observation. */
-              }
-            }
-            this.store.observeOperation(
-              user,
-              operation.id,
-              'running',
-              {
-                pid: native.pid,
-                identity,
-                actor,
-                session_id: session.id,
-                native_session_id: event.native_session_id,
-              },
-              requestId(invocation + event.native_session_id, 'identity'),
-              this.version(run.id),
             );
           }
         } catch (error) {
