@@ -20,6 +20,9 @@ import type {
   AgentSession,
   ArtifactRef,
   ContextBundle,
+  CoordinationQuestion,
+  UserResponse,
+  Decision,
   CrewEvent,
   Delegation,
   Handoff,
@@ -47,6 +50,8 @@ type Status = {
   tasks: TaskState[];
   events: CrewEvent[];
   verifications: Verification[];
+  questions: CoordinationQuestion[];
+  user_responses: UserResponse[];
 };
 type Collected = {
   handoff: Handoff;
@@ -725,6 +730,151 @@ test(
       ),
     );
     assert.equal(f.store.records(run.id, 'final').length, 1);
+  },
+);
+
+test(
+  'a queued task waiting for a user answer leaves an independent mission runnable and retains the actual user response',
+  { timeout: 15_000 },
+  async (t) => {
+    let configured = false;
+    let adopted = false;
+    const launched: string[] = [];
+    const provider = new ScriptedProvider(async ({ request }) => {
+      const api = agent(request),
+        status = (await api.status()).result;
+      if (request.role === 'chief') {
+        if (!configured) {
+          configured = true;
+          for (const suffix of ['needs-user', 'independent'])
+            await api.call('create_task', {
+              task: {
+                ...task(status.run, `task:${suffix}`, 'documenter'),
+                objective: `Write docs/${suffix}.md when allowed`,
+                expected_deliverables: [`docs/${suffix}.md`],
+              },
+            });
+          await api.call('request_user_input', {
+            question_id: 'question:format',
+            question: 'Which format should task:needs-user use?',
+            options: [
+              {
+                label: 'Markdown',
+                consequence: 'Keep the document editable as text',
+              },
+            ],
+            affects_task_ids: ['task:needs-user'],
+            blocking: true,
+          });
+          // Persist both requests: the scheduler must gate the affected task without blocking its sibling.
+          for (const suffix of ['needs-user', 'independent'])
+            await api.call('delegate_task', {
+              task_id: `task:${suffix}`,
+              provider: 'fake',
+              model: null,
+            });
+        } else if (status.user_responses.length && !adopted) {
+          const response = status.user_responses[0]!;
+          assert.equal(response.answer, 'Markdown');
+          await api.call('record_decision', {
+            decision_id: 'decision:actual-user-answer',
+            question: 'Approved output format',
+            answer: response.answer,
+            requested_status: 'approved',
+            basis: 'user_response',
+            user_response_id: response.id,
+            source_ids: [response.source_id],
+            affects_task_ids: ['task:needs-user'],
+            supersedes: null,
+          });
+          adopted = true;
+        }
+        return;
+      }
+      const own = status.tasks[0]!;
+      launched.push(own.id);
+      if (own.id === 'task:needs-user')
+        assert.ok(status.run.status === 'running');
+      const suffix = own.id.slice('task:'.length),
+        relative = `docs/${suffix}.md`;
+      mkdirSync(join(request.cwd, 'docs'), { recursive: true });
+      writeFileSync(join(request.cwd, relative), `# ${suffix}\n`);
+      const handoff: Handoff = {
+        schema_version: 1,
+        id: `handoff:${suffix}`,
+        task_id: own.id,
+        run_id: api.runId,
+        attempt_id: own.active_attempt_id!,
+        generation: own.generation,
+        status: 'delivered',
+        summary: 'Actual document produced after scheduler authorization',
+        source_revision: null,
+        artifacts: [
+          {
+            id: `artifact:${suffix}`,
+            kind: 'file',
+            reference: relative,
+            revision: `sha256:${'0'.repeat(64)}`,
+            producer_attempt_id: own.active_attempt_id!,
+            created_at: now(),
+          },
+        ],
+        verifications: [],
+        criteria_claimed: own.spec.acceptance_criteria.map(
+          (criterion) => criterion.id,
+        ),
+        limitations: [],
+        next_information: [],
+        created_at: now(),
+      };
+      await api.call('submit_handoff', { handoff });
+    });
+    const f = await fixture(t, provider, 3);
+    const run = await f.create();
+    const wait = async (condition: () => boolean) => {
+      const deadline = Date.now() + 5_000;
+      while (Date.now() < deadline) {
+        if (provider.failures.length) throw provider.failures[0];
+        const status = (await f.owner.admin({
+          method: 'status',
+          arguments: { run_id: run.id, limit: 1000 },
+        })) as { events: CrewEvent[] };
+        assert.deepEqual(
+          status.events
+            .filter((event) => event.type === 'turn.launch_failed')
+            .map((event) => event.payload),
+          [],
+          'An open user question is a durable scheduling gate, not a failed worker launch',
+        );
+        if (condition()) return;
+        await delay(10);
+      }
+      assert.fail('Question scenario did not advance its independent work');
+    };
+    await wait(() => existsSync(join(f.root, 'docs/independent.md')));
+    assert.equal(existsSync(join(f.root, 'docs/needs-user.md')), false);
+    assert.deepEqual(launched, ['task:independent']);
+    const response = (await f.owner.admin({
+      method: 'answer',
+      arguments: {
+        run_id: run.id,
+        question_id: 'question:format',
+        answer: 'Markdown',
+      },
+    })) as UserResponse;
+    await wait(() => adopted && existsSync(join(f.root, 'docs/needs-user.md')));
+    await f.runtime.scheduler.idle();
+    assert.equal(response.user_actor_id, 'user:local');
+    const decision = f.store.records<Decision>(run.id, 'decision')[0]!;
+    assert.equal(decision.answer, response.answer);
+    assert.equal(decision.approved_by, response.user_actor_id);
+    assert.ok(decision.source_ids.includes(response.source_id));
+    assert.equal(
+      f.store.records<CoordinationQuestion>(run.id, 'question')[0]!.response_id,
+      response.id,
+    );
+    assert.deepEqual(launched, ['task:independent', 'task:needs-user']);
+    assert.equal(f.store.getRun(run.id).status, 'running');
   },
 );
 
