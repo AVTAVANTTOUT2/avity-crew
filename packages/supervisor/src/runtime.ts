@@ -532,454 +532,514 @@ export class SupervisorRuntime {
       invocation,
       this.version(run.id),
     );
-    const mayStart = () => {
-      const current = this.store.getRun(run.id);
-      return (
-        !this.closing &&
-        current.status === 'running' &&
-        (actor.role !== 'chief' || current.generation === run.generation) &&
-        (this.cancellation.get(fence) ?? 0) === cancellation &&
-        (!actor.task_id ||
-          this.store.getTask(actor.task_id).status === 'running')
-      );
-    };
-    const cancelPreparation = () => {
-      this.store.observeOperation(
-        user,
-        operation.id,
-        'failed',
-        { cancelled_before_start: true, business_success: false },
-        requestId(invocation, 'cancelled'),
-        this.version(run.id),
-      );
-      if (
-        actor.attempt_id &&
-        !['exited', 'interrupted'].includes(
-          this.store.getAttempt(actor.attempt_id).status,
-        )
-      ) {
-        this.store.observeAttempt(
+    let token: string | null = null;
+    let readingStarted = false;
+    try {
+      const mayStart = () => {
+        const current = this.store.getRun(run.id);
+        return (
+          !this.closing &&
+          current.status === 'running' &&
+          (actor.role !== 'chief' || current.generation === run.generation) &&
+          (this.cancellation.get(fence) ?? 0) === cancellation &&
+          (!actor.task_id ||
+            this.store.getTask(actor.task_id).status === 'running')
+        );
+      };
+      const cancelPreparation = () => {
+        this.store.observeOperation(
           user,
-          actor.attempt_id,
-          { status: 'interrupted', pid: null, exit_code: null },
-          requestId(invocation, 'cancelled-attempt'),
+          operation.id,
+          'failed',
+          { cancelled_before_start: true, business_success: false },
+          requestId(invocation, 'cancelled'),
           this.version(run.id),
         );
-        if (this.store.getTask(actor.task_id!).status === 'running')
-          this.store.setTaskWait(
+        if (
+          actor.attempt_id &&
+          !['exited', 'interrupted'].includes(
+            this.store.getAttempt(actor.attempt_id).status,
+          )
+        ) {
+          this.store.observeAttempt(
             user,
-            actor.task_id!,
-            'waiting_provider',
-            'Turn preparation was cancelled before launch',
-            requestId(invocation, 'cancelled-task'),
+            actor.attempt_id,
+            { status: 'interrupted', pid: null, exit_code: null },
+            requestId(invocation, 'cancelled-attempt'),
+            this.version(run.id),
+          );
+          if (this.store.getTask(actor.task_id!).status === 'running')
+            this.store.setTaskWait(
+              user,
+              actor.task_id!,
+              'waiting_provider',
+              'Turn preparation was cancelled before launch',
+              requestId(invocation, 'cancelled-task'),
+              this.version(run.id),
+            );
+        }
+      };
+      if (!mayStart()) {
+        cancelPreparation();
+        return;
+      }
+      const capability = await adapter.probe();
+      if (!mayStart()) {
+        cancelPreparation();
+        return;
+      }
+      if (capability.structured_events.status !== 'supported')
+        throw new CrewError(
+          'UNSUPPORTED',
+          'Structured provider events have not been verified',
+        );
+      this.store.updateSession(
+        user,
+        session.id,
+        {
+          native_session_id: session.native_session_id,
+          cli_version: capability.version,
+          capabilities: capability,
+          cwd: session.cwd,
+        },
+        requestId(invocation, 'probe'),
+        this.version(run.id),
+      );
+      const task = actor.task_id
+        ? this.store.getTask(actor.task_id).spec
+        : undefined;
+      const project = await inspectProject(session.cwd);
+      const selection = task
+        ? await selectTaskSources(
+            project,
+            task,
+            this.store.records<SourceRef>(run.id, 'source'),
+          )
+        : await selectTaskSources(project, {
+            schema_version: 1,
+            id: 'context:chief-selection',
+            run_id: run.id,
+            title: 'Exploration du chef',
+            objective: run.objective,
+            role: 'investigator',
+            acceptance_criteria: nonempty(run.acceptance_criteria),
+            depends_on: [],
+            scope: {
+              read_paths: ['**'],
+              write_paths: [],
+              excluded_paths: this.store.project.config.context.exclude_paths,
+            },
+            base_revision: project.git.revision,
+            context_source_ids: [],
+            expected_deliverables: [
+              'Graphe des missions et critères préservés',
+            ],
+            created_at: now(),
+          });
+      const methods = toolsFor({ kind: 'agent', actor });
+      const handoffs = this.store.records<Handoff>(run.id, 'handoff');
+      const messages = this.store
+        .records<Message>(run.id, 'message')
+        .filter((message) => message.status !== 'failed');
+      const context = compileContext({
+        id: requestId(invocation, 'context'),
+        version:
+          this.store
+            .records<ContextBundle>(run.id, 'context')
+            .filter(
+              (bundle) =>
+                bundle.subject_id === (task?.id ?? `control:${run.id}`),
+            ).length + 1,
+        created_at: now(),
+        actor:
+          actor.role === 'chief' ? { ...actor, attempt_id: invocation } : actor,
+        orchestrator_id: requestId(run.id + ':' + run.generation, 'chief'),
+        workspace_path: session.cwd,
+        ...(task ? { task } : {}),
+        selection,
+        provider: capability,
+        run,
+        decisions: this.store.records<Decision>(run.id, 'decision'),
+        messages,
+        execution_policy: {
+          native_permissions:
+            actor.role === 'chief' ||
+            task?.role === 'reviewer' ||
+            this.store.project.config.permissions.profile === 'read_only'
+              ? 'read-only'
+              : 'workspace-write',
+          resources: workspace
+            ? {
+                ports: workspace.ports,
+                temporary_directory: workspace.temporaryDirectory,
+                database_path: workspace.databasePath,
+              }
+            : null,
+          concurrency: {
+            max_active_agents: run.max_active_agents,
+            includes_active_chief: true,
+          },
+          instructions:
+            'Les outils crew sont la seule autorité de coordination. Lire get_status pour la version courante avant mutation. Créer des request_id et idempotency_key uniques par action ; réutiliser exactement la clé après perte de réponse. Les missions reprennent les IDs des critères du run qu’elles couvrent. delegate_task retourne queued sans attendre. Après délégation, terminer le tour pour libérer sa place. Une sortie native réussie ne vaut jamais acceptation. Pour soumettre un document neuf : document_paths contient les chemins relatifs à capturer ; handoff.artifacts et handoff.verifications restent vides et handoff.source_revision vaut null. Le serveur calcule les empreintes et les preuves observées ; ne pas inventer de hash ni de résultat. Le reviewer lit collect_delivery puis submit_review, sans submit_handoff ni dépendance d’acceptation sur la tâche relue. La revue documentaire porte sur le hash exact du snapshot ; une revue de code approuve le candidat combiné et son SHA exact après propose_integration. Les IDs des vérifications observées sont fournis par collect_delivery et get_status.',
+        },
+        available_tools: methods,
+        dependencies: this.store
+          .tasks(run.id)
+          .filter((item) => task?.depends_on.includes(item.id))
+          .map((item) => ({
+            task_id: item.id,
+            status: item.status,
+            references: handoffs
+              .filter((handoff) => handoff.task_id === item.id)
+              .flatMap((handoff) =>
+                handoff.artifacts.map((artifact) => artifact.reference),
+              ),
+          })),
+        budget: {
+          context_window_tokens:
+            this.store.project.config.context.input_budget_tokens,
+          reserve_tokens: Math.min(
+            4000,
+            Math.floor(
+              this.store.project.config.context.input_budget_tokens / 4,
+            ),
+          ),
+        },
+        artifacts: handoffs.flatMap((handoff) =>
+          handoff.artifacts.map(({ reference, revision }) => ({
+            reference,
+            revision,
+          })),
+        ),
+        verification_plan: [
+          'check:git-diff',
+          ...this.store.project.config.verification_commands.map(
+            (check) => check.id,
+          ),
+        ],
+        run_state: {
+          run_version: this.version(run.id),
+          tasks: this.store.tasks(run.id),
+          handoffs,
+          reviews: this.store.records(run.id, 'review'),
+          user_responses: this.store.records(run.id, 'user_response'),
+          verifications: this.store.records(run.id, 'verification'),
+          questions: this.store.records(run.id, 'question'),
+          delivery_target:
+            this.store.project.config.delivery.target_ref ??
+            `refs/heads/avity-crew/delivery-${run.id.replace(/[^A-Za-z0-9-]/g, '-')}`,
+          expected_target_revision: project.git.revision,
+          activity: this.scheduler.snapshot(),
+        },
+      });
+      for (const snapshot of selection.sources) {
+        if (
+          !this.store
+            .records<SourceRef>(run.id, 'source')
+            .some((source) => source.id === snapshot.source.id)
+        )
+          this.store.saveSource(
+            user,
+            snapshot.source,
+            requestId(snapshot.source.id, 'source'),
             this.version(run.id),
           );
       }
-    };
-    if (!mayStart()) {
-      cancelPreparation();
-      return;
-    }
-    const capability = await adapter.probe();
-    if (!mayStart()) {
-      cancelPreparation();
-      return;
-    }
-    if (capability.structured_events.status !== 'supported')
-      throw new CrewError(
-        'UNSUPPORTED',
-        'Structured provider events have not been verified',
+      this.store.saveContext(
+        user,
+        context.bundle,
+        requestId(invocation, 'save-context'),
+        this.version(run.id),
       );
-    this.store.updateSession(
-      user,
-      session.id,
-      {
-        native_session_id: session.native_session_id,
-        cli_version: capability.version,
-        capabilities: capability,
-        cwd: session.cwd,
-      },
-      requestId(invocation, 'probe'),
-      this.version(run.id),
-    );
-    const task = actor.task_id
-      ? this.store.getTask(actor.task_id).spec
-      : undefined;
-    const project = await inspectProject(session.cwd);
-    const selection = task
-      ? await selectTaskSources(
-          project,
-          task,
-          this.store.records<SourceRef>(run.id, 'source'),
-        )
-      : await selectTaskSources(project, {
-          schema_version: 1,
-          id: 'context:chief-selection',
-          run_id: run.id,
-          title: 'Exploration du chef',
-          objective: run.objective,
-          role: 'investigator',
-          acceptance_criteria: nonempty(run.acceptance_criteria),
-          depends_on: [],
-          scope: {
-            read_paths: ['**'],
-            write_paths: [],
-            excluded_paths: this.store.project.config.context.exclude_paths,
-          },
-          base_revision: project.git.revision,
-          context_source_ids: [],
-          expected_deliverables: ['Graphe des missions et critères préservés'],
-          created_at: now(),
-        });
-    const methods = toolsFor({ kind: 'agent', actor });
-    const handoffs = this.store.records<Handoff>(run.id, 'handoff');
-    const messages = this.store
-      .records<Message>(run.id, 'message')
-      .filter((message) => message.status !== 'failed');
-    const context = compileContext({
-      id: requestId(invocation, 'context'),
-      version:
-        this.store
-          .records<ContextBundle>(run.id, 'context')
-          .filter(
-            (bundle) => bundle.subject_id === (task?.id ?? `control:${run.id}`),
-          ).length + 1,
-      created_at: now(),
-      actor:
-        actor.role === 'chief' ? { ...actor, attempt_id: invocation } : actor,
-      orchestrator_id: requestId(run.id + ':' + run.generation, 'chief'),
-      workspace_path: session.cwd,
-      ...(task ? { task } : {}),
-      selection,
-      provider: capability,
-      run,
-      decisions: this.store.records<Decision>(run.id, 'decision'),
-      messages,
-      execution_policy: {
-        native_permissions:
-          actor.role === 'chief' ||
-          task?.role === 'reviewer' ||
-          this.store.project.config.permissions.profile === 'read_only'
-            ? 'read-only'
-            : 'workspace-write',
-        resources: workspace
-          ? {
-              ports: workspace.ports,
-              temporary_directory: workspace.temporaryDirectory,
-              database_path: workspace.databasePath,
-            }
-          : null,
-        concurrency: {
-          max_active_agents: run.max_active_agents,
-          includes_active_chief: true,
-        },
-        instructions:
-          'Les outils crew sont la seule autorité de coordination. Lire get_status pour la version courante avant mutation. Créer des request_id et idempotency_key uniques par action ; réutiliser exactement la clé après perte de réponse. delegate_task retourne queued sans attendre. Après délégation, terminer le tour pour libérer sa place. Une sortie native réussie ne vaut jamais acceptation. Pour soumettre un document : artifacts file.reference contient les chemins relatifs à capturer ; source_revision peut être null, le service calcule le snapshot. Les preuves fournies par le modèle restent déclaratives ; le service observe ses contrôles. Le reviewer lit collect_delivery puis submit_review, sans submit_handoff ni dépendance d’acceptation sur la tâche relue.',
-      },
-      available_tools: methods,
-      dependencies: this.store
-        .tasks(run.id)
-        .filter((item) => task?.depends_on.includes(item.id))
-        .map((item) => ({
-          task_id: item.id,
-          status: item.status,
-          references: handoffs
-            .filter((handoff) => handoff.task_id === item.id)
-            .flatMap((handoff) =>
-              handoff.artifacts.map((artifact) => artifact.reference),
-            ),
-        })),
-      budget: {
-        context_window_tokens:
-          this.store.project.config.context.input_budget_tokens,
-        reserve_tokens: Math.min(
-          4000,
-          Math.floor(this.store.project.config.context.input_budget_tokens / 4),
-        ),
-      },
-      artifacts: handoffs.flatMap((handoff) =>
-        handoff.artifacts.map(({ reference, revision }) => ({
-          reference,
-          revision,
-        })),
-      ),
-      verification_plan: [
-        'check:git-diff',
-        ...this.store.project.config.verification_commands.map(
-          (check) => check.id,
-        ),
-      ],
-      run_state: {
-        run_version: this.version(run.id),
-        tasks: this.store.tasks(run.id),
-        handoffs,
-        reviews: this.store.records(run.id, 'review'),
-        user_responses: this.store.records(run.id, 'user_response'),
-        verifications: this.store.records(run.id, 'verification'),
-        questions: this.store.records(run.id, 'question'),
-        delivery_target:
-          this.store.project.config.delivery.target_ref ??
-          `refs/heads/avity-crew/delivery-${run.id.replace(/[^A-Za-z0-9-]/g, '-')}`,
-        expected_target_revision: project.git.revision,
-        activity: this.scheduler.snapshot(),
-      },
-    });
-    for (const snapshot of selection.sources) {
-      if (
-        !this.store
-          .records<SourceRef>(run.id, 'source')
-          .some((source) => source.id === snapshot.source.id)
-      )
-        this.store.saveSource(
-          user,
-          snapshot.source,
-          requestId(snapshot.source.id, 'source'),
-          this.version(run.id),
+      const prompt = this.store.writeArtifact(context.prompt),
+        inspection = this.store.writeArtifact(
+          JSON.stringify(context.inspection),
         );
-    }
-    this.store.saveContext(
-      user,
-      context.bundle,
-      requestId(invocation, 'save-context'),
-      this.version(run.id),
-    );
-    const prompt = this.store.writeArtifact(context.prompt),
-      inspection = this.store.writeArtifact(JSON.stringify(context.inspection));
-    this.store.observation(
-      user,
-      'context.compiled',
-      { context_id: context.bundle.id, prompt, inspection },
-      {
-        session_id: session.id,
-        task_id: actor.task_id,
-        attempt_id: actor.attempt_id,
-        generation: actor.generation,
-      },
-    );
-    const token = this.registry.issue(actor);
-    const request: ProviderRequest = {
-      cwd: session.cwd,
-      prompt: context.prompt,
-      model: session.model,
-      role: actor.role,
-      permissions: {
-        sandbox:
-          actor.role === 'chief' ||
-          task?.role === 'reviewer' ||
-          this.store.project.config.permissions.profile === 'read_only'
-            ? 'read-only'
-            : 'workspace-write',
-        approval: 'never',
-      },
-      bridge: {
-        command: process.execPath,
-        args: [fileURLToPath(new URL('./bridge.js', import.meta.url))],
-        approved_tools: methods.map((tool) => tool.name),
-        env: {
-          AVITY_CREW_ENDPOINT_FILE: this.endpointFile,
-          AVITY_CREW_CAPABILITY: token,
-          AVITY_CREW_RUN_ID: run.id,
-          ...(workspace
-            ? {
-                PORT: String(workspace.ports[0] ?? 0),
-                TMPDIR: workspace.temporaryDirectory,
-                AVITY_CREW_DATABASE_PATH: workspace.databasePath,
-              }
-            : {}),
+      this.store.observation(
+        user,
+        'context.compiled',
+        { context_id: context.bundle.id, prompt, inspection },
+        {
+          session_id: session.id,
+          task_id: actor.task_id,
+          attempt_id: actor.attempt_id,
+          generation: actor.generation,
         },
-      },
-    };
-    if (!mayStart()) {
-      cancelPreparation();
-      return;
-    }
-    const native =
-      session.native_session_id &&
-      capability.native_resume.status === 'supported'
-        ? adapter.resume({
-            ...request,
-            native_session_id: session.native_session_id,
-          })
-        : adapter.start(request);
-    this.active.set(invocation, {
-      run_id: run.id,
-      role: actor.role === 'chief' ? 'chief' : 'worker',
-      actor,
-      session,
-      process: native,
-      operation,
-    });
-    let identity: ProcessIdentity | null = null;
-    if (native.pid) {
-      try {
-        identity = await observeProcess(native.pid);
-      } catch {
-        this.store.observation(user, 'recovery.unverified', {
-          turn_id: invocation,
-          reason:
-            'Process identity could not be observed; crash recovery requires inspection',
-        });
-      }
-    }
-    this.active.set(invocation, {
-      run_id: run.id,
-      role: actor.role === 'chief' ? 'chief' : 'worker',
-      actor,
-      session,
-      process: native,
-      operation,
-    });
-    this.store.observeOperation(
-      user,
-      operation.id,
-      'running',
-      {
-        pid: native.pid,
-        session_id: session.id,
-        actor,
-        identity,
-        native_session_id: session.native_session_id,
-      },
-      requestId(invocation, 'running'),
-      this.version(run.id),
-    );
-    if (actor.attempt_id)
-      this.store.observeAttempt(
-        user,
-        actor.attempt_id,
-        { status: 'running', pid: native.pid, exit_code: null },
-        requestId(invocation, 'started'),
-        this.version(run.id),
       );
-    for (const message of messages.filter(
-      (item) =>
-        item.status === 'queued' &&
-        (actor.role === 'chief'
-          ? item.recipient_kind === 'chief'
-          : item.recipient_kind === 'task' &&
-            item.recipient_id === actor.task_id),
-    ))
-      this.store.updateMessage(
-        user,
-        message.id,
-        'delivered',
-        requestId(invocation + message.id, 'delivered'),
-        this.version(run.id),
-      );
-    try {
-      const publishedSessions = new Set<string>();
-      const reading = (async () => {
-        try {
-          for await (const event of native.events) {
-            if (
-              event.type === 'session' &&
-              event.native_session_id &&
-              !publishedSessions.has(event.native_session_id)
-            ) {
-              publishedSessions.add(event.native_session_id);
-              session.native_session_id = event.native_session_id;
-              this.store.updateSession(
-                user,
-                session.id,
-                {
-                  native_session_id: event.native_session_id,
-                  cli_version: capability.version,
-                  capabilities: capability,
-                },
-                requestId(invocation + event.native_session_id, 'session'),
-                this.version(run.id),
-              );
-              if (native.pid) {
-                try {
-                  identity = await observeProcess(native.pid);
-                } catch {
-                  /* Preserve the previous observation. */
+      token = this.registry.issue(actor);
+      const request: ProviderRequest = {
+        cwd: session.cwd,
+        prompt: context.prompt,
+        model: session.model,
+        role: actor.role,
+        permissions: {
+          sandbox:
+            actor.role === 'chief' ||
+            task?.role === 'reviewer' ||
+            this.store.project.config.permissions.profile === 'read_only'
+              ? 'read-only'
+              : 'workspace-write',
+          approval: 'never',
+        },
+        bridge: {
+          command: process.execPath,
+          args: [fileURLToPath(new URL('./bridge.js', import.meta.url))],
+          approved_tools: methods.map((tool) => tool.name),
+          env: {
+            AVITY_CREW_ENDPOINT_FILE: this.endpointFile,
+            AVITY_CREW_CAPABILITY: token,
+            AVITY_CREW_RUN_ID: run.id,
+            ...(workspace
+              ? {
+                  PORT: String(workspace.ports[0] ?? 0),
+                  TMPDIR: workspace.temporaryDirectory,
+                  AVITY_CREW_DATABASE_PATH: workspace.databasePath,
                 }
-              }
-              this.store.observeOperation(
-                user,
-                operation.id,
-                'running',
-                {
-                  pid: native.pid,
-                  identity,
-                  actor,
-                  session_id: session.id,
-                  native_session_id: event.native_session_id,
-                },
-                requestId(invocation + event.native_session_id, 'identity'),
-                this.version(run.id),
-              );
-            }
-            this.store.observation(
-              user,
-              'provider.' + event.type,
-              { ...event, turn_id: invocation },
-              {
-                session_id: session.id,
-                task_id: actor.task_id,
-                attempt_id: actor.attempt_id,
-                generation: actor.generation,
-              },
-            );
-          }
-        } catch (error) {
-          await native.stop();
-          throw error;
+              : {}),
+          },
+        },
+      };
+      if (!mayStart()) {
+        cancelPreparation();
+        return;
+      }
+      const native =
+        session.native_session_id &&
+        capability.native_resume.status === 'supported'
+          ? adapter.resume({
+              ...request,
+              native_session_id: session.native_session_id,
+            })
+          : adapter.start(request);
+      this.active.set(invocation, {
+        run_id: run.id,
+        role: actor.role === 'chief' ? 'chief' : 'worker',
+        actor,
+        session,
+        process: native,
+        operation,
+      });
+      let identity: ProcessIdentity | null = null;
+      if (native.pid) {
+        try {
+          identity = await observeProcess(native.pid);
+        } catch {
+          this.store.observation(user, 'recovery.unverified', {
+            turn_id: invocation,
+            reason:
+              'Process identity could not be observed; crash recovery requires inspection',
+          });
         }
-      })();
-      const [result] = await Promise.all([native.result, reading]);
+      }
+      this.active.set(invocation, {
+        run_id: run.id,
+        role: actor.role === 'chief' ? 'chief' : 'worker',
+        actor,
+        session,
+        process: native,
+        operation,
+      });
+      this.store.observeOperation(
+        user,
+        operation.id,
+        'running',
+        {
+          pid: native.pid,
+          session_id: session.id,
+          actor,
+          identity,
+          native_session_id: session.native_session_id,
+        },
+        requestId(invocation, 'running'),
+        this.version(run.id),
+      );
       if (actor.attempt_id)
         this.store.observeAttempt(
           user,
           actor.attempt_id,
-          {
-            status: result.signal ? 'interrupted' : 'exited',
-            pid: native.pid,
-            exit_code: result.exit_code,
-          },
-          requestId(invocation, 'exited'),
+          { status: 'running', pid: native.pid, exit_code: null },
+          requestId(invocation, 'started'),
           this.version(run.id),
         );
-      this.store.observeOperation(
-        user,
-        operation.id,
-        'completed',
-        { ...result, pid: native.pid, actor, session_id: session.id },
-        requestId(invocation, 'completed'),
-        this.version(run.id),
-      );
-      if (actor.task_id) {
-        const current = this.store.getTask(actor.task_id);
-        if (current.status === 'running')
-          this.store.setTaskWait(
+      for (const message of messages.filter(
+        (item) =>
+          item.status === 'queued' &&
+          (actor.role === 'chief'
+            ? item.recipient_kind === 'chief'
+            : item.recipient_kind === 'task' &&
+              item.recipient_id === actor.task_id),
+      ))
+        this.store.updateMessage(
+          user,
+          message.id,
+          'delivered',
+          requestId(invocation + message.id, 'delivered'),
+          this.version(run.id),
+        );
+      try {
+        readingStarted = true;
+        const publishedSessions = new Set<string>();
+        const reading = (async () => {
+          try {
+            for await (const event of native.events) {
+              if (
+                event.type === 'session' &&
+                event.native_session_id &&
+                !publishedSessions.has(event.native_session_id)
+              ) {
+                publishedSessions.add(event.native_session_id);
+                session.native_session_id = event.native_session_id;
+                this.store.updateSession(
+                  user,
+                  session.id,
+                  {
+                    native_session_id: event.native_session_id,
+                    cli_version: capability.version,
+                    capabilities: capability,
+                  },
+                  requestId(invocation + event.native_session_id, 'session'),
+                  this.version(run.id),
+                );
+                if (native.pid) {
+                  try {
+                    identity = await observeProcess(native.pid);
+                  } catch {
+                    /* Preserve the previous observation. */
+                  }
+                }
+                this.store.observeOperation(
+                  user,
+                  operation.id,
+                  'running',
+                  {
+                    pid: native.pid,
+                    identity,
+                    actor,
+                    session_id: session.id,
+                    native_session_id: event.native_session_id,
+                  },
+                  requestId(invocation + event.native_session_id, 'identity'),
+                  this.version(run.id),
+                );
+              }
+              this.store.observation(
+                user,
+                'provider.' + event.type,
+                { ...event, turn_id: invocation },
+                {
+                  session_id: session.id,
+                  task_id: actor.task_id,
+                  attempt_id: actor.attempt_id,
+                  generation: actor.generation,
+                },
+              );
+            }
+          } catch (error) {
+            await native.stop();
+            throw error;
+          }
+        })();
+        const [result] = await Promise.all([native.result, reading]);
+        if (actor.attempt_id)
+          this.store.observeAttempt(
             user,
-            current.id,
-            result.error ? 'waiting_provider' : 'blocked',
-            result.error?.message ??
-              'Provider exited without a structured handoff or review',
-            requestId(invocation, 'waiting'),
+            actor.attempt_id,
+            {
+              status: result.signal ? 'interrupted' : 'exited',
+              pid: native.pid,
+              exit_code: result.exit_code,
+            },
+            requestId(invocation, 'exited'),
             this.version(run.id),
           );
-        if (
-          run.delivery_mode === 'documentation' &&
-          current.status === 'in_review'
-        )
-          await this.verifyDocuments(run.id, actor.task_id);
-      } else if (
-        result.error &&
-        !terminal(this.store.getRun(run.id)) &&
+        this.store.observeOperation(
+          user,
+          operation.id,
+          'completed',
+          { ...result, pid: native.pid, actor, session_id: session.id },
+          requestId(invocation, 'completed'),
+          this.version(run.id),
+        );
+        if (actor.task_id) {
+          const current = this.store.getTask(actor.task_id);
+          if (current.status === 'running')
+            this.store.setTaskWait(
+              user,
+              current.id,
+              result.error ? 'waiting_provider' : 'blocked',
+              result.error?.message ??
+                'Provider exited without a structured handoff or review',
+              requestId(invocation, 'waiting'),
+              this.version(run.id),
+            );
+          if (
+            run.delivery_mode === 'documentation' &&
+            current.status === 'in_review'
+          )
+            await this.verifyDocuments(run.id, actor.task_id);
+        } else if (
+          result.error &&
+          !terminal(this.store.getRun(run.id)) &&
+          this.store.getRun(run.id).status === 'running'
+        ) {
+          this.store.updateRunStatus(
+            user,
+            'waiting_provider',
+            requestId(invocation, 'chief-wait'),
+            this.version(run.id),
+          );
+        }
+      } finally {
+        this.active.delete(invocation);
+      }
+    } catch (error) {
+      if (token) this.registry.revoke(token);
+      const active = this.active.get(invocation);
+      if (active) {
+        const drain = readingStarted
+          ? Promise.resolve()
+          : (async () => {
+              for await (const _event of active.process.events) {
+                /* Drain while stopping a launch that failed before observation. */
+              }
+            })();
+        await active.process.stop();
+        await Promise.all([active.process.result, drain]);
+        this.active.delete(invocation);
+      }
+      const current = this.store.getRecord<Operation>(
+        run.id,
+        'operation',
+        operation.id,
+      );
+      if (!['completed', 'failed'].includes(current.status))
+        this.store.observeOperation(
+          user,
+          operation.id,
+          current.status === 'intent' ? 'failed' : 'completed',
+          {
+            business_success: false,
+            error:
+              error instanceof CrewError
+                ? { code: error.code, message: error.message }
+                : { code: 'INTERNAL_ERROR' },
+          },
+          requestId(invocation, 'failed'),
+          this.version(run.id),
+        );
+      if (
+        actor.role === 'chief' &&
         this.store.getRun(run.id).status === 'running'
-      ) {
+      )
         this.store.updateRunStatus(
           user,
           'waiting_provider',
-          requestId(invocation, 'chief-wait'),
+          requestId(invocation, 'launch-wait'),
           this.version(run.id),
         );
-      }
+      throw error;
     } finally {
-      this.active.delete(invocation);
+      if (token) this.registry.revoke(token);
     }
   }
 

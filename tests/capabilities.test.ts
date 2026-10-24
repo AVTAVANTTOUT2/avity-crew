@@ -168,6 +168,26 @@ test('a chief control capability does not require a deliverable task attempt', (
   assert.throws(() => registry.issue({ ...actor, generation: 2 }), /replaced/);
 });
 
+test('revoking one turn capability survives restart without revoking its replacement or owner', (t) => {
+  const { store, user } = setup(t);
+  const registry = new CapabilityRegistry(store);
+  const actor: Actor = { ...user, id: 'chief:turn', role: 'chief' };
+  const previous = registry.issue(actor),
+    replacement = registry.issue(actor);
+  registry.revoke(previous);
+  registry.revoke(previous);
+  assert.throws(() => new CapabilityRegistry(store).authenticate(previous), {
+    code: 'FORBIDDEN',
+  });
+  assert.deepEqual(registry.authenticate(replacement), {
+    kind: 'agent',
+    actor,
+  });
+  const owner = readFileSync(registry.ownerKeyPath, 'utf8');
+  assert.throws(() => registry.revoke(owner), { code: 'FORBIDDEN' });
+  assert.equal(registry.authenticate(owner).kind, 'user');
+});
+
 test('a malformed private actor record is rejected with a controlled error', (t) => {
   const { store, user } = setup(t);
   const registry = new CapabilityRegistry(store);

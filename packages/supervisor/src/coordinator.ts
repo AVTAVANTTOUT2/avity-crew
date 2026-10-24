@@ -490,7 +490,13 @@ export class Coordinator implements SupervisorApi {
         };
       }
       case 'submit_handoff':
-        return this.captureHandoff(actor, call.arguments.handoff, key, version);
+        return this.captureHandoff(
+          actor,
+          call.arguments.handoff,
+          key,
+          version,
+          call.arguments.document_paths,
+        );
       case 'submit_review': {
         const review = this.store.submitReview(
           actor,
@@ -554,6 +560,7 @@ export class Coordinator implements SupervisorApi {
     input: Handoff,
     key: string,
     version: number,
+    documentPaths?: readonly string[],
   ): Promise<Handoff> {
     if (
       !actor.task_id ||
@@ -599,9 +606,11 @@ export class Coordinator implements SupervisorApi {
       {
         writePaths: task.spec.scope.write_paths,
         excludedPaths: task.spec.scope.excluded_paths,
-        documentPaths: input.artifacts
-          .filter((item) => item.kind === 'file')
-          .map((item) => item.reference),
+        documentPaths:
+          documentPaths ??
+          input.artifacts
+            .filter((item) => item.kind === 'file')
+            .map((item) => item.reference),
       },
       requestId(key, 'capture'),
     );

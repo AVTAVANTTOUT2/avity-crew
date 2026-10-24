@@ -8,6 +8,7 @@ import {
   openSync,
   readFileSync,
   renameSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
@@ -137,6 +138,19 @@ export class CapabilityRegistry {
     writeNew(temporary, JSON.stringify(actor));
     renameSync(temporary, filename);
     return token;
+  }
+
+  revoke(token: string): void {
+    if (!/^[A-Za-z0-9_-]{43}$/.test(token) || digest(token) === this.ownerHash)
+      throw new CrewError(
+        'FORBIDDEN',
+        'Only an issued agent capability can be revoked',
+      );
+    try {
+      unlinkSync(join(this.directory, `${digest(token)}.json`));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
   }
 
   authenticate(token: string): Principal {

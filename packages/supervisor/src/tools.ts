@@ -38,7 +38,7 @@ const descriptions: Record<ToolCall['method'], string> = {
     'Conserver une observation de sa mission sans la transformer en décision approuvée.',
   report_blocker: 'Signaler un blocage de sa mission et l’action nécessaire.',
   submit_handoff:
-    'Capturer puis soumettre ses livrables, limites et preuves ; ceci ne les accepte pas.',
+    'Capturer ses fichiers puis soumettre une livraison, sans l’accepter. Pour un document neuf : document_paths contient les chemins relatifs, handoff.artifacts et verifications restent vides, source_revision vaut null ; le serveur calcule les empreintes et les preuves observées.',
   record_decision:
     'Enregistrer un choix technique ou adopter une réponse utilisateur réellement référencée.',
   submit_review:
