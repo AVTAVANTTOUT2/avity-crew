@@ -33,6 +33,7 @@ import type {
   ProviderProcess,
   ProviderRequest,
   ProviderResult,
+  Operation,
   Review,
   Run,
   TaskSpec,
@@ -44,6 +45,12 @@ import { identifyProject, Store } from '../packages/storage/src/index.ts';
 import { SupervisorRuntime } from '../packages/supervisor/src/runtime.ts';
 import { SupervisorClient } from '../packages/supervisor/src/client.ts';
 import { startTransport } from '../packages/supervisor/src/transport.ts';
+import {
+  requestId,
+  serviceActor,
+} from '../packages/supervisor/src/coordinator.ts';
+import { observeProcess } from '../packages/supervisor/src/reconciliation.ts';
+import type { ProcessIdentity } from '../packages/supervisor/src/reconciliation.ts';
 
 type Reply<T> = { result: T; run_version: number };
 type Status = {
@@ -60,9 +67,17 @@ type Collected = {
   reviews: Review[];
   evidence: (ArtifactRef & { content_excerpt: string; truncated: boolean })[];
 };
-type Turn = { request: ProviderRequest; nativeId: string; resumed: boolean };
+type Turn = {
+  request: ProviderRequest;
+  nativeId: string;
+  resumed: boolean;
+  signal?: AbortSignal;
+};
 const hasCode = (expected: string) => (error: unknown) =>
   error instanceof CrewError && error.code === expected;
+const deniedCapability = (error: unknown) =>
+  error instanceof CrewError &&
+  ['REVOKED_CAPABILITY', 'FORBIDDEN'].includes(error.code);
 const digest = (value: string | Buffer) =>
   createHash('sha256').update(value).digest('hex');
 const git = (cwd: string, ...args: string[]) =>
@@ -84,6 +99,27 @@ function barrier(count: number) {
       return ready;
     },
   };
+}
+async function bounded<T>(pending: Promise<T>, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), 5_000);
+    pending.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+async function untilInterrupted(signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return;
+  await new Promise<void>((resolve) =>
+    signal.addEventListener('abort', () => resolve(), { once: true }),
+  );
 }
 
 /** Lose an actual HTTP reply after the committed action has produced its headers. */
@@ -179,6 +215,8 @@ class ScriptedProvider implements ProviderAdapter {
     });
   }
   private launch(turn: Turn): ProviderProcess {
+    const interruption = new AbortController();
+    turn.signal = interruption.signal;
     this.turns.push(turn);
     this.active++;
     this.peak = Math.max(this.peak, this.active);
@@ -247,7 +285,7 @@ class ScriptedProvider implements ProviderAdapter {
               provenance: 'simulated',
             };
           }
-          await provider.script(turn);
+          if (!stopped) await provider.script(turn);
           yield { type: 'result', success: !stopped, provenance: 'simulated' };
         } catch (error) {
           provider.failures.push(error);
@@ -271,11 +309,13 @@ class ScriptedProvider implements ProviderAdapter {
       },
       interrupt: async () => {
         stopped = true;
+        interruption.abort();
         await closeIdentity(true);
         finish(value());
       },
       stop: async () => {
         stopped = true;
+        interruption.abort();
         await closeIdentity(true);
         finish(value());
       },
@@ -1696,3 +1736,342 @@ test(
     assert.equal(f.store.records(run.id, 'context').length, initialCount + 20);
   },
 );
+
+test(
+  'pause and resume revoke the old chief capability, and replacement preserves the objective, decision and source without a chief task',
+  { timeout: 20_000 },
+  async (t) => {
+    let turnCount = 0;
+    const notify: (() => void)[] = [];
+    const prepared = [0, 1, 2].map(
+      () =>
+        new Promise<void>((resolve) => {
+          notify.push(resolve);
+        }),
+    );
+    const provider = new ScriptedProvider(async ({ request, signal }) => {
+      const index = turnCount++;
+      const api = agent(request),
+        status = (await api.status()).result;
+      assert.equal(request.role, 'chief');
+      assert.deepEqual(status.tasks, []);
+      const context = (
+        await api.call<{ context: ContextBundle }>('read_context', {
+          subject_id: `control:${api.runId}`,
+          source_ids: [],
+          after_version: 0,
+        })
+      ).result.context;
+      const source = context.sources.find(
+        (item) => item.reference === 'requirements.md',
+      );
+      assert.ok(
+        source,
+        'The original requirement remains available in each continuation',
+      );
+      if (index === 0)
+        await api.call('record_decision', {
+          decision_id: 'decision:preserve-objective',
+          question: 'What should remain stable during interruption?',
+          answer: 'Preserve the original objective and acceptance criteria',
+          requested_status: 'approved',
+          basis: 'technical_judgment',
+          user_response_id: null,
+          source_ids: [source.id],
+          affects_task_ids: [],
+          supersedes: null,
+        });
+      else
+        assert.ok(context.decision_ids.includes('decision:preserve-objective'));
+      notify[index]!();
+      if (index < 2) await untilInterrupted(signal!);
+      else assert.equal(request.model, 'replacement:test');
+    });
+    const f = await fixture(t, provider);
+    writeFileSync(
+      join(f.root, 'requirements.md'),
+      '# Original requirement\nKeep the objective and evidence criteria through interruptions.\n',
+    );
+    const run = await f.create();
+    await bounded(
+      prepared[0]!,
+      'Initial chief did not reach its interruption boundary',
+    );
+    const first = agent(provider.turns[0]!.request);
+    const paused = (await f.owner.admin({
+      method: 'pause',
+      arguments: { run_id: run.id },
+    })) as Run;
+    assert.equal(paused.status, 'paused');
+    await assert.rejects(first.client.tools(run.id), deniedCapability);
+    const resumed = (await f.owner.admin({
+      method: 'resume',
+      arguments: { run_id: run.id },
+    })) as Run;
+    assert.equal(resumed.status, 'running');
+    assert.equal(resumed.objective, run.objective);
+    await bounded(prepared[1]!, 'Resumed chief did not launch');
+    assert.ok(provider.turns[1]!.resumed);
+    assert.equal(provider.turns[1]!.nativeId, provider.turns[0]!.nativeId);
+    await assert.rejects(first.client.tools(run.id), deniedCapability);
+    const second = agent(provider.turns[1]!.request);
+    const replaced = (await f.owner.admin({
+      method: 'replace_chief',
+      arguments: {
+        run_id: run.id,
+        provider: 'fake',
+        model: 'replacement:test',
+      },
+    })) as Run;
+    assert.ok(replaced.generation > resumed.generation);
+    await assert.rejects(second.client.tools(run.id), deniedCapability);
+    await bounded(prepared[2]!, 'Replacement chief did not launch');
+    await f.runtime.scheduler.idle();
+    const final = f.store.getRun(run.id);
+    assert.equal(final.objective, run.objective);
+    assert.deepEqual(final.acceptance_criteria, run.acceptance_criteria);
+    assert.equal(final.chief_model, 'replacement:test');
+    assert.deepEqual(f.store.tasks(run.id), []);
+    assert.deepEqual(f.store.attempts(run.id), []);
+    assert.equal(f.store.records<Decision>(run.id, 'decision').length, 1);
+    assert.equal(provider.turns.length, 3);
+    assert.equal(provider.peak, 1);
+    assert.deepEqual(provider.failures, []);
+  },
+);
+
+async function ownedProcess(t: TestContext) {
+  const child = spawn(process.execPath, ['-e', 'process.stdin.resume()'], {
+    detached: true,
+    stdio: ['pipe', 'ignore', 'ignore'],
+  });
+  child.stdin?.on('error', () => {});
+  const exited = new Promise<void>((resolve, reject) => {
+    child.once('exit', () => resolve());
+    child.once('error', reject);
+  });
+  t.after(async () => {
+    if (child.exitCode === null && child.signalCode === null)
+      child.kill('SIGTERM');
+    child.stdin?.end();
+    await exited;
+  });
+  await new Promise<void>((resolve, reject) => {
+    child.once('spawn', () => resolve());
+    child.once('error', reject);
+  });
+  const identity = await observeProcess(child.pid!);
+  assert.ok(identity);
+  assert.equal(identity.group_id, child.pid);
+  return { child, identity, exited };
+}
+
+function crashState(
+  f: Awaited<ReturnType<typeof fixture>>,
+  identity: ProcessIdentity | null,
+  intentOnly = false,
+) {
+  const run: Run = {
+    id: 'run:crash-fixture',
+    project_id: f.project.id,
+    objective:
+      'Resume this exact original objective after explicit process reconciliation',
+    constraints: ['Preserve uncertain outcomes until inspected'],
+    acceptance_criteria: [
+      {
+        id: 'criterion:crash',
+        description: 'No duplicate turn or invented business success',
+        required: true,
+        verification: 'runtime test',
+      },
+    ],
+    delivery_mode: 'documentation',
+    status: 'planning',
+    chief_provider: 'fake',
+    chief_model: null,
+    generation: 1,
+    version: 0,
+    max_active_agents: 1,
+    created_at: now(),
+    updated_at: now(),
+  };
+  f.store.createRun(run, 'fixture:create-crash-run');
+  const user = serviceActor(f.store, run.id),
+    version = () => f.store.getRun(run.id).version;
+  f.store.updateRunStatus(user, 'running', 'fixture:crash-running', version());
+  const chief: Actor = {
+    ...user,
+    id: requestId(run.id + ':1', 'chief'),
+    role: 'chief',
+  };
+  const session: AgentSession = {
+    id: chief.id,
+    run_id: run.id,
+    task_id: null,
+    provider: 'fake',
+    model: null,
+    native_session_id: 'simulated:exact-recovered-conversation',
+    cli_version: 'fixture:1',
+    cwd: f.root,
+    capabilities: null,
+  };
+  f.store.registerChiefSession(
+    user,
+    session,
+    'fixture:prior-session',
+    version(),
+  );
+  const operation = f.store.beginOperation(
+    user,
+    'provider.turn',
+    JSON.stringify({
+      actor: chief,
+      session_id: session.id,
+      invocation: 'turn:interrupted-service',
+    }),
+    'fixture:uncertain-turn',
+    version(),
+  );
+  if (!intentOnly)
+    f.store.observeOperation(
+      user,
+      operation.id,
+      'running',
+      {
+        actor: chief,
+        session_id: session.id,
+        native_session_id: session.native_session_id,
+        pid: identity?.pid ?? null,
+        identity,
+      },
+      'fixture:prior-process',
+      version(),
+    );
+  return { run, chief, session, operation };
+}
+
+test(
+  'startup preserves an owned uncertain process until explicit resume stops it and resumes the exact chief conversation without business success',
+  { timeout: 15_000 },
+  async (t) => {
+    let ready!: () => void;
+    const resumedTurn = new Promise<void>((resolve) => {
+      ready = resolve;
+    });
+    const provider = new ScriptedProvider(
+      async ({ request, nativeId, resumed }) => {
+        assert.ok(resumed);
+        assert.equal(nativeId, 'simulated:exact-recovered-conversation');
+        assert.equal(request.role, 'chief');
+        const status = (await agent(request).status()).result;
+        assert.equal(
+          status.run.objective,
+          'Resume this exact original objective after explicit process reconciliation',
+        );
+        assert.deepEqual(status.tasks, []);
+        ready();
+      },
+    );
+    const f = await fixture(t, provider),
+      owned = await ownedProcess(t);
+    const state = crashState(f, owned.identity);
+    f.runtime.initialize();
+    assert.equal(f.store.getRun(state.run.id).status, 'waiting_provider');
+    assert.equal(provider.turns.length, 0);
+    assert.doesNotThrow(() => process.kill(owned.child.pid!, 0));
+    assert.equal(
+      f.store.getRecord<Operation>(
+        state.run.id,
+        'operation',
+        state.operation.id,
+      ).status,
+      'running',
+    );
+    await f.owner.admin({
+      method: 'resume',
+      arguments: { run_id: state.run.id },
+    });
+    await bounded(
+      resumedTurn,
+      'Explicit recovery did not resume the exact chief conversation',
+    );
+    await f.runtime.scheduler.idle();
+    await owned.exited;
+    await assert.rejects(
+      agent(provider.turns[0]!.request).client.tools(state.run.id),
+      deniedCapability,
+    );
+    const recovered = f.store.getRecord<Operation>(
+      state.run.id,
+      'operation',
+      state.operation.id,
+    );
+    assert.equal(recovered.status, 'completed');
+    assert.equal(
+      (recovered.result as { recovery: string }).recovery,
+      'stopped',
+    );
+    assert.equal(
+      (recovered.result as { business_success: boolean }).business_success,
+      false,
+    );
+    const event = f.store
+      .events(state.run.id, 0, 1000)
+      .find((item) => item.type === 'recovery.observed')!;
+    assert.equal(
+      (event.payload as Record<string, unknown>).business_success,
+      false,
+    );
+    assert.equal(provider.turns.length, 1);
+    assert.equal(f.store.records(state.run.id, 'session').length, 1);
+    assert.equal(f.store.records(state.run.id, 'final').length, 0);
+    assert.deepEqual(f.store.tasks(state.run.id), []);
+    assert.deepEqual(f.store.attempts(state.run.id), []);
+    assert.deepEqual(provider.failures, []);
+  },
+);
+
+for (const variant of ['forged_identity', 'intent_without_identity'] as const) {
+  test(
+    `startup refuses ${variant} without killing an unverified process or starting a model`,
+    { timeout: 10_000 },
+    async (t) => {
+      const provider = new ScriptedProvider(async () => {
+        assert.fail('An unreconciled turn cannot launch a replacement model');
+      });
+      const f = await fixture(t, provider);
+      const owned =
+        variant === 'forged_identity' ? await ownedProcess(t) : null;
+      const identity = owned
+        ? { ...owned.identity, command_sha256: '0'.repeat(64) }
+        : null;
+      const state = crashState(
+        f,
+        identity,
+        variant === 'intent_without_identity',
+      );
+      f.runtime.initialize();
+      assert.equal(f.store.getRun(state.run.id).status, 'waiting_provider');
+      assert.equal(provider.turns.length, 0);
+      await assert.rejects(
+        f.owner.admin({
+          method: 'resume',
+          arguments: { run_id: state.run.id },
+        }),
+        hasCode('RECONCILIATION_REQUIRED'),
+      );
+      assert.equal(provider.turns.length, 0);
+      assert.equal(f.store.getRun(state.run.id).status, 'waiting_provider');
+      assert.equal(
+        f.store.getRecord<Operation>(
+          state.run.id,
+          'operation',
+          state.operation.id,
+        ).status,
+        variant === 'intent_without_identity' ? 'intent' : 'running',
+      );
+      if (owned) assert.doesNotThrow(() => process.kill(owned.child.pid!, 0));
+      assert.equal(f.store.records(state.run.id, 'final').length, 0);
+    },
+  );
+}
