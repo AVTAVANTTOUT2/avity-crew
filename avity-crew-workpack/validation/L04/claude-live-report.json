@@ -1,0 +1,262 @@
+{
+  "schema_version": 1,
+  "lot": "L04",
+  "evidence_level": "live",
+  "started_at": "2026-10-24T11:11:37.877Z",
+  "revision": "bb5ec87f157ccaae76277ce04058854927ac8182",
+  "platform": "darwin",
+  "architecture": "arm64",
+  "node": "v26.12.0",
+  "workspace": "/var/folders/pw/h2w8823905scmk4b7hd8hzqc0000gn/T/avity crew L04 live 17GVj2",
+  "scenarios": [
+    {
+      "name": "real-file-edit-and-mcp",
+      "status": "passed",
+      "result": {
+        "provider": "claude",
+        "provenance": "live",
+        "native_session_id": "d094e6df-b621-4d4b-a8b0-86918d460c24",
+        "exit_code": 0,
+        "signal": null,
+        "success": true,
+        "text": "Les deux opérations ont réussi :\n\n1. **Write** : j'ai créé `greeting.txt`. Il contient exactement `AVITY_CREW_L04` suivi d'un saut de ligne.\n2. **MCP crew ping** : je l'ai appelé avec le message `L04_REAL_PING`. Réponse : `{\"pong\":\"L04_REAL_PING\",\"token_present\":true}`.\n\nJe retiens la note **CREW_L04_MEMORY** pour le prochain tour. Je la garde dans le contexte de la conversation et non dans un fichier, puisque tu as exclu tout autre fichier.\n\nJe n'ai lancé aucun shell, aucun appel réseau, aucun sous-agent, et je n'ai créé aucun autre fichier.",
+        "error": null
+      },
+      "event_types": [
+        "session",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "tool",
+        "tool",
+        "tool",
+        "tool",
+        "unknown",
+        "tool",
+        "unknown",
+        "tool",
+        "text",
+        "usage",
+        "result"
+      ]
+    },
+    {
+      "name": "exact-resume-new-note-and-edit",
+      "status": "passed",
+      "result": {
+        "provider": "claude",
+        "provenance": "live",
+        "native_session_id": "d094e6df-b621-4d4b-a8b0-86918d460c24",
+        "exit_code": 0,
+        "signal": null,
+        "success": true,
+        "text": "J'ai ajouté `DELTA_L04` à `greeting.txt`. La première ligne est conservée et chaque ligne se termine par un saut de ligne :\n\n```\nAVITY_CREW_L04\nDELTA_L04\n```\n\nLa note du tour précédent était **CREW_L04_MEMORY**. Je retiens aussi la nouvelle note d'équipe **DELTA_L04**.\n\nJe n'ai utilisé ni shell ni outil MCP.",
+        "error": null
+      },
+      "event_types": [
+        "session",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "tool",
+        "unknown",
+        "tool",
+        "unknown",
+        "text",
+        "usage",
+        "result"
+      ]
+    },
+    {
+      "name": "independent-native-session",
+      "status": "passed",
+      "result": {
+        "provider": "claude",
+        "provenance": "live",
+        "native_session_id": "95daad2a-a07e-4c36-92b5-f6190a67f031",
+        "exit_code": 0,
+        "signal": null,
+        "success": true,
+        "text": "SECOND_SESSION_L04",
+        "error": null
+      },
+      "event_types": [
+        "session",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "text",
+        "unknown",
+        "usage",
+        "result"
+      ]
+    },
+    {
+      "name": "read-only-tool-boundary",
+      "status": "passed",
+      "result": {
+        "provider": "claude",
+        "provenance": "live",
+        "native_session_id": "fc0fb641-a769-4925-b7f5-60514fc35347",
+        "exit_code": 0,
+        "signal": null,
+        "success": true,
+        "text": "Je n'ai pas pu créer `forbidden.txt` : l'outil Write n'est pas disponible dans cette session. Je n'ai que Glob, Grep et Read, qui servent à lire et chercher, pas à écrire.\n\nComme demandé, je n'ai pas essayé de contourner la limite : aucun autre outil, aucune commande shell. Le fichier n'existe donc pas.",
+        "error": null
+      },
+      "event_types": [
+        "session",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "text",
+        "unknown",
+        "usage",
+        "result"
+      ]
+    },
+    {
+      "name": "controlled-native-permission-denial",
+      "status": "passed",
+      "result": {
+        "provider": "claude",
+        "provenance": "live",
+        "native_session_id": "5b6eca68-7a91-473b-85d3-add0e4436984",
+        "exit_code": 0,
+        "signal": null,
+        "success": false,
+        "text": "La permission d'utiliser Bash a été refusée parce que Claude Code tourne en mode « don't ask ». La commande `printf L04_PERMISSION > permission-control.txt` n'a donc pas été exécutée, et le fichier `permission-control.txt` n'a pas été créé. Comme tu l'as demandé, je m'arrête ici sans essayer d'autre outil.",
+        "error": {
+          "kind": "permission",
+          "message": "Claude Code denied a requested tool"
+        }
+      },
+      "event_types": [
+        "session",
+        "unknown",
+        "tool",
+        "permission",
+        "error",
+        "tool",
+        "unknown",
+        "text",
+        "permission",
+        "error",
+        "usage",
+        "result"
+      ]
+    },
+    {
+      "name": "live-interruption-before-terminal-result",
+      "status": "passed",
+      "result": {
+        "provider": "claude",
+        "provenance": "live",
+        "native_session_id": "e668903a-8eeb-4693-a252-1ab61f5b469f",
+        "exit_code": 0,
+        "signal": "SIGINT",
+        "success": false,
+        "text": "",
+        "error": {
+          "kind": "process",
+          "message": "[ede_diagnostic] result_type=user last_content_type=n/a stop_reason=null"
+        }
+      },
+      "event_types": [
+        "session",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "unknown",
+        "error",
+        "usage",
+        "result"
+      ]
+    }
+  ],
+  "status": "passed",
+  "capabilities": {
+    "schema_version": 1,
+    "provider": "claude",
+    "binary_path": "/opt/homebrew/bin/claude",
+    "version": "2.1.304 (Claude Code)",
+    "checked_at": "2026-10-24T11:11:38.178Z",
+    "native_resume": {
+      "status": "supported",
+      "evidence_ref": "claude:2.1.304 (Claude Code):local-help",
+      "note": "Protocol verified with Claude Code 2.1.304; probe itself performs no paid turn"
+    },
+    "structured_events": {
+      "status": "supported",
+      "evidence_ref": "claude:2.1.304 (Claude Code):local-help",
+      "note": "Protocol verified with Claude Code 2.1.304; probe itself performs no paid turn"
+    },
+    "mid_turn_input": {
+      "status": "unsupported",
+      "evidence_ref": null,
+      "note": "This adapter queues updates between turns; the supervisor resumes the exact session"
+    },
+    "permission_requests": {
+      "status": "supported",
+      "evidence_ref": "claude:2.1.304 (Claude Code):local-help",
+      "note": "Protocol verified with Claude Code 2.1.304; probe itself performs no paid turn"
+    },
+    "mcp_tools": {
+      "status": "supported",
+      "evidence_ref": "claude:2.1.304 (Claude Code):local-help",
+      "note": "Protocol verified with Claude Code 2.1.304; probe itself performs no paid turn"
+    },
+    "usage_reporting": {
+      "status": "supported",
+      "evidence_ref": "claude:2.1.304 (Claude Code):local-help",
+      "note": "Protocol verified with Claude Code 2.1.304; probe itself performs no paid turn"
+    }
+  },
+  "mcp_calls": [
+    {
+      "method": "server/discover",
+      "tool": null
+    },
+    {
+      "method": "initialize",
+      "tool": null
+    },
+    {
+      "method": "tools/list",
+      "tool": null
+    },
+    {
+      "method": "tools/call",
+      "tool": "ping"
+    }
+  ],
+  "finished_at": "2026-10-24T11:12:27.798Z"
+}

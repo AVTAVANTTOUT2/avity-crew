@@ -1,0 +1,16 @@
+{
+  "handoff_id":"handoff-99285431381a486281fb3947f845df13",
+  "outcome":"accepted",
+  "source_revision":"git:bb5ec87f157ccaae76277ce04058854927ac8182",
+  "tested_revision":"git:b30b3301a826513ed706d248962df1baf44e8354",
+  "verification_scope":"combined_code",
+  "summary":"Même source et candidat combiné déjà examinés/testés ; passation reformulée selon COORDINATION, limites factuelles conservées et aucun critère L04 modifié. Les six preuves live de source restent distinctes des 38 tests de combinaison.",
+  "findings":[],
+  "integration":{
+    "base_revision":"git:f5f50bd0415793b5b1656b9b5816fcb7764e7f0c",
+    "source_revision":"git:bb5ec87f157ccaae76277ce04058854927ac8182",
+    "candidate_revision":"git:b30b3301a826513ed706d248962df1baf44e8354",
+    "evidence_ref":"avity-crew-workpack/validation/L04/integration-review.md"
+  },
+  "checks":[{"name":"Types format build et 38 tests du candidat combiné", "command":"npm run check", "kind":"integration", "exit_code":0, "evidence_ref":"avity-crew-workpack/validation/L04/integration-review.md", "revision":"git:b30b3301a826513ed706d248962df1baf44e8354"}]
+}

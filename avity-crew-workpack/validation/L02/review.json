@@ -1,0 +1,45 @@
+{
+  "handoff_id": "handoff-f5dc9f7cd9bb486aaf1e8e29161fd229",
+  "outcome": "changes_requested",
+  "source_revision": "git:f5f50bd0415793b5b1656b9b5816fcb7764e7f0c",
+  "tested_revision": "git:f5f50bd0415793b5b1656b9b5816fcb7764e7f0c",
+  "verification_scope": "combined_code",
+  "summary": "Clean install and 25 real/offline tests pass, but three compiled-API probes expose missing event target correlation, successful reuse of a corrupted artifact, and a Git subdirectory retained as project root. Fix these targeted storage/identity defects before accepting L02. No UI or RPC work is requested.",
+  "findings": [
+    "packages/storage/src/index.ts:357,421: createTask and claimTask by user/chief emit task_id/attempt_id/session_id null and only request_key in payload. The public event journal cannot identify the target entity. Pass target IDs and generation separately from actor identity and test task creation/claim/observations.",
+    "packages/storage/src/index.ts:1162: writeArtifact returns success for an existing regular digest file without verifying its bytes. A write, fixture corruption, and repeated write reproduce a successful reference that readArtifact immediately rejects as ARTIFACT_CHANGED. Verify existing content and fail explicitly on corruption.",
+    "packages/storage/src/project.ts:46: identifyProject from a Git subdirectory shares the repository ID but retains the subdirectory as root, which Store can persist on first opening. Resolve the Git top-level while preserving path spaces and test nested-directory startup."
+  ],
+  "integration": {
+    "base_revision": "git:4767e10e03806309bc629d4dc1e65cedc0604f0a",
+    "source_revision": "git:f5f50bd0415793b5b1656b9b5816fcb7764e7f0c",
+    "candidate_revision": "git:f5f50bd0415793b5b1656b9b5816fcb7764e7f0c",
+    "evidence_ref": "avity-crew-workpack/validation/L02/review.md"
+  },
+  "checks": [
+    {
+      "name": "Independent clean lockfile installation",
+      "command": "npm ci",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L02/review.md",
+      "revision": "git:f5f50bd0415793b5b1656b9b5816fcb7764e7f0c"
+    },
+    {
+      "name": "Independent strict types, format, build and 25 contract/SQLite tests",
+      "command": "npm run check",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L02/review.md",
+      "revision": "git:f5f50bd0415793b5b1656b9b5816fcb7764e7f0c"
+    },
+    {
+      "name": "Candidate whitespace and patch check",
+      "command": "git diff --check 4767e10e03806309bc629d4dc1e65cedc0604f0a f5f50bd0415793b5b1656b9b5816fcb7764e7f0c",
+      "kind": "doc_validation",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L02/review.md",
+      "revision": "git:f5f50bd0415793b5b1656b9b5816fcb7764e7f0c"
+    }
+  ]
+}

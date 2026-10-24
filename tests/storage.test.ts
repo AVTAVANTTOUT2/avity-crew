@@ -12,7 +12,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 import { Store, identifyProject } from '../packages/storage/src/index.ts';
 import { CrewError, now } from '../packages/contracts/src/index.ts';
@@ -719,4 +719,67 @@ test('canonical project identity follows symlinks but isolates distinct projects
     () => new Store({ ...f.project, id: otherProject.id }),
     code('PROJECT_MISMATCH'),
   );
+});
+
+test('journal correlation identifies the target separately from the authenticated actor', (t) => {
+  const f = fixture(t);
+  f.addTask();
+  const session = f.session();
+  const attempt = f.store.claimTask(
+    f.actor,
+    f.task.id,
+    session,
+    'claim:correlation',
+    f.version(),
+  );
+  const created = f.store
+    .events(f.run.id)
+    .find((event) => event.type === 'task.created')!;
+  const claimed = f.store
+    .events(f.run.id)
+    .find((event) => event.type === 'task.claimed')!;
+  assert.equal(created.actor_id, f.actor.id);
+  assert.equal(created.task_id, f.task.id);
+  assert.equal(claimed.actor_id, f.actor.id);
+  assert.equal(claimed.task_id, f.task.id);
+  assert.equal(claimed.attempt_id, attempt.id);
+  assert.equal(claimed.session_id, session.id);
+  assert.equal(claimed.generation, attempt.generation);
+});
+
+test('reusing an artifact digest does not report success for corrupted existing data', (t) => {
+  const f = fixture(t),
+    artifact = f.store.writeArtifact('integrity evidence');
+  writeFileSync(join(f.project.data_dir, artifact.reference), 'corrupted data');
+  assert.throws(
+    () => f.store.writeArtifact('integrity evidence'),
+    code('ARTIFACT_CHANGED'),
+  );
+});
+
+test('first opening from a Git subdirectory persists the repository root', (t) => {
+  const f = fixture(t);
+  execFileSync('git', ['-C', f.root, 'init', '-b', 'main'], {
+    stdio: 'ignore',
+  });
+  const nested = join(f.root, 'src');
+  mkdirSync(nested);
+  const expected = identifyProject(f.root, join(f.directory, 'git data'));
+  const actual = identifyProject(nested, join(f.directory, 'git data'));
+  assert.equal(actual.id, expected.id);
+  assert.equal(actual.root, expected.root);
+  const store = new Store(actual);
+  t.after(() => store.close());
+  assert.equal(store.project.root, expected.root);
+});
+
+test('initializing Git in a new project preserves its durable project identity', (t) => {
+  const f = fixture(t),
+    before = identifyProject(f.root, join(f.directory, 'stable data'));
+  execFileSync('git', ['-C', f.root, 'init', '-b', 'main'], {
+    stdio: 'ignore',
+  });
+  const after = identifyProject(f.root, join(f.directory, 'stable data'));
+  assert.equal(after.id, before.id);
+  assert.equal(after.data_dir, before.data_dir);
 });

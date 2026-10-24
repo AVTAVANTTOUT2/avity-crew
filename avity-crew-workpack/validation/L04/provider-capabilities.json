@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "provider": "claude",
+  "binary_path": "/opt/homebrew/bin/claude",
+  "version": "2.1.304 (Claude Code)",
+  "checked_at": "2026-10-24T11:11:38.178Z",
+  "native_resume": {
+    "status": "supported",
+    "evidence_ref": "validation/L04/claude-live-report.json#exact-resume-new-note-and-edit",
+    "note": "Exact UUID preserved; previous note and new team context verified in a real resumed edit"
+  },
+  "structured_events": {
+    "status": "supported",
+    "evidence_ref": "validation/L04/claude-live-report.json",
+    "note": "Real stream-json events observed; fragmented UTF-8 and limits separately tested with simulated processes"
+  },
+  "mid_turn_input": {
+    "status": "unsupported",
+    "evidence_ref": "validation/L04/checks.md",
+    "note": "send raises UNSUPPORTED; supervisor must queue the new context and resume the exact session"
+  },
+  "permission_requests": {
+    "status": "supported",
+    "evidence_ref": "validation/L04/claude-live-report.json#controlled-native-permission-denial",
+    "note": "Unattended native permission denials become explicit permission/error events; interactive resolution belongs to the supervisor"
+  },
+  "mcp_tools": {
+    "status": "supported",
+    "evidence_ref": "validation/L04/claude-live-report.json#real-file-edit-and-mcp",
+    "note": "Real crew ping call and environment delivery verified without exposing environment values"
+  },
+  "usage_reporting": {
+    "status": "supported",
+    "evidence_ref": "validation/L04/claude-live-report.json",
+    "note": "Usage events observed live; numeric fields normalized by fixture tests, detailed live values not archived"
+  }
+}

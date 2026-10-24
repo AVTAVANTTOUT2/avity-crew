@@ -1,0 +1,40 @@
+{
+  "summary": "Adaptateur Claude Code natif et runner partage livres : flux UTF-8 JSONL borne avec backpressure, secrets masques, sessions/reprise exactes, permissions explicites et arret du groupe POSIX. Six scenarios live reussis avec edition de fichier, MCP reel, nouvelle note en reprise, identites distinctes, refus et interruption sans faux succes. Les AC-L04 sont couverts ; les limites de capacites et preuves hors recette restent explicites dans checks.md et les rapports live.",
+  "revision": "git:bb5ec87f157ccaae76277ce04058854927ac8182",
+  "artifacts": [
+    { "commit": "bb5ec87f157ccaae76277ce04058854927ac8182" },
+    { "ref": "validation/L04/checks.md", "sha256": "726c5d7621c5d782e458acf9b528a63bb2e169d210677af15f753fee755526dd" },
+    { "ref": "validation/L04/provider-capabilities.json", "sha256": "4d274767e3dcc043ddf3ff0a4f649a71ed9e0e2aaa19a3835b429d8818e99ecd" },
+    { "ref": "validation/L04/claude-live-report.json", "sha256": "c21ba3f30ce9efa48b62a4a503501f438b637e3bc5585ef8dcfa507d3afbf72c" }
+  ],
+  "tests": [
+    {
+      "name": "Typecheck, lint et 25 tests Node 26.12.0 sur candidat propre",
+      "command": "npm run check",
+      "kind": "unit",
+      "exit_code": 0,
+      "evidence_ref": "validation/L04/checks.md",
+      "revision": "git:bb5ec87f157ccaae76277ce04058854927ac8182"
+    },
+    {
+      "name": "13 tests providers cibles sur Node 24.22.1",
+      "command": "npm exec --yes --package=node@24.22.1 -- node --test dist/tests/providers/process.test.js dist/tests/providers/claude.test.js",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "validation/L04/checks.md",
+      "revision": "git:bb5ec87f157ccaae76277ce04058854927ac8182"
+    },
+    {
+      "name": "Six scenarios Claude Code 2.1.304 reels et bornes",
+      "command": "node scripts/live-claude.mjs /Users/zeldris/avity-crew/avity-crew-workpack/validation/L04/claude-live-report.json",
+      "kind": "live",
+      "provider": "claude",
+      "exit_code": 0,
+      "evidence_ref": "validation/L04/claude-live-report.json",
+      "revision": "git:bb5ec87f157ccaae76277ce04058854927ac8182"
+    }
+  ],
+  "limitations": [],
+  "next_steps": [],
+  "live_verification": "passed"
+}

@@ -1,0 +1,10 @@
+{
+  "summary": "Stockage SQLite réel avec migrations atomiques, état durable, attribution protégée par génération, mutations/événements/idempotence transactionnels, messages observables, provenance, journal paginé, sauvegarde et artefacts privés.",
+  "revision": "git:f5f50bd0415793b5b1656b9b5816fcb7764e7f0c",
+  "artifacts": [{"commit":"f5f50bd0415793b5b1656b9b5816fcb7764e7f0c"}],
+  "tests": [
+    {"name":"Contrôles et SQLite réel Node 26", "command":"npm run check", "kind":"integration", "exit_code":0, "evidence_ref":"avity-crew-workpack/validation/L02/checks.md", "revision":"git:f5f50bd0415793b5b1656b9b5816fcb7764e7f0c"},
+    {"name":"Contrats et SQLite réel Node 24", "command":"npm exec --yes --package=node@24.22.1 -- node --test 'dist/tests/**/*.test.js'", "kind":"integration", "exit_code":0, "evidence_ref":"avity-crew-workpack/validation/L02/checks.md", "revision":"git:f5f50bd0415793b5b1656b9b5816fcb7764e7f0c"}
+  ],
+  "limitations": [], "next_steps": [], "live_verification":"not_applicable"
+}

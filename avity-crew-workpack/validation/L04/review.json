@@ -1,0 +1,16 @@
+{
+  "handoff_id": "handoff-4d03c0896b324ca7ba5a018fa7e378a5",
+  "outcome": "changes_requested",
+  "source_revision": "git:bb5ec87f157ccaae76277ce04058854927ac8182",
+  "tested_revision": "git:b30b3301a826513ed706d248962df1baf44e8354",
+  "verification_scope": "combined_code",
+  "summary": "Adaptateur et runner examinés par le coordinateur indépendant de leur auteur ; six preuves live de la source inspectées et combinaison intégrée testée avec 38 contrôles verts.",
+  "findings": ["Passation à reformuler : limitations contient des capacités documentées et plateformes hors recette L04 ; next_steps contient la revue elle-même et des tâches L07. Conserver ces limites dans les rapports, mais réserver ces tableaux aux exigences L04 réellement inachevées, sans modifier les critères ni les preuves."],
+  "integration": {
+    "base_revision": "git:f5f50bd0415793b5b1656b9b5816fcb7764e7f0c",
+    "source_revision": "git:bb5ec87f157ccaae76277ce04058854927ac8182",
+    "candidate_revision": "git:b30b3301a826513ed706d248962df1baf44e8354",
+    "evidence_ref": "avity-crew-workpack/validation/L04/integration-review.md"
+  },
+  "checks": [{"name":"Types format build et 38 tests du candidat combiné", "command":"npm run check", "kind":"integration", "exit_code":0, "evidence_ref":"avity-crew-workpack/validation/L04/integration-review.md", "revision":"git:b30b3301a826513ed706d248962df1baf44e8354"}]
+}

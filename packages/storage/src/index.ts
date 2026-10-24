@@ -339,6 +339,9 @@ export class Store {
     actor: Actor,
     type: string,
     payload: Record<string, unknown>,
+    correlation: Partial<
+      Pick<CrewEvent, 'task_id' | 'attempt_id' | 'session_id' | 'generation'>
+    > = {},
   ): void {
     const seq = Number(
       this.db
@@ -364,12 +367,14 @@ export class Store {
         string,
         unknown
       >,
+      ...correlation,
     };
+    validate('CrewEvent', event);
     this.db
       .prepare('INSERT INTO events(run_id,seq,data) VALUES (?,?,?)')
       .run(runId, seq, JSON.stringify(event));
   }
-  private mutate<T>(
+  private mutate<T extends { id: string }>(
     actor: Actor,
     key: string,
     method: string,
@@ -418,7 +423,40 @@ export class Store {
       this.db
         .prepare('UPDATE runs SET version=?,status=?,data=? WHERE id=?')
         .run(run.version, run.status, JSON.stringify(run), run.id);
-      this.append(run.id, actor, method, { request_key: key });
+      const target = result as T &
+        Partial<{
+          task_id: string;
+          attempt_id: string;
+          session_id: string;
+          generation: number;
+        }>;
+      const attemptId =
+        method === 'task.claimed' || method === 'attempt.observed'
+          ? result.id
+          : (target.attempt_id ?? actor.attempt_id);
+      this.append(
+        run.id,
+        actor,
+        method,
+        { request_key: key, subject_id: result.id },
+        {
+          task_id:
+            target.task_id ??
+            (method.startsWith('task.') ? result.id : actor.task_id),
+          attempt_id: attemptId,
+          session_id:
+            target.session_id ??
+            (method === 'session.observed'
+              ? result.id
+              : attemptId
+                ? this.getAttempt(attemptId).session_id
+                : null),
+          generation:
+            target.generation && target.generation > 0
+              ? target.generation
+              : actor.generation,
+        },
+      );
       this.db
         .prepare(
           'INSERT INTO requests(run_id,key,fingerprint,response) VALUES (?,?,?,?)',
@@ -1169,6 +1207,11 @@ export class Store {
         closeSync(fd);
       }
       renameSync(temporary, filename);
+    } else {
+      this.readArtifact({
+        reference: `artifacts/${digest}`,
+        revision: `sha256:${digest}`,
+      });
     }
     return { reference: `artifacts/${digest}`, revision: `sha256:${digest}` };
   }

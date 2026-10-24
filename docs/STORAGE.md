@@ -5,6 +5,11 @@ répertoire Git commun pour l'identité des worktrees. Sans Git, le chemin réel
 du dossier est l'identité. Chaque projet possède un namespace privé sous
 `$XDG_DATA_HOME/avity-crew` ou `~/.local/share/avity-crew`.
 
+Depuis un sous-dossier Git, root est le sommet du worktree courant. Pour un
+dépôt standard, l'identité utilise le parent du répertoire commun `.git` :
+initialiser Git dans un dossier nouveau conserve donc son identité durable et
+ses runs. Les worktrees liés partagent cette même identité.
+
 `Store(project)` ouvre `state.sqlite`, active clés étrangères, synchronisation
 complète et délai de verrouillage. Les migrations numérotées s'exécutent sous
 transaction exclusive d'écriture ; une version inconnue est refusée. Le fichier
@@ -36,6 +41,10 @@ complètes de revue/intégration/acceptation sont complétées avec L06/L07.
 run, avec 1 à 1000 événements par page. Une nouvelle lecture peut inclure des
 événements commis entre deux pages. Les messages distinguent queued, delivered,
 acknowledged, applied et failed ; seul un constat fait avancer leur état.
+
+L'auteur authentifié reste actor_id ; les champs task_id/attempt_id/session_id
+et payload.subject_id identifient séparément la cible de la mutation, y compris
+lorsqu'un chef ou l'utilisateur attribue une tâche.
 `exportMarkdown` est une projection expurgée, jamais une source d'autorité.
 
 `writeArtifact` publie un fichier complet par renommage, nommé par son SHA-256.

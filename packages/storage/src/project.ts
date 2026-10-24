@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { realpathSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { now, validate } from '../../contracts/src/index.ts';
 import type { Project, ProjectConfig } from '../../contracts/src/index.ts';
@@ -43,7 +43,7 @@ export function identifyProject(
   config = defaultConfig(),
 ): Project {
   validate('ProjectConfig', config);
-  const root = realpathSync(directory);
+  let root = realpathSync(directory);
   let common: string | null = null;
   try {
     common = realpathSync(
@@ -51,13 +51,21 @@ export function identifyProject(
         'git',
         ['-C', root, 'rev-parse', '--path-format=absolute', '--git-common-dir'],
         { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
-      ).trim(),
+      ).replace(/\r?\n$/, ''),
+    );
+    root = realpathSync(
+      execFileSync('git', ['-C', root, 'rev-parse', '--show-toplevel'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).replace(/\r?\n$/, ''),
     );
   } catch {
     /* Documentary projects do not require Git. */
   }
   const id = `project:${createHash('sha256')
-    .update(common ?? root)
+    .update(
+      common ? (basename(common) === '.git' ? dirname(common) : common) : root,
+    )
     .digest('hex')
     .slice(0, 32)}`;
   const dataDir = resolve(dataHome, 'avity-crew', id.replace(':', '-'));
