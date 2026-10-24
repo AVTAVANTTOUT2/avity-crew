@@ -3,6 +3,7 @@ import {
   cp,
   mkdtemp,
   mkdir,
+  readFile,
   realpath,
   rm,
   symlink,
@@ -30,6 +31,7 @@ import {
   inspectCompiledContext,
   inspectProject,
   reconcileSources,
+  redactContext,
   renderTemplate,
   selectTaskSources,
 } from '../packages/context/src/index.ts';
@@ -375,6 +377,68 @@ test('secrets, binary data, traversal and symlinks outside the project cannot en
       rm(root, { recursive: true, force: true }),
       rm(outside, { recursive: true, force: true }),
     ]);
+  }
+});
+
+test('quoted JSON source secrets with spaces and escapes are redacted through the compiled prompt', async () => {
+  const root = await fixture();
+  try {
+    const api = 'SYNTHETIC_API_42 with "quotes", \\ backslash and\nnewline';
+    const password = 'SYNTHETIC_PASS_42 with spaces, tab\t and unicode é';
+    const raw =
+      JSON.stringify(
+        {
+          api_key: api,
+          password,
+          nested: { OPENAI_API_KEY: api },
+          label: 'BILLING_CONFIG_STAYS_USEFUL',
+          timeout_ms: 1500,
+        },
+        null,
+        2,
+      ).replace('"api_key"', '"api\\u005fkey"') + '\n';
+    const path = join(root, 'src/billing/settings.json');
+    await writeFile(path, raw);
+    const selection = await selectTaskSources(
+      await inspectProject(root),
+      task(),
+    );
+    const compiled = compileContext(await input(selection));
+    assert.ok(
+      !compiled.prompt.includes('SYNTHETIC_API_42'),
+      'A quoted JSON API key must not reach the provider prompt',
+    );
+    assert.ok(
+      !compiled.prompt.includes('SYNTHETIC_PASS_42'),
+      'The complete quoted password must be redacted, including spaces and escapes',
+    );
+    assert.match(compiled.prompt, /BILLING_CONFIG_STAYS_USEFUL/);
+    assert.match(compiled.prompt, /Preserve tenant isolation/);
+    const source = selection.sources.find((item) =>
+      item.source.reference.endsWith('settings.json'),
+    )!;
+    assert.equal(source.redacted, true);
+    assert.equal(
+      source.source.revision,
+      'sha256:' + createHash('sha256').update(raw).digest('hex'),
+    );
+    const safe = JSON.parse(source.content) as {
+      api_key: string;
+      password: string;
+      nested: { OPENAI_API_KEY: string };
+      label: string;
+      timeout_ms: number;
+    };
+    assert.equal(safe.api_key, '[REDACTED]');
+    assert.equal(safe.password, '[REDACTED]');
+    assert.equal(safe.nested.OPENAI_API_KEY, '[REDACTED]');
+    assert.equal(safe.label, 'BILLING_CONFIG_STAYS_USEFUL');
+    assert.equal(safe.timeout_ms, 1500);
+    assert.equal(await readFile(path, 'utf8'), raw);
+    assert.deepEqual(JSON.parse(redactContext(raw)), safe);
+    assert.equal(redactContext('api_key=synthetic'), 'api_key=[REDACTED]');
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 });
 

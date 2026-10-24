@@ -96,6 +96,23 @@ export interface SourceChange {
 export function redactContext(value: string): string {
   return value
     .replace(
+      /("(?:\\.|[^"\\])*")(\s*:\s*)("(?:\\.|[^"\\])*")/g,
+      (original: string, key: string, separator: string) => {
+        let decoded: unknown;
+        try {
+          decoded = JSON.parse(key);
+        } catch {
+          return original;
+        }
+        return typeof decoded === 'string' &&
+          /^(?:.*_)?(?:password|passwd|private[_-]?key|api[_-]?key|access[_-]?token|secret|token|authorization|bridge_env)$/i.test(
+            decoded,
+          )
+          ? `${key}${separator}"[REDACTED]"`
+          : original;
+      },
+    )
+    .replace(
       /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g,
       '[REDACTED PRIVATE KEY]',
     )
