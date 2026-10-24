@@ -186,6 +186,11 @@ test('revoking one turn capability survives restart without revoking its replace
   const owner = readFileSync(registry.ownerKeyPath, 'utf8');
   assert.throws(() => registry.revoke(owner), { code: 'FORBIDDEN' });
   assert.equal(registry.authenticate(owner).kind, 'user');
+  registry.revokeAllAgentCapabilities();
+  assert.throws(() => registry.authenticate(replacement), {
+    code: 'FORBIDDEN',
+  });
+  assert.equal(registry.authenticate(owner).kind, 'user');
 });
 
 test('a malformed private actor record is rejected with a controlled error', (t) => {

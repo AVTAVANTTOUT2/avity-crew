@@ -80,6 +80,7 @@ export class SupervisorRuntime {
   private closing = false;
 
   initialize(): void {
+    this.registry.revokeAllAgentCapabilities();
     for (const run of this.store.listRuns()) {
       if (terminal(run)) continue;
       const uncertain = this.store

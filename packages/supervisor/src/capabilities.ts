@@ -7,6 +7,7 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  readdirSync,
   renameSync,
   unlinkSync,
   writeFileSync,
@@ -151,6 +152,12 @@ export class CapabilityRegistry {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
+  }
+
+  revokeAllAgentCapabilities(): void {
+    for (const name of readdirSync(this.directory))
+      if (/^[a-f0-9]{64}\.json$/.test(name))
+        unlinkSync(join(this.directory, name));
   }
 
   authenticate(token: string): Principal {
