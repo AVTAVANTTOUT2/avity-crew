@@ -380,6 +380,7 @@ export class SupervisorRuntime {
     const manager = new WorkspaceManager(this.store, user);
     let recoveryBase: string | null = null;
     let nativeSession: AgentSession | undefined;
+    let oldWorkspace: Operation | undefined;
     if (task.active_attempt_id) {
       const previous = this.store.getAttempt(task.active_attempt_id);
       nativeSession = this.store.getRecord<AgentSession>(
@@ -387,7 +388,7 @@ export class SupervisorRuntime {
         'session',
         previous.session_id,
       );
-      const oldWorkspace = this.store
+      oldWorkspace = this.store
         .records<Operation>(runId, 'operation')
         .find(
           (operation) =>
@@ -395,22 +396,6 @@ export class SupervisorRuntime {
             operation.status === 'completed' &&
             (operation.result as WorkspaceHandle).attemptId === previous.id,
         );
-      if (run.delivery_mode === 'code' && oldWorkspace) {
-        const snapshot = await manager.collectDelivery(
-          oldWorkspace.id,
-          {
-            writePaths: task.spec.scope.write_paths,
-            excludedPaths: task.spec.scope.excluded_paths,
-          },
-          requestId(delegation.id, 'recovery-snapshot'),
-        );
-        recoveryBase = snapshot.sourceRevision;
-        this.store.observation(user, 'recovery.snapshot', {
-          task_id: task.id,
-          revision: recoveryBase,
-          business_success: false,
-        });
-      }
     }
     if (task.active_attempt_id)
       task = this.store.reassignTask(
@@ -451,6 +436,22 @@ export class SupervisorRuntime {
       generation: attempt.generation,
     };
     try {
+      if (run.delivery_mode === 'code' && oldWorkspace) {
+        const snapshot = await manager.collectDelivery(
+          oldWorkspace.id,
+          {
+            writePaths: task.spec.scope.write_paths,
+            excludedPaths: task.spec.scope.excluded_paths,
+          },
+          requestId(delegation.id, 'recovery-snapshot'),
+        );
+        recoveryBase = snapshot.sourceRevision;
+        this.store.observation(user, 'recovery.snapshot', {
+          task_id: task.id,
+          revision: recoveryBase,
+          business_success: false,
+        });
+      }
       const previous = this.store
         .records<Handoff>(runId, 'handoff')
         .filter((handoff) => handoff.task_id === task.id)
