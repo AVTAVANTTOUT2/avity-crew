@@ -1,20 +1,19 @@
 import { existsSync, lstatSync, readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { CrewError, validate } from '../../contracts/src/index.ts';
-import {
-  Store,
-  defaultConfig,
-  identifyProject,
-} from '../../storage/src/index.ts';
+import type { ProjectConfig } from '../../contracts/src/index.ts';
+import { Store, identifyProject } from '../../storage/src/index.ts';
 import { startTransport } from './transport.ts';
 import { SupervisorRuntime } from './runtime.ts';
+import { CapabilityRegistry } from './capabilities.ts';
 
 const args = process.argv.slice(2);
 if (args.length !== 2 || args[0] !== '--project')
   throw new CrewError('INVALID_INPUT', 'Usage: service --project DIRECTORY');
 const directory = resolve(args[1]!);
-let config = defaultConfig();
-const configFile = join(directory, '.avity-crew.json');
+const project = identifyProject(directory);
+let config: ProjectConfig | null = null;
+const configFile = join(project.root, '.avity-crew.json');
 if (existsSync(configFile)) {
   const stat = lstatSync(configFile);
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 256 * 1024)
@@ -23,26 +22,41 @@ if (existsSync(configFile)) {
   validate('ProjectConfig', parsed);
   config = parsed;
 }
-const store = new Store(identifyProject(directory, undefined, config));
+const store = new Store(project);
 let closing = false;
-const runtime = new SupervisorRuntime(
+let runtime: SupervisorRuntime | undefined;
+const ready = (): SupervisorRuntime => {
+  if (!runtime)
+    throw new CrewError(
+      'SERVICE_STARTING',
+      'Service initialization is not yet complete',
+    );
+  return runtime;
+};
+const transport = await startTransport({
+  directory: store.project.data_dir,
+  project_id: store.project.id,
+  registry: new CapabilityRegistry(store),
+  api: {
+    tools: (principal, runId) => ready().coordinator.tools(principal, runId),
+    execute: (principal, call) => ready().coordinator.execute(principal, call),
+    admin: (principal, request) =>
+      ready().coordinator.admin(principal, request),
+  },
+});
+if (config) store.configureProject(config);
+runtime = new SupervisorRuntime(
   store,
   join(store.project.data_dir, 'endpoint.json'),
   undefined,
   close,
 );
-const transport = await startTransport({
-  directory: store.project.data_dir,
-  project_id: store.project.id,
-  registry: runtime.registry,
-  api: runtime.coordinator,
-});
 runtime.initialize();
 async function close(): Promise<void> {
   if (closing) return;
   closing = true;
   try {
-    await runtime.close();
+    await runtime?.close();
     await transport.close();
     store.close();
   } catch (error) {

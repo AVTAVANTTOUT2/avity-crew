@@ -15,6 +15,7 @@ import type {
   ProviderAdapter,
   ProviderProcess,
   ProviderRequest,
+  Review,
   Run,
   SourceRef,
   Verification,
@@ -682,6 +683,12 @@ export class SupervisorRuntime {
           },
           instructions:
             'Les outils crew sont la seule autorité de coordination. Lire get_status pour la version courante avant mutation. Créer des request_id et idempotency_key uniques par action ; réutiliser exactement la clé après perte de réponse. Les missions reprennent les IDs des critères du run qu’elles couvrent. delegate_task retourne queued sans attendre. Après délégation, terminer le tour pour libérer sa place. Une sortie native réussie ne vaut jamais acceptation. Pour soumettre un document neuf : document_paths contient les chemins relatifs à capturer ; handoff.artifacts et handoff.verifications restent vides et handoff.source_revision vaut null. Le serveur calcule les empreintes et les preuves observées ; ne pas inventer de hash ni de résultat. Le reviewer lit collect_delivery puis submit_review, sans submit_handoff ni dépendance d’acceptation sur la tâche relue. La revue documentaire porte sur le hash exact du snapshot ; une revue de code approuve le candidat combiné et son SHA exact après propose_integration. Les IDs des vérifications observées sont fournis par collect_delivery et get_status.',
+          planning_rules: [
+            'Attribuer les critères d’écriture à leur exécutant et les critères de revue à une mission reviewer distincte. Les critères globaux du run restent obligatoires ; ne pas demander à un writer de revendiquer une revue ou une clôture qu’il ne réalise pas.',
+            'Pour corriger une mission arrêtée ou une passation à resoumettre : record_decision approved technical_judgment avec affects_task_ids, puis amend_task avec la TaskSpec complète et une raison, puis delegate_task. Le run garde ses critères. Toute nouvelle livraison exige sa revue indépendante.',
+            'limitations contient les conditions qui empêchent de satisfaire les critères propres à la mission. Les méthodes déjà prises en charge par le service et les informations destinées à la suite vont dans next_information. Ne pas effacer une limite réelle ni inventer une preuve.',
+            'Une revue acceptée produit sa propre preuve de contrôle, liée à la livraison acceptée. finish_run peut référencer ses evidence_artifact_ids pour les critères de revue, avec les preuves du writer pour les critères d’écriture.',
+          ],
         },
         available_tools: methods,
         dependencies: this.store
@@ -720,11 +727,75 @@ export class SupervisorRuntime {
         ],
         run_state: {
           run_version: this.version(run.id),
-          tasks: this.store.tasks(run.id),
-          handoffs,
-          reviews: this.store.records(run.id, 'review'),
+          details:
+            'get_status(task_id) restitue la TaskSpec complète ; collect_delivery restitue passation, limites, revues et preuves exactes.',
+          tasks: this.store.tasks(run.id).map((item) => ({
+            id: item.id,
+            title: item.spec.title,
+            role: item.spec.role,
+            depends_on: item.spec.depends_on,
+            criterion_ids: item.spec.acceptance_criteria.map(
+              (criterion) => criterion.id,
+            ),
+            status: item.status,
+            generation: item.generation,
+            active_attempt_id: item.active_attempt_id,
+            accepted_revision: item.accepted_revision,
+            wait_reason: item.wait_reason,
+          })),
+          handoffs: handoffs.map((handoff) => ({
+            id: handoff.id,
+            task_id: handoff.task_id,
+            attempt_id: handoff.attempt_id,
+            generation: handoff.generation,
+            status: handoff.status,
+            source_revision: handoff.source_revision,
+            criteria_claimed: handoff.criteria_claimed,
+            limitation_count: handoff.limitations.length,
+            summary: handoff.summary.slice(0, 800),
+            summary_truncated: handoff.summary.length > 800,
+            artifacts: handoff.artifacts,
+          })),
+          reviews: this.store
+            .records<Review>(run.id, 'review')
+            .map((review) => ({
+              id: review.id,
+              review_task_id: review.review_task_id,
+              review_of_task_id: review.review_of_task_id,
+              handoff_id: review.handoff_id,
+              outcome: review.outcome,
+              verification_scope: review.verification_scope,
+              source_revision: review.source_revision,
+              tested_revision: review.tested_revision,
+              blocking_findings: review.findings.filter(
+                (finding) => finding.severity === 'blocking',
+              ).length,
+              verification_ids: review.verification_ids,
+            })),
           user_responses: this.store.records(run.id, 'user_response'),
-          verifications: this.store.records(run.id, 'verification'),
+          verifications: this.store
+            .records<Verification>(run.id, 'verification')
+            .map(
+              ({
+                id,
+                criterion_ids,
+                mode,
+                execution,
+                result,
+                tested_revision,
+                evidence_artifact_ids,
+                provider,
+              }) => ({
+                id,
+                criterion_ids,
+                mode,
+                execution,
+                result,
+                tested_revision,
+                evidence_artifact_ids,
+                provider,
+              }),
+            ),
           questions: this.store.records(run.id, 'question'),
           delivery_target:
             this.store.project.config.delivery.target_ref ??
@@ -1419,15 +1490,44 @@ export class SupervisorRuntime {
             'NOT_FOUND',
             'No compiled context for this subject',
           );
-        const event = this.store
-          .events(runId, 0, 200)
-          .find(
+        let after = 0;
+        let event;
+        while (!event) {
+          const page = this.store.events(runId, after, 200);
+          event = page.find(
             (item) =>
               item.type === 'context.compiled' &&
               (item.payload as Record<string, unknown>)['context_id'] ===
                 context.id,
           );
-        return { context, references: event?.payload ?? null };
+          if (page.length < 200) break;
+          after = page.at(-1)!.seq;
+        }
+        const references = event?.payload as
+          | {
+              prompt?: { reference: string; revision: string };
+              inspection?: { reference: string; revision: string };
+            }
+          | undefined;
+        let prompt: string | null = null,
+          inspection: unknown = null;
+        if (references?.prompt && references.inspection) {
+          if (references.prompt.revision !== `sha256:${context.content_sha256}`)
+            throw new CrewError(
+              'CONTEXT_CHANGED',
+              'Stored prompt does not match its compiled context',
+            );
+          prompt = this.store.readArtifact(references.prompt).toString('utf8');
+          inspection = JSON.parse(
+            this.store.readArtifact(references.inspection).toString('utf8'),
+          ) as unknown;
+        }
+        return {
+          context,
+          references: event?.payload ?? null,
+          prompt,
+          inspection,
+        };
       }
       case 'export':
         return args['format'] === 'markdown'

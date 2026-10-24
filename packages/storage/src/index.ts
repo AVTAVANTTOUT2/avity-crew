@@ -785,6 +785,22 @@ export class Store {
           'INVALID_EVIDENCE',
           'Verification belongs to another task',
         );
+      if (
+        proof.criterion_ids.some(
+          (id) =>
+            !task.spec.acceptance_criteria.some(
+              (criterion) => criterion.id === id,
+            ),
+        ) ||
+        proof.evidence_artifact_ids.some(
+          (id) =>
+            this.checkedArtifact(run.id, id).producer_attempt_id !== attempt.id,
+        )
+      )
+        throw new CrewError(
+          'STALE_EVIDENCE',
+          'Verification must belong to the current task criteria and attempt',
+        );
     }
     if (
       !proofs.length ||

@@ -257,6 +257,36 @@ export class Coordinator implements SupervisorApi {
     };
   }
 
+  private scopedSpec(input: TaskSpec): TaskSpec {
+    for (const path of [
+      ...input.scope.read_paths,
+      ...input.scope.write_paths,
+      ...input.scope.excluded_paths,
+    ])
+      if (
+        isAbsolute(path) ||
+        path.includes('\\') ||
+        path.split('/').includes('..') ||
+        /^[A-Za-z]:/.test(path)
+      )
+        throw new CrewError(
+          'INVALID_SCOPE',
+          'Mission paths must stay relative to the project',
+        );
+    return {
+      ...input,
+      scope: {
+        ...input.scope,
+        excluded_paths: [
+          ...new Set([
+            ...input.scope.excluded_paths,
+            ...this.store.project.config.context.exclude_paths,
+          ]),
+        ],
+      },
+    };
+  }
+
   private async dispatch(actor: Actor, call: ToolCall): Promise<unknown> {
     const key = call.idempotency_key,
       version = call.expected_version;
@@ -290,37 +320,20 @@ export class Coordinator implements SupervisorApi {
           exclusions: project.exclusions.slice(0, 100),
         };
       }
-      case 'create_task': {
-        const input = call.arguments.task;
-        for (const path of [
-          ...input.scope.read_paths,
-          ...input.scope.write_paths,
-          ...input.scope.excluded_paths,
-        ])
-          if (
-            isAbsolute(path) ||
-            path.includes('\\') ||
-            path.split('/').includes('..') ||
-            /^[A-Za-z]:/.test(path)
-          )
-            throw new CrewError(
-              'INVALID_SCOPE',
-              'Mission paths must stay relative to the project',
-            );
-        const task: TaskSpec = {
-          ...input,
-          scope: {
-            ...input.scope,
-            excluded_paths: [
-              ...new Set([
-                ...input.scope.excluded_paths,
-                ...this.store.project.config.context.exclude_paths,
-              ]),
-            ],
-          },
-        };
-        return this.store.createTask(actor, task, key, version);
-      }
+      case 'create_task':
+        return this.store.createTask(
+          actor,
+          this.scopedSpec(call.arguments.task),
+          key,
+          version,
+        );
+      case 'amend_task':
+        return this.store.amendTask(
+          actor,
+          { ...call.arguments, task: this.scopedSpec(call.arguments.task) },
+          key,
+          version,
+        );
       case 'delegate_task': {
         const delegated = this.store.delegateTask(
           actor,
