@@ -172,3 +172,55 @@ active/inconnue ne subsiste. La vérification, `running→validating→completed
 le record `final`, l'événement et la réponse rejouable partagent une transaction.
 Un refus ne laisse aucun statut intermédiaire commis. Un exit 0 ou un texte
 affirmant le succès ne satisfait pas ces gardes.
+
+## Correction du plan et résultats de contrôle
+
+`amendTask(chiefOrUser, {task, reason, decision_id}, key, version)` remplace une
+mission après une décision approuvée qui cite cette tâche, ou porte explicitement
+sur tout le run (`affects_task_ids:[]`). L'identité, le run et `created_at` restent
+immuables. Les tâches acceptées ou annulées sont refusées. Toutes les anciennes
+tentatives doivent être observées `exited` ou `interrupted` et les intentions de
+processus fournisseurs associées doivent être réconciliées ; un heartbeat ne
+permet pas cet amendement.
+
+Le nouveau DAG est contrôlé, les chemins restent relatifs au projet et les
+exclusions de sa configuration sont conservées. Un record `task_revision`
+conserve les deux TaskSpec, la raison, la décision et l'acteur authentifié. La
+génération de la tâche augmente : les anciennes capacités et livraisons ne
+peuvent plus être utilisées, même si le contenu du document reste identique.
+Une livraison en revue ou validation passe `changes_requested`. Une tâche prête
+peut rester prête ; ses dépendances sont réévaluées. Une tâche arrêtée qui était
+encore `running` devient bloquée en attendant la réattribution explicite.
+Le runtime utilise ensuite `reassignTask` et une nouvelle soumission. Le run
+conserve intégralement son objectif, ses contraintes et ses critères obligatoires.
+
+Les anciens motifs d'attente sont effacés à la réattribution, au claim, à la
+livraison complète et à l'amendement lorsqu'ils ne décrivent plus l'état courant.
+Une question toujours ouverte demeure une garde de claim/acceptation. Un état
+bloqué ou une livraison partielle conserve son motif de blocage.
+
+Chaque `submitReview` valide produit aussi un snapshot canonique de la Review,
+un ArtifactRef et une Verification de l'exécution du contrôle, puis un record
+`control_result` reliant les IDs de la tâche, de la tentative, de la revue, du
+handoff et des preuves. Cette preuve est `static`/`manual`, sans commande ni
+exit code, avec le fournisseur de la session reviewer. Elle constate le résultat
+réel du contrôle ; elle n'annonce aucune exécution native ni recette live. Le
+contrôle accepté ne crée ni tâche de chef ni handoff artificiel de reviewer.
+Tous ces records et les transitions du contrôle partagent la transaction de revue.
+
+Pour la clôture, un résultat de contrôle ne fournit des preuves globales que si
+sa Review approuvée figure dans les `review_ids` d'une acceptation réelle de la
+livraison courante. L'empreinte du snapshot, sa tentative, ses critères et sa
+révision testée sont revérifiés. Une revue négative, une ancienne source ou une
+revue non utilisée par l'acceptation n'autorise pas la fin du run. Les preuves et
+artefacts éligibles des contrôles rejoignent ceux des writers acceptés pour
+vérifier `criterion_evidence`, sans retirer de critère global.
+
+## Configuration du service propriétaire
+
+`configureProject(config)` est une opération interne du service, sans API agent.
+Le bootstrap l'appelle uniquement après acquisition du verrou de transport du
+projet. Elle valide la configuration, ne remplace que `project.config` en
+transaction, puis actualise la copie mémoire après commit. Elle n'est pas appelée
+par le constructeur. L'identité, les chemins, la version de carte, la date de
+création et les runs/tâches sont conservés. Une configuration invalide n'écrit rien.

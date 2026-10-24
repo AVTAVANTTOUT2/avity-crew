@@ -20,6 +20,7 @@ import { join, relative, isAbsolute, dirname } from 'node:path';
 import { CrewError, ident, now, validate } from '../../contracts/src/index.ts';
 import type {
   Project,
+  ProjectConfig,
   Run,
   TaskSpec,
   TaskState,
@@ -116,8 +117,37 @@ type RecordKind =
   | 'delegation'
   | 'blocker'
   | 'acceptance'
+  | 'task_revision'
+  | 'control_result'
   | 'final';
 type Row = { data: string };
+
+export interface TaskRevision {
+  id: string;
+  run_id: string;
+  task_id: string;
+  previous_spec: TaskSpec;
+  next_spec: TaskSpec;
+  reason: string;
+  decision_id: string;
+  actor: Actor;
+  generation_before: number;
+  generation_after: number;
+  created_at: string;
+}
+export interface ControlResult {
+  id: string;
+  run_id: string;
+  task_id: string;
+  attempt_id: string;
+  generation: number;
+  review_id: string;
+  handoff_id: string;
+  review_of_task_id: string;
+  artifact_id: string;
+  verification_id: string;
+  created_at: string;
+}
 
 export class Store {
   private readonly db: DatabaseSync;
@@ -168,6 +198,22 @@ export class Store {
 
   close(): void {
     this.db.close();
+  }
+  configureProject(config: ProjectConfig): void {
+    validate('ProjectConfig', config);
+    const snapshot = structuredClone(config);
+    this.transaction(() => {
+      const current = this.decode<Project>(
+        this.db
+          .prepare('SELECT data FROM project WHERE id=?')
+          .get(this.project.id),
+        'Project',
+      );
+      this.db
+        .prepare('UPDATE project SET data=? WHERE id=?')
+        .run(JSON.stringify({ ...current, config: snapshot }), current.id);
+    });
+    this.project.config = snapshot;
   }
 
   private migrate(): void {
@@ -440,8 +486,14 @@ export class Store {
       (question) =>
         question.status === 'open' &&
         question.blocking &&
-        (taskId === undefined || question.affects_task_ids.includes(taskId)),
+        (taskId === undefined ||
+          !question.affects_task_ids.length ||
+          question.affects_task_ids.includes(taskId)),
     );
+  }
+  private clearObsoleteWait(task: TaskState): void {
+    const question = this.blockingQuestions(task.run_id, task.id)[0];
+    task.wait_reason = question ? `question:${question.id}` : null;
   }
 
   private currentHandoff(runId: string, taskId: string): Handoff {
@@ -1119,6 +1171,174 @@ export class Store {
     );
   }
 
+  amendTask(
+    actor: Actor,
+    args: { task: TaskSpec; reason: string; decision_id: string },
+    key: string,
+    expectedVersion: number,
+  ): TaskState {
+    validate('TaskSpec', args.task);
+    validate('Identifier', args.decision_id);
+    return this.mutate(
+      actor,
+      key,
+      'task.amended',
+      args,
+      expectedVersion,
+      () => {
+        this.openRun(actor, ['user', 'chief']);
+        if (typeof args.reason !== 'string' || !args.reason.trim())
+          throw new CrewError(
+            'INVALID_INPUT',
+            'Plan amendment requires its reason',
+          );
+        const task = this.getTask(args.task.id);
+        if (task.run_id !== actor.run_id || args.task.run_id !== task.run_id)
+          throw new CrewError(
+            'WRONG_RUN',
+            'Task amendment belongs to another run',
+          );
+        if (args.task.created_at !== task.spec.created_at)
+          throw new CrewError(
+            'IMMUTABLE_TASK',
+            'Task identity, run and creation time are immutable',
+          );
+        if (['accepted', 'cancelled'].includes(task.status))
+          throw new CrewError(
+            'INVALID_TRANSITION',
+            'A terminal task cannot be amended',
+          );
+        const decision = this.getRecord<Decision>(
+          actor.run_id,
+          'decision',
+          args.decision_id,
+        );
+        if (
+          decision.status !== 'approved' ||
+          (decision.affects_task_ids.length &&
+            !decision.affects_task_ids.includes(task.id))
+        )
+          throw new CrewError(
+            'DECISION_REQUIRED',
+            'An approved decision must explicitly cover this task or the whole run',
+          );
+        if (
+          this.attempts(actor.run_id).some(
+            (attempt) =>
+              attempt.task_id === task.id &&
+              !['exited', 'interrupted'].includes(attempt.status),
+          )
+        )
+          throw new CrewError(
+            'RECONCILIATION_REQUIRED',
+            'Observe every old attempt stopped before amending its task',
+          );
+        for (const operation of this.uncertainOperations(actor.run_id).filter(
+          (item) => item.kind === 'provider.turn',
+        )) {
+          let owner: { task_id?: string | null } | undefined;
+          if (operation.result && typeof operation.result === 'object')
+            owner = (operation.result as { actor?: Actor }).actor;
+          if (!owner) {
+            try {
+              owner = (JSON.parse(operation.target) as { actor?: Actor }).actor;
+            } catch {
+              /* Unknown ownership cannot authorize a plan change. */
+            }
+          }
+          if (!owner || owner.task_id === task.id)
+            throw new CrewError(
+              'RECONCILIATION_REQUIRED',
+              'Reconcile prior provider ownership before changing its task',
+            );
+        }
+        for (const path of [
+          ...args.task.scope.read_paths,
+          ...args.task.scope.write_paths,
+          ...args.task.scope.excluded_paths,
+        ]) {
+          if (
+            isAbsolute(path) ||
+            path.includes('\\') ||
+            path.split('/').includes('..') ||
+            /^[A-Za-z]:/.test(path)
+          )
+            throw new CrewError(
+              'INVALID_SCOPE',
+              'Amended mission paths must stay relative to the project',
+            );
+        }
+        const next: TaskSpec = {
+          ...structuredClone(args.task),
+          scope: {
+            ...args.task.scope,
+            excluded_paths: [
+              ...new Set([
+                ...args.task.scope.excluded_paths,
+                ...this.project.config.context.exclude_paths,
+              ]),
+            ],
+          },
+        };
+        assertAcyclic(
+          new Map(
+            this.tasks(actor.run_id).map((item) => [
+              item.id,
+              item.id === task.id ? next.depends_on : item.spec.depends_on,
+            ]),
+          ),
+        );
+        const revision: TaskRevision = {
+          id: ident('task-revision'),
+          run_id: actor.run_id,
+          task_id: task.id,
+          previous_spec: task.spec,
+          next_spec: next,
+          reason: redactSecrets(args.reason),
+          decision_id: decision.id,
+          actor: {
+            id: actor.id,
+            project_id: actor.project_id,
+            run_id: actor.run_id,
+            role: actor.role,
+            task_id: actor.task_id,
+            attempt_id: actor.attempt_id,
+            generation: actor.generation,
+          },
+          generation_before: task.generation,
+          generation_after: task.generation + 1,
+          created_at: now(),
+        };
+        if (['in_review', 'validating'].includes(task.status))
+          this.moveTask(task, 'changes_requested');
+        else if (task.status === 'running') {
+          this.moveTask(task, 'blocked');
+          task.wait_reason = `Plan amended: ${redactSecrets(args.reason)}`;
+        } else if (['ready', 'waiting_dependency'].includes(task.status))
+          this.moveTask(
+            task,
+            next.depends_on.every(
+              (id) => this.getTask(id).status === 'accepted',
+            )
+              ? 'ready'
+              : 'waiting_dependency',
+          );
+        task.spec = next;
+        task.generation++;
+        task.version++;
+        if (
+          task.status !== 'blocked' ||
+          this.blockingQuestions(task.run_id, task.id).length
+        )
+          this.clearObsoleteWait(task);
+        task.accepted_revision = null;
+        this.writeTask(task);
+        this.writeRecord(actor, 'task_revision', revision, task.id);
+        return task;
+      },
+    );
+  }
+
   claimTask(
     actor: Actor,
     taskId: string,
@@ -1199,6 +1419,7 @@ export class Store {
         task.status = 'running';
         task.generation = attempt.generation;
         task.active_attempt_id = attempt.id;
+        this.clearObsoleteWait(task);
         task.version++;
         this.writeTask(task);
         if (delegation) {
@@ -1295,6 +1516,7 @@ export class Store {
           ? 'ready'
           : 'waiting_dependency';
         task.version++;
+        this.clearObsoleteWait(task);
         this.writeTask(task);
         return task;
       },
@@ -1355,6 +1577,7 @@ export class Store {
           this.writeRecord(actor, 'artifact', artifact, task.id);
         this.writeRecord(actor, 'handoff', handoff, task.id);
         task.status = handoff.status === 'delivered' ? 'in_review' : 'blocked';
+        if (handoff.status === 'delivered') this.clearObsoleteWait(task);
         task.version++;
         this.writeTask(task);
         return handoff;
@@ -1699,6 +1922,51 @@ export class Store {
             );
         }
         this.writeRecord(actor, 'review', review, target.id);
+        const timestamp = now();
+        const artifact: ArtifactRef = {
+          id: ident('artifact'),
+          kind: 'report',
+          ...this.writeArtifact(canonical(review)),
+          producer_attempt_id: reviewerAttempt.id,
+          created_at: timestamp,
+        };
+        const criteria = control.spec.acceptance_criteria;
+        const verification: Verification = {
+          id: ident('verification'),
+          criterion_ids: [
+            criteria[0].id,
+            ...criteria.slice(1).map((item) => item.id),
+          ],
+          mode: 'static',
+          execution: 'manual',
+          command: null,
+          cwd: reviewerSession.cwd,
+          result: 'passed',
+          exit_code: null,
+          tested_revision: review.tested_revision ?? review.source_revision,
+          evidence_artifact_ids: [artifact.id],
+          started_at: timestamp,
+          ended_at: timestamp,
+          provider: reviewerSession.provider,
+        };
+        validate('ArtifactRef', artifact);
+        validate('Verification', verification);
+        this.writeRecord(actor, 'artifact', artifact, control.id);
+        this.writeRecord(actor, 'verification', verification, control.id);
+        const result: ControlResult = {
+          id: ident('control-result'),
+          run_id: actor.run_id,
+          task_id: control.id,
+          attempt_id: reviewerAttempt.id,
+          generation: control.generation,
+          review_id: review.id,
+          handoff_id: handoff.id,
+          review_of_task_id: target.id,
+          artifact_id: artifact.id,
+          verification_id: verification.id,
+          created_at: timestamp,
+        };
+        this.writeRecord(actor, 'control_result', result, control.id);
         if (review.outcome !== 'approved')
           this.moveTask(
             target,
@@ -1708,6 +1976,9 @@ export class Store {
         this.moveTask(control, 'in_review');
         this.moveTask(control, 'validating');
         this.moveTask(control, 'accepted');
+        control.accepted_revision = verification.tested_revision;
+        this.clearObsoleteWait(control);
+        this.writeTask(control);
         return review;
       },
     );
@@ -1796,14 +2067,105 @@ export class Store {
           run.id,
           'acceptance',
         );
-        const proofs = acceptances.flatMap((acceptance) =>
-          acceptance.verification_ids.map((id) =>
-            this.checkedProof(run.id, id, acceptance.accepted_revision),
-          ),
-        );
+        const proofs = acceptances.flatMap((acceptance) => {
+          const checked = this.deliveryCheck(
+            actor,
+            {
+              handoff_id: acceptance.handoff_id,
+              review_ids: acceptance.review_ids as [string, ...string[]],
+              verification_ids: acceptance.verification_ids as [
+                string,
+                ...string[],
+              ],
+              accepted_revision: acceptance.accepted_revision,
+            },
+            true,
+          );
+          if (
+            checked.task.status !== 'accepted' ||
+            checked.existing?.id !== acceptance.id
+          )
+            throw new CrewError(
+              'INVALID_EVIDENCE',
+              'Final evidence must belong to a current accepted delivery',
+            );
+          return checked.proofs;
+        });
         const artifactIds = new Set(
           acceptances.flatMap((acceptance) => acceptance.artifact_ids),
         );
+        for (const control of this.allRecords<ControlResult>(
+          run.id,
+          'control_result',
+        )) {
+          const acceptance = acceptances.find(
+            (item) =>
+              item.task_id === control.review_of_task_id &&
+              item.handoff_id === control.handoff_id &&
+              item.review_ids.includes(control.review_id),
+          );
+          if (!acceptance) continue;
+          const review = this.getRecord<Review>(
+            run.id,
+            'review',
+            control.review_id,
+          );
+          const task = this.getTask(control.task_id),
+            attempt = this.getAttempt(control.attempt_id);
+          if (
+            review.outcome !== 'approved' ||
+            review.findings.some(
+              (finding) => finding.severity === 'blocking',
+            ) ||
+            review.review_task_id !== task.id ||
+            review.review_of_task_id !== acceptance.task_id ||
+            review.handoff_id !== acceptance.handoff_id ||
+            review.tested_revision !== acceptance.accepted_revision ||
+            task.status !== 'accepted' ||
+            task.active_attempt_id !== attempt.id ||
+            task.generation !== control.generation ||
+            attempt.generation !== control.generation
+          )
+            continue;
+          const artifact = this.checkedArtifact(run.id, control.artifact_id);
+          const proof = this.checkedProof(
+            run.id,
+            control.verification_id,
+            acceptance.accepted_revision,
+          );
+          const session = this.getRecord<AgentSession>(
+            run.id,
+            'session',
+            attempt.session_id,
+          );
+          const criteria = task.spec.acceptance_criteria;
+          if (
+            artifact.producer_attempt_id !== attempt.id ||
+            this.readArtifact(artifact).toString('utf8') !==
+              canonical(review) ||
+            proof.mode !== 'static' ||
+            proof.execution !== 'manual' ||
+            proof.command !== null ||
+            proof.exit_code !== null ||
+            proof.provider !== session.provider ||
+            proof.evidence_artifact_ids.length !== 1 ||
+            proof.evidence_artifact_ids[0] !== artifact.id ||
+            proof.criterion_ids.some(
+              (id) => !criteria.some((criterion) => criterion.id === id),
+            ) ||
+            criteria.some(
+              (criterion) =>
+                criterion.required &&
+                !proof.criterion_ids.includes(criterion.id),
+            )
+          )
+            throw new CrewError(
+              'INVALID_EVIDENCE',
+              'Control proof does not identify the canonical review result',
+            );
+          proofs.push(proof);
+          artifactIds.add(artifact.id);
+        }
         for (const id of artifactIds) this.checkedArtifact(run.id, id);
         for (const id of args.delivered_artifact_ids) {
           if (!artifactIds.has(id))
