@@ -2042,7 +2042,7 @@ export class Store {
   ): CrewEvent {
     return this.transaction(() => {
       this.authority(actor, ['user']);
-      if (!/^(provider|turn|scheduler)\.[a-z][a-z0-9_.]*$/.test(type))
+      if (!/^(provider|turn|scheduler|context|tool|recovery)\.[a-z][a-z0-9_.]*$/.test(type))
         throw new CrewError(
           'INVALID_OBSERVATION',
           'Only runtime observation namespaces are permitted',

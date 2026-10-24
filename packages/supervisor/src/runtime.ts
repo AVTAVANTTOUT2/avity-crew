@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { CrewError, ident, now, validate } from '../../contracts/src/index.ts';
 import type {
   Actor,
@@ -557,7 +558,7 @@ export class SupervisorRuntime {
       },
       bridge: {
         command: process.execPath,
-        args: [new URL('./bridge.js', import.meta.url).pathname],
+        args: [fileURLToPath(new URL('./bridge.js', import.meta.url))],
         approved_tools: methods.map((tool) => tool.name),
         env: {
           AVITY_CREW_ENDPOINT_FILE: this.endpointFile,
