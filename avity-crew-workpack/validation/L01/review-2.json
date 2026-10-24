@@ -1,0 +1,43 @@
+{
+  "handoff_id": "handoff-465dabb22b5a438c85b3636f2925c3cc",
+  "outcome": "changes_requested",
+  "source_revision": "git:82761cd3f7b94ad00320a01541c38024256b8269",
+  "tested_revision": "git:82761cd3f7b94ad00320a01541c38024256b8269",
+  "verification_scope": "combined_code",
+  "summary": "Previous findings are fixed and clean installation plus all eleven offline tests pass. One regression remains: a fake error event without its optional error payload is forgotten, so a following successful result yields success true. Preserve the error signal independently of details and cover it before accepting L01.",
+  "findings": [
+    "packages/providers/src/fake.ts: an event with type error and no error payload is permitted by ProviderEvent, but the stream assigns null and success checks only !error. Reproduced compiled script [error without payload, result success true] yields success true, error null. Preserve error presence or create an explicit protocol error for absent details, and add a focused test."
+  ],
+  "integration": {
+    "base_revision": "git:e42d658c2e2cf55bc70973e4f6b893d3b61850ba",
+    "source_revision": "git:82761cd3f7b94ad00320a01541c38024256b8269",
+    "candidate_revision": "git:82761cd3f7b94ad00320a01541c38024256b8269",
+    "evidence_ref": "avity-crew-workpack/validation/L01/review-2.md"
+  },
+  "checks": [
+    {
+      "name": "Clean candidate lockfile installation",
+      "command": "npm ci",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L01/review-2.md",
+      "revision": "git:82761cd3f7b94ad00320a01541c38024256b8269"
+    },
+    {
+      "name": "Independent strict types, formatting, build and eleven tests",
+      "command": "npm run check",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L01/review-2.md",
+      "revision": "git:82761cd3f7b94ad00320a01541c38024256b8269"
+    },
+    {
+      "name": "Initial help smoke on corrected candidate",
+      "command": "node bin/avity-crew.mjs --help",
+      "kind": "integration",
+      "exit_code": 0,
+      "evidence_ref": "avity-crew-workpack/validation/L01/review-2.md",
+      "revision": "git:82761cd3f7b94ad00320a01541c38024256b8269"
+    }
+  ]
+}

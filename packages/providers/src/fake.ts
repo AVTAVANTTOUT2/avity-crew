@@ -74,7 +74,11 @@ export class FakeProvider implements ProviderAdapter {
             if (event.type === 'text') text += event.text ?? '';
             if (event.type === 'session')
               nativeSessionId = event.native_session_id ?? null;
-            if (event.type === 'error') error = event.error ?? null;
+            if (event.type === 'error')
+              error = event.error ?? {
+                kind: 'protocol',
+                message: 'Simulated provider error without details',
+              };
             if (event.type === 'result') success = event.success === true;
             yield { ...event, provenance: 'simulated' as const };
           }

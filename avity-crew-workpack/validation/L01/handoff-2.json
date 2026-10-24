@@ -1,0 +1,10 @@
+{
+  "summary": "Socle corrigé après revues indépendantes : validation typée et stricte, identité active des tentatives, simulation sans faux succès ni fausse queue, gardes de clôture et provenance, schémas et fixtures autonomes.",
+  "revision": "git:82761cd3f7b94ad00320a01541c38024256b8269",
+  "artifacts": [{"commit": "82761cd3f7b94ad00320a01541c38024256b8269"}],
+  "tests": [
+    {"name": "Contrôles complets Node 26", "command": "npm run check", "kind": "unit", "exit_code": 0, "evidence_ref": "avity-crew-workpack/validation/L01/checks-2.md", "revision": "git:82761cd3f7b94ad00320a01541c38024256b8269"},
+    {"name": "11 régressions et contrats Node 24", "command": "npm exec --yes --package=node@24.22.1 -- node --test 'dist/tests/**/*.test.js'", "kind": "integration", "exit_code": 0, "evidence_ref": "avity-crew-workpack/validation/L01/checks-2.md", "revision": "git:82761cd3f7b94ad00320a01541c38024256b8269"}
+  ],
+  "limitations": [], "next_steps": [], "live_verification": "not_applicable"
+}

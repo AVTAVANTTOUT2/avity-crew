@@ -332,3 +332,21 @@ test('an interrupted simulated process cannot report success', async () => {
   assert.equal(result.signal, 'SIGINT');
   assert.equal(result.provenance, 'simulated');
 });
+
+test('a simulated error without provider details still prevents success', async () => {
+  const handle = new FakeProvider([
+    { type: 'error', provenance: 'simulated' },
+    { type: 'result', success: true, provenance: 'simulated' },
+  ]).start({
+    cwd: process.cwd(),
+    prompt: 'test',
+    model: null,
+    role: 'developer',
+    permissions: { sandbox: 'read-only', approval: 'never' },
+  });
+  for await (const event of handle.events)
+    assert.equal(event.provenance, 'simulated');
+  const result = await handle.result;
+  assert.equal(result.success, false);
+  assert.equal(result.error?.kind, 'protocol');
+});
