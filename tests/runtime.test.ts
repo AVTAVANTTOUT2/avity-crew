@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import type { TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { request as httpRequest } from 'node:http';
 import {
   mkdtempSync,
   mkdirSync,
@@ -57,6 +59,60 @@ const hasCode = (expected: string) => (error: unknown) =>
   error instanceof CrewError && error.code === expected;
 const digest = (value: string | Buffer) =>
   createHash('sha256').update(value).digest('hex');
+const git = (cwd: string, ...args: string[]) =>
+  execFileSync('git', ['-C', cwd, ...args], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).replace(/\r?\n$/, '');
+
+function barrier(count: number) {
+  let entered = 0;
+  let release!: () => void;
+  const ready = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return {
+    ready,
+    enter: () => {
+      if (++entered === count) release();
+      return ready;
+    },
+  };
+}
+
+/** Lose an actual HTTP reply after the committed action has produced its headers. */
+async function discardReply(
+  request: ProviderRequest,
+  call: ToolCall,
+): Promise<void> {
+  const env = request.bridge!.env;
+  const endpoint = JSON.parse(
+    readFileSync(env.AVITY_CREW_ENDPOINT_FILE!, 'utf8'),
+  ) as { url: string };
+  const body = JSON.stringify(call);
+  await new Promise<void>((resolve, reject) => {
+    let responseSeen = false;
+    const outgoing = httpRequest(new URL('call', endpoint.url), {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${env.AVITY_CREW_CAPABILITY!}`,
+        'content-type': 'application/json',
+        'content-length': Buffer.byteLength(body),
+      },
+    });
+    outgoing.once('response', (response) => {
+      responseSeen = true;
+      assert.equal(response.statusCode, 200);
+      response.destroy();
+      outgoing.destroy();
+      resolve();
+    });
+    outgoing.once('error', (error) => {
+      if (!responseSeen) reject(error);
+    });
+    outgoing.end(body);
+  });
+}
 
 /** Scripted decisions only: HTTP, filesystem, SQLite, scheduler and verification stay real. */
 class ScriptedProvider implements ProviderAdapter {
@@ -205,24 +261,65 @@ function agent(request: ProviderRequest) {
     method: ToolCall['method'],
     args: unknown,
   ): Promise<Reply<T>> => {
-    const current = await status();
-    return client.execute(
-      envelope(method, args, current.run_version),
-    ) as Promise<Reply<T>>;
+    const action = await prepare(method, args);
+    for (let retry = 0; ; retry++) {
+      try {
+        return (await client.execute(action)) as Reply<T>;
+      } catch (error) {
+        if (
+          !(error instanceof CrewError) ||
+          error.code !== 'VERSION_CONFLICT' ||
+          retry >= 7
+        )
+          throw error;
+        action.expected_version = (await status()).run_version;
+      }
+    }
   };
-  return { client, runId, status, call };
+  const prepare = async (method: ToolCall['method'], args: unknown) =>
+    envelope(method, args, (await status()).run_version);
+  return { client, runId, status, call, prepare };
 }
 
 async function fixture(
   t: TestContext,
   provider: ScriptedProvider,
   maximum = 1,
+  mode: Run['delivery_mode'] = 'documentation',
 ) {
   const directory = mkdtempSync(join(tmpdir(), 'crew runtime simulated '));
   const root = join(directory, 'project with spaces');
   mkdirSync(root);
+  if (mode === 'code') {
+    git(root, 'init', '--initial-branch=main');
+    writeFileSync(join(root, 'baseline.txt'), 'User baseline preserved\n');
+    git(root, 'add', '--all');
+    git(
+      root,
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@localhost',
+      'commit',
+      '-m',
+      'test baseline',
+    );
+  }
   const project = identifyProject(root, join(directory, 'private data'));
   project.config.max_active_agents = maximum;
+  if (mode === 'code')
+    project.config.verification_commands = [
+      {
+        id: 'check:combined-files',
+        argv: [
+          process.execPath,
+          '-e',
+          "const a=require('node:assert/strict'),f=require('node:fs');a.equal(f.readFileSync('features/a.txt','utf8'),'feature a');a.equal(f.readFileSync('features/b.txt','utf8'),'feature b');console.log('Both actual files pass on the combined candidate')",
+        ],
+        cwd: '.',
+        timeout_seconds: 10,
+      },
+    ];
   const store = new Store(project);
   const runtime = new SupervisorRuntime(
     store,
@@ -258,7 +355,7 @@ async function fixture(
         chief_provider: 'fake',
         chief_model: null,
         max_active_agents: maximum,
-        delivery_mode: 'documentation',
+        delivery_mode: mode,
       },
     }) as Promise<Run>;
   const completed = async (runId: string) => {
@@ -628,5 +725,598 @@ test(
       ),
     );
     assert.equal(f.store.records(run.id, 'final').length, 1);
+  },
+);
+
+test(
+  'lost HTTP response can be replayed with the same action key and a native success cannot finish an unproved task',
+  { timeout: 15_000 },
+  async (t) => {
+    let observed!: () => void;
+    const observedReply = new Promise<void>((resolve) => {
+      observed = resolve;
+    });
+    const provider = new ScriptedProvider(async ({ request }) => {
+      const api = agent(request),
+        current = (await api.status()).result;
+      assert.equal(request.role, 'chief');
+      const spec = task(current.run, 'task:replay', 'documenter');
+      const action = await api.prepare('create_task', { task: spec });
+      await discardReply(request, action);
+      const reconnect = new SupervisorClient({
+        endpointFile: request.bridge!.env.AVITY_CREW_ENDPOINT_FILE!,
+        capability: request.bridge!.env.AVITY_CREW_CAPABILITY!,
+      });
+      const first = (await reconnect.execute(action)) as Reply<TaskState>;
+      const replay = (await reconnect.execute(action)) as Reply<TaskState>;
+      assert.deepEqual(replay, first);
+      const status = (await api.status()).result;
+      assert.equal(status.tasks.length, 1);
+      assert.equal(status.tasks[0]!.id, spec.id);
+      assert.equal(status.tasks[0]!.status, 'ready');
+      assert.equal(status.run.status, 'running');
+      observed();
+    });
+    const f = await fixture(t, provider);
+    const run = await f.create();
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(
+        () =>
+          reject(
+            provider.failures[0] ??
+              new Error('Lost-response replay did not finish'),
+          ),
+        5_000,
+      );
+      observedReply.then(
+        () => {
+          clearTimeout(timeout);
+          resolve();
+        },
+        (error: unknown) => {
+          clearTimeout(timeout);
+          reject(error);
+        },
+      );
+    });
+    await f.runtime.scheduler.idle();
+    assert.deepEqual(provider.failures, []);
+    assert.equal(f.store.tasks(run.id).length, 1);
+    assert.equal(f.store.records(run.id, 'final').length, 0);
+    assert.equal(f.store.getRun(run.id).status, 'running');
+    assert.equal(provider.turns.length, 1);
+  },
+);
+
+test(
+  'two simulated writers overlap in real isolated Git workspaces and only their reviewed checked combination is promoted',
+  { timeout: 25_000 },
+  async (t) => {
+    const writers = barrier(2);
+    const workspaces: string[] = [];
+    const resources: { port: string; database: string }[] = [];
+    let candidateRevision: string | undefined;
+    let baseRevision: string | undefined;
+    let acceptedAfterReview = false;
+    const targetRef = 'refs/heads/crew-runtime-delivery';
+    const provider = new ScriptedProvider(async ({ request }) => {
+      const api = agent(request),
+        current = (await api.status()).result;
+      if (request.role === 'chief') {
+        if (!current.tasks.length) {
+          const project = (
+            await api.call<{ git: { revision: string } }>('inspect_project', {
+              focus: ['**'],
+              requested_source_ids: [],
+            })
+          ).result;
+          baseRevision = project.git.revision;
+          assert.match(baseRevision, /^git:/);
+          for (const suffix of ['a', 'b']) {
+            const spec: TaskSpec = {
+              ...task(current.run, `task:code-${suffix}`, 'documenter'),
+              role: 'developer',
+              objective: `Write features/${suffix}.txt with feature ${suffix}`,
+              scope: {
+                read_paths: ['**'],
+                write_paths: [`features/${suffix}.txt`],
+                excluded_paths: [],
+              },
+              base_revision: baseRevision,
+              expected_deliverables: [`features/${suffix}.txt`],
+            };
+            await api.call('create_task', { task: spec });
+          }
+          for (const suffix of ['a', 'b'])
+            await api.call('delegate_task', {
+              task_id: `task:code-${suffix}`,
+              provider: 'fake',
+              model: null,
+            });
+          await writers.ready;
+          return;
+        }
+        const targets = current.tasks.filter(
+          (item) => item.spec.role === 'developer',
+        );
+        if (
+          targets.some(
+            (item) => !['in_review', 'accepted'].includes(item.status),
+          )
+        )
+          return;
+        const deliveries = await Promise.all(
+          targets.map(
+            async (item) =>
+              (
+                await api.call<Collected>('collect_delivery', {
+                  task_id: item.id,
+                  handoff_id: null,
+                })
+              ).result,
+          ),
+        );
+        if (!current.tasks.some((item) => item.spec.role === 'reviewer')) {
+          const candidate = (
+            await api.call<{
+              status: string;
+              candidateRevision: string;
+              proofs: { exitCode: number; candidateRevision: string }[];
+            }>('propose_integration', {
+              handoff_ids: deliveries.map((item) => item.handoff.id),
+              target_ref: targetRef,
+              expected_target_revision: baseRevision,
+              required_check_ids: ['check:combined-files'],
+            })
+          ).result;
+          assert.equal(candidate.status, 'validated');
+          candidateRevision = candidate.candidateRevision;
+          assert.ok(
+            candidate.proofs.every(
+              (proof) =>
+                proof.exitCode === 0 &&
+                proof.candidateRevision === candidateRevision,
+            ),
+          );
+          for (const suffix of ['a', 'b']) {
+            const spec: TaskSpec = {
+              ...task(current.run, `task:review-${suffix}`, 'reviewer'),
+              objective: `Review task:code-${suffix} source and exact combined candidate`,
+              scope: {
+                read_paths: ['**'],
+                write_paths: [],
+                excluded_paths: [],
+              },
+              base_revision: candidateRevision,
+            };
+            await api.call('create_task', { task: spec });
+            await api.call('delegate_task', {
+              task_id: spec.id,
+              provider: 'fake',
+              model: null,
+            });
+          }
+          return;
+        }
+        if (
+          deliveries.some(
+            (delivery) =>
+              !delivery.reviews.some(
+                (review) =>
+                  review.outcome === 'approved' &&
+                  review.verification_scope === 'combined_code' &&
+                  review.tested_revision === candidateRevision,
+              ),
+          )
+        )
+          return;
+        for (const delivery of deliveries) {
+          const review = delivery.reviews.find(
+            (item) => item.outcome === 'approved',
+          )!;
+          const result = (
+            await api.call<TaskState>('accept_delivery', {
+              handoff_id: delivery.handoff.id,
+              review_ids: [review.id],
+              verification_ids: delivery.verifications.map((proof) => proof.id),
+              accepted_revision: candidateRevision,
+            })
+          ).result;
+          assert.equal(result.status, 'accepted');
+          assert.equal(result.accepted_revision, candidateRevision);
+        }
+        acceptedAfterReview = true;
+        const proof = deliveries[0]!.verifications[0]!;
+        try {
+          const final = (
+            await api.call<Run>('finish_run', {
+              summary:
+                'Two real isolated changes reviewed and tested together; providers simulated',
+              criterion_evidence: proof.criterion_ids.map((id) => ({
+                criterion_id: id,
+                evidence_artifact_ids: proof.evidence_artifact_ids,
+              })),
+              delivered_artifact_ids: deliveries.flatMap((delivery) =>
+                delivery.handoff.artifacts.map((artifact) => artifact.id),
+              ),
+            })
+          ).result;
+          assert.equal(final.status, 'completed');
+        } catch (error) {
+          if (!(error instanceof CrewError) || error.code !== 'RUN_BUSY')
+            throw error;
+          // A review tool may return before its provider turn has actually stopped.
+          // That terminal observation wakes the next chief turn; acceptance is never inferred.
+        }
+        return;
+      }
+      const own = current.tasks[0]!;
+      if (request.role === 'developer') {
+        workspaces.push(request.cwd);
+        resources.push({
+          port: request.bridge!.env.PORT!,
+          database: request.bridge!.env.AVITY_CREW_DATABASE_PATH!,
+        });
+        await writers.enter();
+        const suffix = own.id.endsWith('-a') ? 'a' : 'b';
+        mkdirSync(join(request.cwd, 'features'), { recursive: true });
+        writeFileSync(
+          join(request.cwd, `features/${suffix}.txt`),
+          `feature ${suffix}`,
+        );
+        const handoff: Handoff = {
+          schema_version: 1,
+          id: `handoff:code-${suffix}`,
+          task_id: own.id,
+          run_id: api.runId,
+          attempt_id: own.active_attempt_id!,
+          generation: own.generation,
+          status: 'delivered',
+          summary: `Actual isolated feature ${suffix}`,
+          source_revision: null,
+          artifacts: [],
+          verifications: [],
+          criteria_claimed: own.spec.acceptance_criteria.map((item) => item.id),
+          limitations: [],
+          next_information: [],
+          created_at: now(),
+        };
+        const captured = (
+          await api.call<Handoff>('submit_handoff', { handoff })
+        ).result;
+        assert.match(captured.source_revision!, /^git:/);
+        assert.ok(
+          captured.artifacts.some((artifact) => artifact.kind === 'git_commit'),
+        );
+      } else if (request.role === 'reviewer') {
+        assert.equal(request.permissions.sandbox, 'read-only');
+        assert.equal(
+          `git:${git(request.cwd, 'rev-parse', 'HEAD')}`,
+          candidateRevision,
+        );
+        assert.equal(
+          readFileSync(join(request.cwd, 'features/a.txt'), 'utf8'),
+          'feature a',
+        );
+        assert.equal(
+          readFileSync(join(request.cwd, 'features/b.txt'), 'utf8'),
+          'feature b',
+        );
+        const suffix = own.id.endsWith('-a') ? 'a' : 'b';
+        const delivery = (
+          await api.call<Collected>('collect_delivery', {
+            task_id: `task:code-${suffix}`,
+            handoff_id: null,
+          })
+        ).result;
+        assert.ok(
+          delivery.verifications.every(
+            (proof) =>
+              proof.tested_revision === candidateRevision &&
+              proof.result === 'passed' &&
+              proof.exit_code === 0,
+          ),
+        );
+        const review: Review = {
+          schema_version: 1,
+          id: `review:code-${suffix}`,
+          run_id: api.runId,
+          review_task_id: own.id,
+          review_of_task_id: delivery.handoff.task_id,
+          handoff_id: delivery.handoff.id,
+          outcome: 'approved',
+          verification_scope: 'combined_code',
+          source_revision: delivery.handoff.source_revision!,
+          tested_revision: candidateRevision!,
+          summary:
+            'Read actual source and both files in exact combined candidate',
+          findings: [],
+          verification_ids: delivery.verifications.map((proof) => proof.id),
+          created_at: now(),
+        };
+        await api.call('submit_review', { review });
+      } else assert.fail(`Unexpected role ${request.role}`);
+    });
+    const f = await fixture(t, provider, 3, 'code');
+    const initial = git(f.root, 'rev-parse', 'HEAD');
+    writeFileSync(
+      join(f.root, 'user-note.txt'),
+      'User work must stay in the principal folder',
+    );
+    const run = await f.create();
+    await f.completed(run.id);
+    assert.deepEqual(provider.failures, []);
+    assert.equal(workspaces.length, 2);
+    assert.equal(new Set(workspaces).size, 2);
+    assert.equal(new Set(resources.map((item) => item.port)).size, 2);
+    assert.equal(new Set(resources.map((item) => item.database)).size, 2);
+    assert.equal(provider.peak, 3);
+    assert.ok(acceptedAfterReview);
+    assert.equal(
+      git(f.root, 'rev-parse', targetRef),
+      candidateRevision!.slice(4),
+    );
+    assert.equal(git(f.root, 'rev-parse', 'HEAD'), initial);
+    assert.equal(
+      readFileSync(join(f.root, 'user-note.txt'), 'utf8'),
+      'User work must stay in the principal folder',
+    );
+    assert.equal(
+      git(f.root, 'show', `${targetRef}:features/a.txt`),
+      'feature a',
+    );
+    assert.equal(
+      git(f.root, 'show', `${targetRef}:features/b.txt`),
+      'feature b',
+    );
+    assert.ok(
+      f.store.tasks(run.id).every((item) => item.status === 'accepted'),
+    );
+    assert.equal(f.store.tasks(run.id).length, 4);
+  },
+);
+
+test(
+  'changes_requested produces a recorded correction strategy, a new attempt and new observed evidence before acceptance',
+  { timeout: 20_000 },
+  async (t) => {
+    let chiefTurns = 0,
+      writes = 0,
+      inspections = 0;
+    const sequence: string[] = [];
+    const capturedRevisions: string[] = [];
+    const capturedAttempts: string[] = [];
+    const contents = [
+      '# Draft\n\nMissing the required conclusion.\n',
+      '# Corrected result\n\nThe required conclusion is now present.\n',
+    ];
+    const provider = new ScriptedProvider(async ({ request }) => {
+      const api = agent(request),
+        current = (await api.status()).result;
+      if (request.role === 'chief') {
+        sequence.push(`chief:${++chiefTurns}`);
+        if (chiefTurns === 1) {
+          const spec = task(current.run, 'task:correctable', 'documenter');
+          await api.call('create_task', { task: spec });
+          await api.call('delegate_task', {
+            task_id: spec.id,
+            provider: 'fake',
+            model: null,
+          });
+        } else if (chiefTurns === 2 || chiefTurns === 4) {
+          const spec = {
+            ...task(current.run, `task:inspection-${chiefTurns}`, 'reviewer'),
+            objective:
+              'Review task:correctable; require the stated conclusion in the exact captured document',
+          };
+          await api.call('create_task', { task: spec });
+          await api.call('delegate_task', {
+            task_id: spec.id,
+            provider: 'fake',
+            model: null,
+          });
+        } else if (chiefTurns === 3) {
+          const delivery = (
+            await api.call<Collected>('collect_delivery', {
+              task_id: 'task:correctable',
+              handoff_id: null,
+            })
+          ).result;
+          assert.equal(delivery.reviews[0]!.outcome, 'changes_requested');
+          assert.equal(
+            current.tasks.find((item) => item.id === 'task:correctable')!
+              .status,
+            'changes_requested',
+          );
+          await assert.rejects(
+            api.call('accept_delivery', {
+              handoff_id: delivery.handoff.id,
+              review_ids: delivery.reviews.map((review) => review.id),
+              verification_ids: delivery.verifications.map((proof) => proof.id),
+              accepted_revision: delivery.handoff.source_revision,
+            }),
+            hasCode('INVALID_TRANSITION'),
+          );
+          await api.call('record_decision', {
+            decision_id: 'decision:targeted-correction',
+            question: 'How to address the independent review?',
+            answer:
+              'Keep the required conclusion criterion and correct the document in a new attempt',
+            requested_status: 'approved',
+            basis: 'technical_judgment',
+            user_response_id: null,
+            source_ids: [],
+            affects_task_ids: ['task:correctable'],
+            supersedes: null,
+          });
+          assert.equal(
+            (
+              await api.call<Delegation>('delegate_task', {
+                task_id: 'task:correctable',
+                provider: 'fake',
+                model: null,
+              })
+            ).result.status,
+            'queued',
+          );
+        } else if (chiefTurns === 5) {
+          const delivery = (
+            await api.call<Collected>('collect_delivery', {
+              task_id: 'task:correctable',
+              handoff_id: null,
+            })
+          ).result;
+          assert.equal(delivery.reviews.length, 1);
+          assert.equal(delivery.reviews[0]!.outcome, 'approved');
+          assert.ok(
+            delivery.verifications.every(
+              (proof) =>
+                proof.tested_revision === delivery.handoff.source_revision,
+            ),
+          );
+          await api.call('accept_delivery', {
+            handoff_id: delivery.handoff.id,
+            review_ids: [delivery.reviews[0]!.id],
+            verification_ids: delivery.verifications.map((proof) => proof.id),
+            accepted_revision: delivery.handoff.source_revision,
+          });
+          const proof = delivery.verifications[0]!;
+          await api.call('finish_run', {
+            summary:
+              'Independent refusal addressed by a new delivery and fresh checks',
+            criterion_evidence: proof.criterion_ids.map((id) => ({
+              criterion_id: id,
+              evidence_artifact_ids: proof.evidence_artifact_ids,
+            })),
+            delivered_artifact_ids: delivery.handoff.artifacts.map(
+              (artifact) => artifact.id,
+            ),
+          });
+        } else assert.fail('Unexpected continuation in correction scenario');
+        return;
+      }
+      const own = current.tasks[0]!;
+      if (request.role === 'documenter') {
+        sequence.push(`write:${++writes}`);
+        const content = contents[writes - 1]!;
+        assert.ok(content);
+        mkdirSync(join(request.cwd, 'docs'), { recursive: true });
+        writeFileSync(join(request.cwd, 'docs/livrable.md'), content);
+        const declaration: Handoff = {
+          schema_version: 1,
+          id: `handoff:correction-${writes}`,
+          task_id: own.id,
+          run_id: api.runId,
+          attempt_id: own.active_attempt_id!,
+          generation: own.generation,
+          status: 'delivered',
+          summary:
+            writes === 1
+              ? 'Initial draft for independent inspection'
+              : 'Targeted correction retains the original criterion',
+          source_revision: null,
+          artifacts: [
+            {
+              id: `artifact:declared-${writes}`,
+              kind: 'file',
+              reference: 'docs/livrable.md',
+              revision: `sha256:${'0'.repeat(64)}`,
+              producer_attempt_id: own.active_attempt_id!,
+              created_at: now(),
+            },
+          ],
+          verifications: [],
+          criteria_claimed: own.spec.acceptance_criteria.map(
+            (criterion) => criterion.id,
+          ),
+          limitations: [],
+          next_information: [],
+          created_at: now(),
+        };
+        const captured = (
+          await api.call<Handoff>('submit_handoff', { handoff: declaration })
+        ).result;
+        capturedRevisions.push(captured.source_revision!);
+        capturedAttempts.push(captured.attempt_id);
+      } else if (request.role === 'reviewer') {
+        sequence.push(`inspect:${++inspections}`);
+        const delivery = (
+          await api.call<Collected>('collect_delivery', {
+            task_id: 'task:correctable',
+            handoff_id: null,
+          })
+        ).result;
+        const content = delivery.evidence.find(
+          (artifact) => artifact.kind === 'file',
+        )!.content_excerpt;
+        assert.equal(content, contents[inspections - 1]);
+        const negative = inspections === 1;
+        const review: Review = {
+          schema_version: 1,
+          id: `review:correction-${inspections}`,
+          run_id: api.runId,
+          review_task_id: own.id,
+          review_of_task_id: delivery.handoff.task_id,
+          handoff_id: delivery.handoff.id,
+          outcome: negative ? 'changes_requested' : 'approved',
+          verification_scope: negative ? 'source' : 'documentation',
+          source_revision: delivery.handoff.source_revision!,
+          tested_revision: negative ? null : delivery.handoff.source_revision,
+          summary: negative
+            ? 'Required conclusion is missing; request a targeted correction'
+            : 'Required conclusion present in the new exact snapshot',
+          findings: negative
+            ? [
+                {
+                  severity: 'blocking',
+                  description: 'Required conclusion is absent',
+                  reference: 'docs/livrable.md',
+                },
+              ]
+            : [],
+          verification_ids: negative
+            ? []
+            : delivery.verifications.map((proof) => proof.id),
+          created_at: now(),
+        };
+        await api.call('submit_review', { review });
+      } else assert.fail(`Unexpected role ${request.role}`);
+    });
+    const f = await fixture(t, provider);
+    const run = await f.create();
+    await f.completed(run.id);
+    assert.deepEqual(provider.failures, []);
+    assert.deepEqual(sequence, [
+      'chief:1',
+      'write:1',
+      'chief:2',
+      'inspect:1',
+      'chief:3',
+      'write:2',
+      'chief:4',
+      'inspect:2',
+      'chief:5',
+    ]);
+    assert.equal(new Set(capturedAttempts).size, 2);
+    assert.equal(new Set(capturedRevisions).size, 2);
+    assert.equal(provider.peak, 1);
+    assert.equal(f.store.records(run.id, 'decision').length, 1);
+    const handoffs = f.store.records<Handoff>(run.id, 'handoff');
+    const oldFile = handoffs[0]!.artifacts.find(
+      (artifact) => artifact.kind === 'file',
+    )!;
+    assert.equal(f.store.readArtifact(oldFile).toString('utf8'), contents[0]);
+    assert.equal(
+      f.store.getTask('task:correctable').accepted_revision,
+      handoffs[1]!.source_revision,
+    );
+    assert.equal(f.store.records(run.id, 'acceptance').length, 1);
+    assert.ok(
+      f.store.tasks(run.id).every((item) => item.status === 'accepted'),
+    );
+    assert.equal(
+      readFileSync(join(f.root, 'docs/livrable.md'), 'utf8'),
+      contents[1],
+    );
   },
 );
