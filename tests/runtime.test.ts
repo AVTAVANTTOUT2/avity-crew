@@ -52,6 +52,7 @@ import {
 import { observeProcess } from '../packages/supervisor/src/reconciliation.ts';
 import type { ProcessIdentity } from '../packages/supervisor/src/reconciliation.ts';
 import type { IntegrationCandidate } from '../packages/workspace/src/index.ts';
+import { WorkspaceManager } from '../packages/workspace/src/index.ts';
 
 type Reply<T> = { result: T; run_version: number };
 type Status = {
@@ -2658,5 +2659,342 @@ test(
       f.store.records<Decision>(run.id, 'decision')[0]!.id,
       'decision:correct-combined-capacity',
     );
+  },
+);
+
+test(
+  'a failed recovery collection consumes one delegation, records one blocked preparation attempt and only retries after an explicit new delegation',
+  { timeout: 20_000 },
+  async (t) => {
+    const recoveryTask = 'task:recovery-preparation',
+      independentTask = 'task:independent-preparation';
+    const failureMessage =
+      'Controlled recovery snapshot requires reconciliation';
+    const developerStarts: string[] = [];
+    let failingRecovery = true;
+    let recoveryCollections = 0;
+    const provider = new ScriptedProvider(async ({ request }) => {
+      if (request.role === 'chief') return;
+      const api = agent(request),
+        status = (await api.status()).result,
+        own = status.tasks[0]!;
+      developerStarts.push(own.id);
+      mkdirSync(join(request.cwd, 'features'), { recursive: true });
+      if (own.id === recoveryTask) {
+        assert.equal(
+          failingRecovery,
+          false,
+          'No provider may start during failed preparation',
+        );
+        assert.equal(
+          readFileSync(join(request.cwd, 'features/recovered.txt'), 'utf8'),
+          'Preserved first-attempt work\n',
+        );
+        writeFileSync(
+          join(request.cwd, 'features/recovered.txt'),
+          'Recovered after explicit retry\n',
+        );
+      } else {
+        assert.equal(own.id, independentTask);
+        writeFileSync(
+          join(request.cwd, 'features/independent.txt'),
+          'Independent mission completed\n',
+        );
+      }
+      const handoff: Handoff = {
+        schema_version: 1,
+        id: `handoff:${own.id}:${own.generation}`,
+        task_id: own.id,
+        run_id: api.runId,
+        attempt_id: own.active_attempt_id!,
+        generation: own.generation,
+        status: 'delivered',
+        summary: 'Actual work captured without inferred task acceptance',
+        source_revision: null,
+        artifacts: [],
+        verifications: [],
+        criteria_claimed: own.spec.acceptance_criteria.map(
+          (criterion) => criterion.id,
+        ),
+        limitations: [],
+        next_information: [],
+        created_at: now(),
+      };
+      await api.call('submit_handoff', { handoff });
+    });
+    const f = await fixture(t, provider, 3, 'code');
+    const run = await f.create(),
+      user = serviceActor(f.store, run.id);
+    const version = () => f.store.getRun(run.id).version;
+    const base = `git:${git(f.root, 'rev-parse', 'HEAD')}`;
+    const recovered: TaskSpec = {
+      ...task(run, recoveryTask, 'documenter'),
+      role: 'developer',
+      objective: 'Recover the previous partial work and finish its file',
+      scope: {
+        read_paths: ['**'],
+        write_paths: ['features/recovered.txt'],
+        excluded_paths: [],
+      },
+      base_revision: base,
+      expected_deliverables: ['features/recovered.txt'],
+    };
+    const independent: TaskSpec = {
+      ...recovered,
+      id: independentTask,
+      title: independentTask,
+      objective: 'Produce independent work without waiting for recovery',
+      scope: { ...recovered.scope, write_paths: ['features/independent.txt'] },
+      expected_deliverables: ['features/independent.txt'],
+    };
+    f.store.createTask(
+      user,
+      recovered,
+      'fixture:create-recovery-task',
+      version(),
+    );
+    f.store.createTask(
+      user,
+      independent,
+      'fixture:create-independent-task',
+      version(),
+    );
+    const session: AgentSession = {
+      id: 'session:prior-recovery',
+      run_id: run.id,
+      task_id: recoveryTask,
+      provider: 'fake',
+      model: null,
+      native_session_id: 'simulated:prior-recovery-session',
+      cli_version: null,
+      cwd: f.root,
+      capabilities: null,
+    };
+    const oldAttempt = f.store.claimTask(
+      user,
+      recoveryTask,
+      session,
+      'fixture:claim-prior-recovery',
+      version(),
+    );
+    f.store.observeAttempt(
+      user,
+      oldAttempt.id,
+      { status: 'running', pid: null, exit_code: null },
+      'fixture:prior-recovery-running',
+      version(),
+    );
+    const manager = new WorkspaceManager(f.store, user);
+    const oldWorkspace = await manager.createWorkspace(
+      {
+        taskId: recoveryTask,
+        attemptId: oldAttempt.id,
+        baseRevision: base,
+        mode: 'code',
+      },
+      'fixture:prior-workspace',
+    );
+    mkdirSync(join(oldWorkspace.path, 'features'));
+    writeFileSync(
+      join(oldWorkspace.path, 'features/recovered.txt'),
+      'Preserved first-attempt work\n',
+    );
+    const partial = await manager.collectDelivery(
+      oldWorkspace.operationId,
+      { writePaths: recovered.scope.write_paths },
+      'fixture:partial-snapshot',
+    );
+    assert.ok(partial.preservationRef);
+    const oldActor: Actor = {
+      ...user,
+      id: session.id,
+      role: 'developer',
+      task_id: recoveryTask,
+      attempt_id: oldAttempt.id,
+      generation: oldAttempt.generation,
+    };
+    f.store.submitHandoff(
+      oldActor,
+      {
+        schema_version: 1,
+        id: 'handoff:prior-partial',
+        task_id: recoveryTask,
+        run_id: run.id,
+        attempt_id: oldAttempt.id,
+        generation: oldAttempt.generation,
+        status: 'partial',
+        summary: 'Preserved partial work needs a new preparation attempt',
+        source_revision: partial.sourceRevision,
+        artifacts: [
+          {
+            id: 'artifact:prior-partial',
+            kind: 'git_commit',
+            reference: partial.preservationRef,
+            revision: partial.sourceRevision,
+            producer_attempt_id: oldAttempt.id,
+            created_at: now(),
+          },
+        ],
+        verifications: [],
+        criteria_claimed: [],
+        limitations: ['A new attempt is required'],
+        next_information: [],
+        created_at: now(),
+      },
+      'fixture:submit-prior-partial',
+      version(),
+    );
+    f.store.observeAttempt(
+      user,
+      oldAttempt.id,
+      { status: 'exited', pid: null, exit_code: 0 },
+      'fixture:prior-recovery-exited',
+      version(),
+    );
+    const originalCollect = WorkspaceManager.prototype.collectDelivery;
+    WorkspaceManager.prototype.collectDelivery = async function (
+      this: WorkspaceManager,
+      ...args: Parameters<WorkspaceManager['collectDelivery']>
+    ) {
+      if (args[0] === oldWorkspace.operationId) {
+        recoveryCollections++;
+        if (failingRecovery)
+          throw new CrewError('RECONCILIATION_REQUIRED', failureMessage);
+      }
+      return originalCollect.call(this, ...args);
+    };
+    const wait = async (condition: () => boolean, message: string) => {
+      const deadline = Date.now() + 5_000;
+      while (Date.now() < deadline) {
+        if (provider.failures.length) throw provider.failures[0];
+        if (condition()) return;
+        await delay(5);
+      }
+      assert.fail(message);
+    };
+    try {
+      const queued = f.store.delegateTask(
+        user,
+        { task_id: recoveryTask, provider: 'fake', model: null },
+        'fixture:delegate-failing-recovery',
+        version(),
+      );
+      f.store.delegateTask(
+        user,
+        { task_id: independentTask, provider: 'fake', model: null },
+        'fixture:delegate-independent',
+        version(),
+      );
+      f.runtime.wake(run.id, false);
+      await wait(
+        () =>
+          f.store
+            .events(run.id, 0, 1000)
+            .some((event) => event.type === 'turn.launch_failed'),
+        'The controlled preparation failure was not observed',
+      );
+      const claimed = f.store.getRecord<Delegation>(
+        run.id,
+        'delegation',
+        queued.id,
+      );
+      assert.equal(
+        claimed.status,
+        'claimed',
+        'A failed preparation must consume its explicit delegation instead of remaining queued',
+      );
+      assert.ok(claimed.attempt_id);
+      const failedAttempt = f.store.getAttempt(claimed.attempt_id);
+      assert.notEqual(failedAttempt.id, oldAttempt.id);
+      assert.equal(failedAttempt.status, 'exited');
+      assert.equal(failedAttempt.pid, null);
+      assert.equal(failedAttempt.exit_code, null);
+      assert.equal(f.store.getTask(recoveryTask).status, 'blocked');
+      assert.equal(f.store.getTask(recoveryTask).wait_reason, failureMessage);
+      assert.equal(
+        f.store
+          .attempts(run.id)
+          .filter((attempt) => attempt.task_id === recoveryTask).length,
+        2,
+      );
+      await wait(
+        () => f.store.getTask(independentTask).status === 'in_review',
+        'The independent mission must continue after the unrelated recovery failure',
+      );
+      for (let wake = 0; wake < 5; wake++) f.runtime.wake(run.id);
+      await delay(20);
+      await f.runtime.scheduler.idle();
+      assert.equal(
+        recoveryCollections,
+        1,
+        'Ordinary wake notifications must not retry a failed explicit request',
+      );
+      assert.equal(
+        f.store
+          .events(run.id, 0, 1000)
+          .filter((event) => event.type === 'turn.launch_failed').length,
+        1,
+      );
+      assert.equal(
+        f.store
+          .attempts(run.id)
+          .filter((attempt) => attempt.task_id === recoveryTask).length,
+        2,
+      );
+      assert.equal(
+        developerStarts.filter((id) => id === recoveryTask).length,
+        0,
+      );
+      assert.ok(developerStarts.includes(independentTask));
+      failingRecovery = false;
+      const retry = f.store.delegateTask(
+        user,
+        { task_id: recoveryTask, provider: 'fake', model: null },
+        'fixture:explicit-recovery-retry',
+        version(),
+      );
+      assert.notEqual(retry.id, queued.id);
+      f.runtime.wake(run.id, false);
+      await wait(
+        () => f.store.getTask(recoveryTask).status === 'in_review',
+        'A new explicit delegation must be able to recover after the preparation blocker is removed',
+      );
+      await f.runtime.scheduler.idle();
+      const completed = f.store.getRecord<Delegation>(
+        run.id,
+        'delegation',
+        retry.id,
+      );
+      assert.equal(completed.status, 'claimed');
+      assert.notEqual(completed.attempt_id, failedAttempt.id);
+      assert.equal(
+        f.store.getRecord<Delegation>(run.id, 'delegation', queued.id)
+          .attempt_id,
+        failedAttempt.id,
+      );
+      assert.equal(
+        f.store
+          .attempts(run.id)
+          .filter((attempt) => attempt.task_id === recoveryTask).length,
+        3,
+      );
+      assert.equal(
+        developerStarts.filter((id) => id === recoveryTask).length,
+        1,
+      );
+      assert.equal(f.store.getTask(recoveryTask).wait_reason, null);
+      assert.equal(f.store.getRun(run.id).status, 'running');
+      assert.equal(f.store.records(run.id, 'final').length, 0);
+      assert.equal(
+        readFileSync(join(oldWorkspace.path, 'features/recovered.txt'), 'utf8'),
+        'Preserved first-attempt work\n',
+      );
+    } finally {
+      try {
+        await f.runtime.close();
+      } finally {
+        WorkspaceManager.prototype.collectDelivery = originalCollect;
+      }
+    }
   },
 );
