@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import type { TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { request as httpRequest } from 'node:http';
 import {
   mkdtempSync,
@@ -128,7 +128,13 @@ class ScriptedProvider implements ProviderAdapter {
   active = 0;
   peak = 0;
   private sequence = 0;
-  constructor(private readonly script: (turn: Turn) => Promise<void>) {}
+  constructor(
+    private readonly script: (turn: Turn) => Promise<void>,
+    private readonly options: {
+      repeatSession?: boolean;
+      observeRealProcess?: boolean;
+    } = {},
+  ) {}
 
   async probe(): Promise<ProviderCapabilities> {
     const supported = {
@@ -182,6 +188,26 @@ class ScriptedProvider implements ProviderAdapter {
     });
     let stopped = false;
     const provider = this;
+    // A disposable Node process exercises real observed_at metadata; decisions stay simulated.
+    const identityProcess = this.options.observeRealProcess
+      ? spawn(process.execPath, ['-e', 'process.stdin.resume()'], {
+          cwd: turn.request.cwd,
+          stdio: ['pipe', 'ignore', 'ignore'],
+        })
+      : undefined;
+    const identityEnded = identityProcess
+      ? new Promise<void>((resolve, reject) => {
+          identityProcess.once('exit', () => resolve());
+          identityProcess.once('error', reject);
+        })
+      : Promise.resolve();
+    identityProcess?.stdin?.on('error', () => {});
+    const closeIdentity = async (interrupt = false) => {
+      if (interrupt && identityProcess?.exitCode === null)
+        identityProcess.kill('SIGINT');
+      identityProcess?.stdin?.end();
+      await identityEnded;
+    };
     const value = (error: ProviderResult['error'] = null): ProviderResult => ({
       provider: 'fake',
       provenance: 'simulated',
@@ -193,7 +219,7 @@ class ScriptedProvider implements ProviderAdapter {
       error,
     });
     return {
-      pid: null,
+      pid: identityProcess?.pid ?? null,
       events: (async function* (): AsyncGenerator<ProviderEvent> {
         let failure: ProviderResult['error'] = null;
         try {
@@ -202,6 +228,25 @@ class ScriptedProvider implements ProviderAdapter {
             native_session_id: turn.nativeId,
             provenance: 'simulated',
           };
+          if (provider.options.repeatSession) {
+            await delay(5);
+            yield {
+              type: 'session',
+              native_session_id: turn.nativeId,
+              provenance: 'simulated',
+            };
+            yield {
+              type: 'text',
+              text: 'Simulated hook output before tools',
+              provenance: 'simulated',
+            };
+            await delay(5);
+            yield {
+              type: 'text',
+              text: 'Simulated initialization output before tools',
+              provenance: 'simulated',
+            };
+          }
           await provider.script(turn);
           yield { type: 'result', success: !stopped, provenance: 'simulated' };
         } catch (error) {
@@ -212,6 +257,7 @@ class ScriptedProvider implements ProviderAdapter {
           };
           yield { type: 'error', error: failure, provenance: 'simulated' };
         } finally {
+          await closeIdentity();
           provider.active--;
           finish(value(failure));
         }
@@ -225,10 +271,12 @@ class ScriptedProvider implements ProviderAdapter {
       },
       interrupt: async () => {
         stopped = true;
+        await closeIdentity(true);
         finish(value());
       },
       stop: async () => {
         stopped = true;
+        await closeIdentity(true);
         finish(value());
       },
     };
@@ -440,221 +488,232 @@ test(
       '# Livrable\n\nDocument réel produit pour le scénario simulé.\n';
     let chiefTurns = 0;
     const sequence: string[] = [];
-    const provider = new ScriptedProvider(async ({ request }) => {
-      const api = agent(request);
-      const current = (await api.status()).result;
-      const own = current.tasks[0];
-      if (request.role === 'chief') {
-        sequence.push(`chief:${++chiefTurns}`);
-        assert.equal(current.run.status, 'running');
-        if (chiefTurns === 1) {
-          assert.deepEqual(
-            current.tasks,
-            [],
-            'The chief is outside the deliverable DAG',
-          );
-          await assert.rejects(
-            api.call('finish_run', {
-              summary: 'A native success is not evidence',
-              criterion_evidence: [
-                {
-                  criterion_id: current.run.acceptance_criteria[0]!.id,
-                  evidence_artifact_ids: ['artifact:absent'],
-                },
-              ],
-              delivered_artifact_ids: ['artifact:absent'],
-            }),
-            hasCode('INVALID_EVIDENCE'),
-          );
-          const spec = task(current.run, 'task:document', 'documenter');
-          await api.call('create_task', { task: spec });
-          const delegated = (
-            await api.call<Delegation>('delegate_task', {
-              task_id: spec.id,
-              provider: 'fake',
-              model: null,
-            })
-          ).result;
-          assert.equal(delegated.status, 'queued');
-          assert.equal(delegated.attempt_id, null);
-          const after = (await api.status()).result;
-          assert.equal(
-            after.tasks[0]!.active_attempt_id,
-            null,
-            'Delegation returns before a slot or worker is available',
-          );
-        } else if (chiefTurns === 2) {
-          const delivery = (
-            await api.call<Collected>('collect_delivery', {
-              task_id: 'task:document',
-              handoff_id: null,
-            })
-          ).result;
-          assert.equal(
-            current.tasks.find((item) => item.id === 'task:document')!.status,
-            'in_review',
-            'A successful writer exit cannot accept the task',
-          );
-          assert.ok(
-            delivery.verifications.some(
-              (proof) => proof.result === 'passed' && proof.exit_code === 0,
-            ),
-          );
-          const spec = task(current.run, 'task:review', 'reviewer');
-          assert.deepEqual(
-            spec.depends_on,
-            [],
-            'A review must not await acceptance of its own target',
-          );
-          await api.call('create_task', { task: spec });
-          assert.equal(
-            (
+    const provider = new ScriptedProvider(
+      async ({ request }) => {
+        const api = agent(request);
+        const current = (await api.status()).result;
+        const own = current.tasks[0];
+        if (request.role === 'chief') {
+          sequence.push(`chief:${++chiefTurns}`);
+          assert.equal(current.run.status, 'running');
+          if (chiefTurns === 1) {
+            assert.deepEqual(
+              current.tasks,
+              [],
+              'The chief is outside the deliverable DAG',
+            );
+            await assert.rejects(
+              api.call('finish_run', {
+                summary: 'A native success is not evidence',
+                criterion_evidence: [
+                  {
+                    criterion_id: current.run.acceptance_criteria[0]!.id,
+                    evidence_artifact_ids: ['artifact:absent'],
+                  },
+                ],
+                delivered_artifact_ids: ['artifact:absent'],
+              }),
+              hasCode('INVALID_EVIDENCE'),
+            );
+            const spec = task(current.run, 'task:document', 'documenter');
+            await api.call('create_task', { task: spec });
+            const delegated = (
               await api.call<Delegation>('delegate_task', {
                 task_id: spec.id,
                 provider: 'fake',
                 model: null,
               })
-            ).result.status,
-            'queued',
+            ).result;
+            assert.equal(delegated.status, 'queued');
+            assert.equal(delegated.attempt_id, null);
+            const after = (await api.status()).result;
+            assert.equal(
+              after.tasks[0]!.active_attempt_id,
+              null,
+              'Delegation returns before a slot or worker is available',
+            );
+          } else if (chiefTurns === 2) {
+            const delivery = (
+              await api.call<Collected>('collect_delivery', {
+                task_id: 'task:document',
+                handoff_id: null,
+              })
+            ).result;
+            assert.equal(
+              current.tasks.find((item) => item.id === 'task:document')!.status,
+              'in_review',
+              'A successful writer exit cannot accept the task',
+            );
+            assert.ok(
+              delivery.verifications.some(
+                (proof) => proof.result === 'passed' && proof.exit_code === 0,
+              ),
+            );
+            const spec = task(current.run, 'task:review', 'reviewer');
+            assert.deepEqual(
+              spec.depends_on,
+              [],
+              'A review must not await acceptance of its own target',
+            );
+            await api.call('create_task', { task: spec });
+            assert.equal(
+              (
+                await api.call<Delegation>('delegate_task', {
+                  task_id: spec.id,
+                  provider: 'fake',
+                  model: null,
+                })
+              ).result.status,
+              'queued',
+            );
+          } else if (chiefTurns === 3) {
+            const delivery = (
+              await api.call<Collected>('collect_delivery', {
+                task_id: 'task:document',
+                handoff_id: null,
+              })
+            ).result;
+            const review = delivery.reviews[0]!;
+            const accepted = (
+              await api.call<TaskState>('accept_delivery', {
+                handoff_id: delivery.handoff.id,
+                review_ids: [review.id],
+                verification_ids: delivery.verifications.map(
+                  (proof) => proof.id,
+                ),
+                accepted_revision: delivery.handoff.source_revision,
+              })
+            ).result;
+            assert.equal(accepted.status, 'accepted');
+            assert.equal(
+              accepted.accepted_revision,
+              delivery.handoff.source_revision,
+            );
+            const proof = delivery.verifications.find(
+              (item) => item.result === 'passed',
+            )!;
+            const final = (
+              await api.call<Run>('finish_run', {
+                summary:
+                  'Captured document reviewed and verified; provider reasoning was simulated',
+                criterion_evidence: proof.criterion_ids.map((id) => ({
+                  criterion_id: id,
+                  evidence_artifact_ids: proof.evidence_artifact_ids,
+                })),
+                delivered_artifact_ids: delivery.handoff.artifacts.map(
+                  (item) => item.id,
+                ),
+              })
+            ).result;
+            assert.equal(final.status, 'completed');
+          } else assert.fail('Unexpected extra chief turn');
+          return;
+        }
+        assert.ok(own);
+        assert.equal(own.spec.role, request.role);
+        const context = (
+          await api.call<{ context: ContextBundle }>('read_context', {
+            subject_id: own.id,
+            source_ids: [],
+            after_version: 0,
+          })
+        ).result.context;
+        assert.equal(context.subject_kind, 'task');
+        assert.equal(context.subject_id, own.id);
+        assert.equal(context.content_sha256, digest(request.prompt));
+        assert.ok(request.prompt.includes(request.cwd));
+        if (request.role === 'documenter') {
+          sequence.push('documenter');
+          mkdirSync(join(request.cwd, 'docs'), { recursive: true });
+          writeFileSync(join(request.cwd, 'docs/livrable.md'), content);
+          const declared: Handoff = {
+            schema_version: 1,
+            id: 'handoff:document',
+            task_id: own.id,
+            run_id: api.runId,
+            attempt_id: own.active_attempt_id!,
+            generation: own.generation,
+            status: 'delivered',
+            summary: 'A real document file is ready to capture',
+            source_revision: null,
+            artifacts: [
+              {
+                id: 'artifact:model-declared',
+                kind: 'file',
+                reference: 'docs/livrable.md',
+                revision: `sha256:${'0'.repeat(64)}`,
+                producer_attempt_id: own.active_attempt_id!,
+                created_at: now(),
+              },
+            ],
+            verifications: [],
+            criteria_claimed: own.spec.acceptance_criteria.map(
+              (item) => item.id,
+            ),
+            limitations: [],
+            next_information: [],
+            created_at: now(),
+          };
+          const captured = (
+            await api.call<Handoff>('submit_handoff', { handoff: declared })
+          ).result;
+          assert.match(captured.source_revision!, /^sha256:[a-f0-9]{64}$/);
+          const file = captured.artifacts.find((item) => item.kind === 'file')!;
+          assert.equal(file.revision, `sha256:${digest(content)}`);
+          assert.notEqual(file.id, declared.artifacts[0]!.id);
+          assert.match(file.reference, /^artifacts\//);
+          assert.equal(
+            (await api.status()).result.tasks[0]!.status,
+            'in_review',
           );
-        } else if (chiefTurns === 3) {
+        } else if (request.role === 'reviewer') {
+          sequence.push('reviewer');
+          assert.equal(request.permissions.sandbox, 'read-only');
           const delivery = (
             await api.call<Collected>('collect_delivery', {
               task_id: 'task:document',
               handoff_id: null,
             })
           ).result;
-          const review = delivery.reviews[0]!;
-          const accepted = (
-            await api.call<TaskState>('accept_delivery', {
-              handoff_id: delivery.handoff.id,
-              review_ids: [review.id],
-              verification_ids: delivery.verifications.map((proof) => proof.id),
-              accepted_revision: delivery.handoff.source_revision,
-            })
-          ).result;
-          assert.equal(accepted.status, 'accepted');
           assert.equal(
-            accepted.accepted_revision,
-            delivery.handoff.source_revision,
+            delivery.evidence.find((item) => item.kind === 'file')!
+              .content_excerpt,
+            content,
           );
-          const proof = delivery.verifications.find(
-            (item) => item.result === 'passed',
-          )!;
-          const final = (
-            await api.call<Run>('finish_run', {
-              summary:
-                'Captured document reviewed and verified; provider reasoning was simulated',
-              criterion_evidence: proof.criterion_ids.map((id) => ({
-                criterion_id: id,
-                evidence_artifact_ids: proof.evidence_artifact_ids,
-              })),
-              delivered_artifact_ids: delivery.handoff.artifacts.map(
-                (item) => item.id,
-              ),
-            })
-          ).result;
-          assert.equal(final.status, 'completed');
-        } else assert.fail('Unexpected extra chief turn');
-        return;
-      }
-      assert.ok(own);
-      assert.equal(own.spec.role, request.role);
-      const context = (
-        await api.call<{ context: ContextBundle }>('read_context', {
-          subject_id: own.id,
-          source_ids: [],
-          after_version: 0,
-        })
-      ).result.context;
-      assert.equal(context.subject_kind, 'task');
-      assert.equal(context.subject_id, own.id);
-      assert.equal(context.content_sha256, digest(request.prompt));
-      assert.ok(request.prompt.includes(request.cwd));
-      if (request.role === 'documenter') {
-        sequence.push('documenter');
-        mkdirSync(join(request.cwd, 'docs'), { recursive: true });
-        writeFileSync(join(request.cwd, 'docs/livrable.md'), content);
-        const declared: Handoff = {
-          schema_version: 1,
-          id: 'handoff:document',
-          task_id: own.id,
-          run_id: api.runId,
-          attempt_id: own.active_attempt_id!,
-          generation: own.generation,
-          status: 'delivered',
-          summary: 'A real document file is ready to capture',
-          source_revision: null,
-          artifacts: [
-            {
-              id: 'artifact:model-declared',
-              kind: 'file',
-              reference: 'docs/livrable.md',
-              revision: `sha256:${'0'.repeat(64)}`,
-              producer_attempt_id: own.active_attempt_id!,
-              created_at: now(),
-            },
-          ],
-          verifications: [],
-          criteria_claimed: own.spec.acceptance_criteria.map((item) => item.id),
-          limitations: [],
-          next_information: [],
-          created_at: now(),
-        };
-        const captured = (
-          await api.call<Handoff>('submit_handoff', { handoff: declared })
-        ).result;
-        assert.match(captured.source_revision!, /^sha256:[a-f0-9]{64}$/);
-        const file = captured.artifacts.find((item) => item.kind === 'file')!;
-        assert.equal(file.revision, `sha256:${digest(content)}`);
-        assert.notEqual(file.id, declared.artifacts[0]!.id);
-        assert.match(file.reference, /^artifacts\//);
-        assert.equal((await api.status()).result.tasks[0]!.status, 'in_review');
-      } else if (request.role === 'reviewer') {
-        sequence.push('reviewer');
-        assert.equal(request.permissions.sandbox, 'read-only');
-        const delivery = (
-          await api.call<Collected>('collect_delivery', {
-            task_id: 'task:document',
-            handoff_id: null,
-          })
-        ).result;
-        assert.equal(
-          delivery.evidence.find((item) => item.kind === 'file')!
-            .content_excerpt,
-          content,
-        );
-        assert.ok(delivery.verifications.length);
-        assert.ok(
-          delivery.verifications.every(
-            (proof) =>
-              proof.mode === 'static' &&
-              proof.result === 'passed' &&
-              proof.tested_revision === delivery.handoff.source_revision &&
-              proof.execution === 'automated' &&
-              proof.exit_code === 0 &&
-              proof.evidence_artifact_ids.length > 0,
-          ),
-        );
-        const review: Review = {
-          schema_version: 1,
-          id: 'review:document',
-          run_id: api.runId,
-          review_task_id: own.id,
-          review_of_task_id: delivery.handoff.task_id,
-          handoff_id: delivery.handoff.id,
-          outcome: 'approved',
-          verification_scope: 'documentation',
-          source_revision: delivery.handoff.source_revision!,
-          tested_revision: delivery.handoff.source_revision,
-          summary: 'Read exact immutable document and service-observed checks',
-          findings: [],
-          verification_ids: delivery.verifications.map((proof) => proof.id),
-          created_at: now(),
-        };
-        await api.call('submit_review', { review });
-      } else assert.fail(`Unexpected scripted role ${request.role}`);
-    });
+          assert.ok(delivery.verifications.length);
+          assert.ok(
+            delivery.verifications.every(
+              (proof) =>
+                proof.mode === 'static' &&
+                proof.result === 'passed' &&
+                proof.tested_revision === delivery.handoff.source_revision &&
+                proof.execution === 'automated' &&
+                proof.exit_code === 0 &&
+                proof.evidence_artifact_ids.length > 0,
+            ),
+          );
+          const review: Review = {
+            schema_version: 1,
+            id: 'review:document',
+            run_id: api.runId,
+            review_task_id: own.id,
+            review_of_task_id: delivery.handoff.task_id,
+            handoff_id: delivery.handoff.id,
+            outcome: 'approved',
+            verification_scope: 'documentation',
+            source_revision: delivery.handoff.source_revision!,
+            tested_revision: delivery.handoff.source_revision,
+            summary:
+              'Read exact immutable document and service-observed checks',
+            findings: [],
+            verification_ids: delivery.verifications.map((proof) => proof.id),
+            created_at: now(),
+          };
+          await api.call('submit_review', { review });
+        } else assert.fail(`Unexpected scripted role ${request.role}`);
+      },
+      { repeatSession: true, observeRealProcess: true },
+    );
     const f = await fixture(t, provider);
     const run = await f.create();
     await f.completed(run.id);
@@ -724,6 +783,36 @@ test(
       event.type.startsWith('provider.'),
     );
     assert.ok(providerEvents.length);
+    const sessionsPublished = providerEvents.filter(
+      (event) => event.type === 'provider.session',
+    );
+    assert.equal(
+      sessionsPublished.length,
+      provider.turns.length * 2,
+      'Repeated native session events must remain in the journal',
+    );
+    for (const turn of provider.turns) {
+      const expected =
+        provider.turns.filter((item) => item.nativeId === turn.nativeId)
+          .length * 2;
+      assert.equal(
+        sessionsPublished.filter(
+          (event) =>
+            (event.payload as Record<string, unknown>).native_session_id ===
+            turn.nativeId,
+        ).length,
+        expected,
+      );
+    }
+    assert.equal(
+      providerEvents.filter((event) => event.type === 'provider.text').length,
+      provider.turns.length * 2,
+    );
+    assert.ok(
+      !events.some((event) =>
+        JSON.stringify(event.payload).includes('IDEMPOTENCY_CONFLICT'),
+      ),
+    );
     assert.ok(
       providerEvents.every(
         (event) =>
