@@ -75,14 +75,13 @@ export class CapabilityRegistry {
     this.ownerHash = digest(owner);
   }
 
-  private assertCurrent(actor: Actor): void {
-    for (const value of [
-      actor.id,
-      actor.project_id,
-      actor.run_id,
-      actor.attempt_id,
-    ])
+  private assertCurrent(value: unknown): asserts value is Actor {
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+      throw new CrewError('FORBIDDEN', 'Invalid capability actor');
+    const actor = value as Actor;
+    for (const value of [actor.id, actor.project_id, actor.run_id])
       validate('Identifier', value);
+    if (actor.attempt_id !== null) validate('Identifier', actor.attempt_id);
     if (
       actor.project_id !== this.store.project.id ||
       !Number.isSafeInteger(actor.generation) ||
@@ -151,11 +150,9 @@ export class CapabilityRegistry {
       )
     )
       return { kind: 'user', project_id: this.store.project.id };
-    let actor: Actor;
+    let actor: unknown;
     try {
-      actor = JSON.parse(
-        privateRead(join(this.directory, `${hash}.json`)),
-      ) as Actor;
+      actor = JSON.parse(privateRead(join(this.directory, `${hash}.json`)));
     } catch {
       throw new CrewError('FORBIDDEN', 'Unknown capability');
     }

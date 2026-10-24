@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import type { TestContext } from 'node:test';
+import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import {
   mkdtempSync,
@@ -7,12 +9,13 @@ import {
   readdirSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { Store, identifyProject } from '../packages/storage/src/index.ts';
 import { CapabilityRegistry } from '../packages/supervisor/src/capabilities.ts';
-import { now } from '../packages/contracts/src/index.ts';
+import { CrewError, now } from '../packages/contracts/src/index.ts';
 import type {
   Actor,
   AgentSession,
@@ -20,7 +23,7 @@ import type {
   TaskSpec,
 } from '../packages/contracts/src/index.ts';
 
-test('capabilities are private, survive service recreation and revalidate task authority', (t) => {
+function setup(t: TestContext) {
   const directory = mkdtempSync(join(tmpdir(), 'avity capability ')),
     root = join(directory, 'project');
   mkdirSync(root);
@@ -62,6 +65,11 @@ test('capabilities are private, survive service recreation and revalidate task a
     attempt_id: null,
     generation: 1,
   };
+  return { store, user, run, root };
+}
+
+test('capabilities are private, survive service recreation and revalidate task authority', (t) => {
+  const { store, user, run, root } = setup(t);
   const spec = JSON.parse(
     readFileSync(
       new URL(
@@ -141,4 +149,43 @@ test('capabilities are private, survive service recreation and revalidate task a
     store.getRun(run.id).version,
   );
   assert.throws(() => registry.authenticate(token), /authority/);
+});
+
+test('a chief control capability does not require a deliverable task attempt', (t) => {
+  const { store, user } = setup(t);
+  const registry = new CapabilityRegistry(store);
+  const actor: Actor = {
+    ...user,
+    id: 'chief:test',
+    role: 'chief',
+    task_id: null,
+    attempt_id: null,
+  };
+  assert.deepEqual(registry.authenticate(registry.issue(actor)), {
+    kind: 'agent',
+    actor,
+  });
+  assert.throws(() => registry.issue({ ...actor, generation: 2 }), /replaced/);
+});
+
+test('a malformed private actor record is rejected with a controlled error', (t) => {
+  const { store, user } = setup(t);
+  const registry = new CapabilityRegistry(store);
+  const token = registry.issue({
+    ...user,
+    id: 'chief:test',
+    role: 'chief',
+    task_id: null,
+    attempt_id: 'control:test',
+  });
+  const path = join(
+    store.project.data_dir,
+    'capabilities',
+    `${createHash('sha256').update(token).digest('hex')}.json`,
+  );
+  writeFileSync(path, 'null');
+  assert.throws(
+    () => registry.authenticate(token),
+    (error) => error instanceof CrewError && error.code === 'FORBIDDEN',
+  );
 });
