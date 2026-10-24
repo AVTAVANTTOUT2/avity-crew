@@ -1388,6 +1388,13 @@
       "properties": {
         "handoff": {
           "$ref": "#/$defs/Handoff"
+        },
+        "document_paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RelativePath"
+          },
+          "minItems": 1
         }
       },
       "required": [
