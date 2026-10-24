@@ -2,7 +2,8 @@
 
 Exécuter `avity-crew` depuis le projet, ou ajouter `--project "/chemin/projet"`.
 La [configuration](INSTALLATION.md#configuration-avant-le-premier-lancement)
-éventuelle doit précéder son premier enregistrement.
+éventuelle est relue au démarrage du service, sans modifier les choix déjà
+enregistrés dans les runs. Un changement de fichier nécessite son redémarrage.
 
 ## Démarrer un objectif vérifiable
 
@@ -123,6 +124,22 @@ d'une conversation Claude n'est pas transférée magiquement à Codex. `reassign
 nécessite une ancienne tentative arrêtée ou réconciliée. En cas d'issue ambiguë,
 la commande peut refuser plutôt que d'accorder deux propriétaires au même travail.
 
+Pendant une pause ou un arrêt, les nouveaux lancements et réveils en file sont
+bloqués jusqu'à la fin observée des tours concernés. L'état final de contrôle
+n'est enregistré qu'après cette observation. `CONTROL_IN_PROGRESS` signifie
+qu'une autre commande de contrôle doit d'abord se terminer ; relire le statut
+avant de réessayer.
+
+Le chef peut corriger une mission avec l'outil interne `amend_task`, après une
+décision approuvée couvrant la tâche. Il fournit la TaskSpec complète, la raison
+et l'ID de décision. Le service conserve les spécifications avant/après et
+l'auteur authentifié dans une révision auditée, puis change la génération de la
+tâche. Les anciennes tentatives doivent être arrêtées ou réconciliées ; les
+anciennes autorités et passations ne deviennent pas valides pour le nouveau
+plan. L'objectif, les contraintes et les critères globaux du run restent inchangés.
+Une correction envoyée par message ne constitue donc pas à elle seule un plan
+amendé. Voir les [gardes de stockage](STORAGE.md#correction-du-plan-et-résultats-de-contrôle).
+
 ```sh
 avity-crew service status --json
 avity-crew service stop
@@ -159,6 +176,22 @@ sont expurgés : le contenu du projet peut rester privé.
 La fin native d'un tour, une phrase « terminé » ou un test simulé vert ne suffit
 pas à accepter une tâche. La livraison doit référencer le snapshot, la revue
 indépendante et les contrôles de la révision concernée.
+
+En mode documentation, l'agent peut soumettre `document_paths` avec des chemins
+relatifs de fichiers présents dans son scope. Le service capture les octets,
+calcule leurs empreintes et conserve les preuves. L'agent peut laisser
+`artifacts: []`, `verifications: []` et `source_revision: null` dans cette entrée ;
+il ne doit pas inventer un hash ou déclarer un test exécuté. Le Handoff conservé
+est ensuite celui de la capture, soumis aux contrôles habituels.
+
+Une tâche de contrôle produit une Review sur la livraison actuelle d'un autre
+acteur et d'une conversation distincte. Le service conserve le rapport de revue
+et sa preuve statique comme `control_result`. Cette preuve n'affirme pas qu'une
+commande métier a été exécutée : les commandes configurées gardent leurs propres
+résultats et révisions testées. Pour contribuer à la clôture globale, une revue
+approuvée doit être utilisée par l'acceptation de la livraison courante. Une
+ancienne revue, un avis négatif ou un simple message ne suffit pas. L'[exemple
+documentaire](examples/documentation-run.md) distingue écriture, contrôle et clôture.
 
 ## Récupérer une livraison de code
 
@@ -201,6 +234,11 @@ d'application ni un push à votre place.
 
 Le fournisseur reprend une conversation uniquement par son ID natif exact quand
 la capacité est disponible ; sinon le travail nécessite un nouveau contexte.
+Le contexte de reprise distingue l'état courant des livraisons et les nouvelles
+mises à jour, avec sources et omissions explicites. Les générations du chef et
+des tâches, les tentatives actives et les versions restent vérifiées côté service :
+un ancien agent ne récupère pas son autorité parce qu'il possède encore un ancien
+prompt ou qu'une requête attendait dans la file.
 Une mutation dont la réponse HTTP s'est perdue peut avoir été exécutée. La CLI
 ne la rejoue pas automatiquement : vérifier l'état avant de répéter l'action.
 Voir les garanties et limites [POSIX de reprise](RECOVERY.md) et la
@@ -230,6 +268,7 @@ dans un exemple. `internal mcp` réserve stdout à JSON-RPC. Voir le
 | `VERSION_CONFLICT`                                | Relire le statut et distinguer nouvelle action/rejeu de la même action                                             |
 | `IDEMPOTENCY_CONFLICT`                            | Même clé avec contenu différent : examiner le journal ; ne pas générer des clés en boucle pour contourner l'erreur |
 | `RECONCILIATION_REQUIRED`                         | Conserver base, worktrees et opérations ; faire constater la propriété et la fin du processus avant réattribution  |
+| `CONTROL_IN_PROGRESS`                             | Laisser finir la pause, l'arrêt ou l'autre contrôle en cours, puis relire le statut avant une nouvelle action      |
 | Permission native refusée                         | Ajuster la mission ou répondre au besoin réel de permission ; aucun bypass global n'est ajouté                     |
 | Vue ou export trop grand                          | Réduire la page d'événements et inspecter un contexte ciblé ; ne pas supprimer les preuves                         |
 

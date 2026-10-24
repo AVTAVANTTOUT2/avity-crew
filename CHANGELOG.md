@@ -25,15 +25,24 @@
   d'un lancement encore en préparation ; scénarios HTTP/SQLite avec providers simulés.
 - Reprise explicite et contrôles d'identité des processus POSIX ; les issues
   ambiguës restent signalées au lieu d'être présentées comme un arrêt confirmé.
-- Guides d'installation locale, d'usage et de sauvegarde.
+- Relecture de la configuration complète au démarrage du service, avec
+  conservation de l'historique du projet et des choix propres aux runs existants.
+- Correction de tâches par `amend_task`, liée à une décision approuvée et à une
+  révision auditée ; l'objectif et les critères globaux du run restent inchangés.
+- Capture de documents par `document_paths` : les empreintes et preuves de
+  fichiers sont calculées par le service, sans demander au modèle de les inventer.
+- Preuves de contrôle liées à une revue indépendante et à la livraison courante ;
+  les anciennes tentatives ou preuves ne peuvent pas clore le nouvel état.
+- Blocage des nouveaux lancements pendant pause/arrêt, jusqu'à la fin observée
+  des processus ; refus des autorités révoquées et des générations périmées.
+- Banc de charge simulé exerçant sept places réelles du scheduler, avec HTTP,
+  workspaces et enfants Node POSIX ; aucune CLI LLM dans cette preuve.
+- Guides d'installation locale, d'usage, de sauvegarde et d'extension des adaptateurs,
+  avec exemple de mission documentaire.
 
-Au point de référence `4c003ca` du 24 octobre 2026, L07–L12 ne sont pas acceptés.
-Les suites locales à 125 puis 143 tests réussis ne remplacent pas la recette
-native de bout en bout. Un premier essai intégré Claude a rencontré
-`IDEMPOTENCY_CONFLICT` lors de plusieurs événements. Des essais ultérieurs ont
-observé les mutations MCP `create_task`, `report_blocker` et `publish_note`, ainsi
-que l'écriture d'un document sans Git. Le run reste en pause : l'entrée de
-passation exige des empreintes avant leur capture, que le modèle refuse
-d'inventer ; correction du contrat en cours. Aucune validation globale,
-Linux/Windows ou CI distante n'est revendiquée.
+Le rapport final de recette devra qualifier la source et le paquet retenus,
+les parcours natifs mixtes, la charge native observée et les limites restantes.
+Les tests simulés et les preuves séparées des adaptateurs ne remplacent pas
+cette recette ; L11/L12 ne sont pas déclarés validés par ce changelog.
+Aucune qualification Linux/Windows ou CI distante n'est revendiquée ici.
 Le paquet reste local ; aucune publication externe n'a été effectuée.

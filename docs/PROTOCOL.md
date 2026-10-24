@@ -29,13 +29,13 @@ Le répertoire doit être privé (0700), non symbolique. Les fichiers de service
 
 Un lock principal/endpoint ancien n'est récupéré que si son projet/protocole/PID/nonce sont valides et si `kill(pid, 0)` confirme `ESRCH`. PID vivant, `EPERM`, autre erreur ou métadonnée ambiguë provoquent un refus ; aucun fichier n'est effacé par déduction d'un simple délai. Le garde de démarrage ambigu ou interrompu est conservé pour inspection explicite, même si le PID semble ancien : aucun retrait concurrent spéculatif. Après une interruption pendant ce très court passage, une intervention de réconciliation de propriété peut donc être nécessaire.
 
-`close()` est idempotent et supprime seulement les fichiers portant encore son propre nonce. Il ferme les connexions HTTP ; le cycle de vie des tâches métier reste au superviseur. La racine lancera et supervisera le processus détaché : cette API ne le daemonise pas elle-même.
+`close()` est idempotent et supprime seulement les fichiers portant encore son propre nonce. Il ferme les connexions HTTP ; le cycle de vie des tâches métier reste au superviseur. La CLI lance le service détaché, dont le point d'entrée raccorde ce transport au runtime. Cette API de transport ne daemonise pas elle-même le service.
 
 ## Authentification et routes
 
 Chaque requête porte `Authorization: Bearer <capability>`. `CapabilityRegistry.authenticate` fournit exclusivement le `Principal`, vérifié contre le projet de l'endpoint. Les requêtes avec body sont réauthentifiées après réception pour observer une révocation pendant la lecture.
 
-Un principal agent ne peut lire/exécuter que son `run_id`. Avant `execute`, la méthode doit apparaître dans `api.tools(principal, runId)`. Le `ToolCall` complet passe la validation contractuelle existante ; un champ `actor` ajouté au body est refusé. L'identité du body n'est jamais utilisée comme autorité. Les mutations métier doivent conserver leur propre fencing transactionnel au moment de l'effet.
+Un principal agent ne peut lire/exécuter que son `run_id`. Avant `execute`, la méthode doit apparaître dans `api.tools(principal, runId)`. Le `ToolCall` complet passe la validation contractuelle existante ; un champ `actor` ajouté au body est refusé. L'identité du body n'est jamais utilisée comme autorité. Les mutations métier vérifient aussi transactionnellement les générations, l'autorité du chef et la tentative active au moment de l'effet : une entrée en file ne conserve pas un droit révoqué.
 
 | Route relative         | Entrée                | Résultat                                      |
 | ---------------------- | --------------------- | --------------------------------------------- |
@@ -56,7 +56,7 @@ Le fallback CLI interne doit construire le même `ToolCall` et appeler `execute`
 
 ## Pont MCP stdio
 
-`runMcpBridge({client, runId, input?, output?})` utilise le même client. `runMcpFromEnv()` lit exclusivement les variables `AVITY_CREW_ENDPOINT_FILE`, `AVITY_CREW_CAPABILITY`, `AVITY_CREW_RUN_ID`. La racine connectera cette entrée à sa commande interne. stdout contient uniquement JSON-RPC MCP, une ligne UTF-8 par message, avec backpressure.
+`runMcpBridge({client, runId, input?, output?})` utilise le même client. `runMcpFromEnv()` lit exclusivement les variables `AVITY_CREW_ENDPOINT_FILE`, `AVITY_CREW_CAPABILITY`, `AVITY_CREW_RUN_ID`. Le service prépare cet environnement pour le pont natif ; `avity-crew internal mcp` expose la même entrée. stdout contient uniquement JSON-RPC MCP, une ligne UTF-8 par message, avec backpressure.
 
 La version prise en charge est explicitement **2025-11-25**, avec `initialize`, notification `notifications/initialized`, puis `tools/list`, `tools/call` et `ping`. Une version inconnue demandée dans initialize reçoit la version connue du serveur, jamais une valeur arbitraire reflétée. Le client décide s'il la prend en charge. La nouvelle révision 2026-07-28 utilise un autre lifecycle : elle n'est pas revendiquée ici. Les interfaces des CLI ciblées par le chantier utilisent le lifecycle initialize ; leur recette réelle sur le pont complet appartient à l'intégration.
 

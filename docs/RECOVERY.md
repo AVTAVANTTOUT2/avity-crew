@@ -11,3 +11,33 @@ If the leader is already absent when recovery starts, a group without live membe
 `ps` birth time has second precision; argv is a native textual representation and may change while a process runs. This is a conservative comparison, not an atomic kernel handle or a cryptographic ownership proof. PID reuse with a different birth/command/group is detected, but same-second reuse with identical representation and the final observation-to-signal race cannot be eliminated by portable `ps`. Process visibility must include the runtime's own children. Descendants which deliberately leave the recorded process group are outside this helper's guarantee. A reboot or uncertain journal/identity requires a domain recovery decision before reuse; no heartbeat timeout grants a new owner.
 
 Windows is explicitly unsupported by these helpers; no equivalent process-tree guarantee is claimed. The tests exercise real detached child processes on the local POSIX host, forged identities, non-owned groups, restart from a serialized identity, normal exit, TERM-resistant parents/descendants, a real observed zombie and already-missing leaders. Linux and other POSIX implementations require their own qualification; the initial executed host is macOS. Provider LLM sessions and the runtime's persisted recovery workflow are not exercised by this OS-only suite.
+
+## Runtime recovery and authority
+
+The service journals `provider.turn` intent and the observed process identity with
+the session, actor, role and generation. On service startup, it revokes prior
+agent capabilities and marks unfinished provider operations for reconciliation.
+It does not automatically restart those turns. An explicit resume, replacement
+or reassignment must reconcile the recorded process before granting new ownership;
+missing or ambiguous identity remains `RECONCILIATION_REQUIRED`.
+
+Pause and stop prevent queued launches and wakeups while active processes are
+being interrupted. The run becomes paused or cancelled only after their exits
+are observed. A concurrent control receives `CONTROL_IN_PROGRESS`. Heartbeat age,
+silence and a closed terminal never establish that a writer has stopped.
+
+A native conversation is resumed by its exact recorded session ID when the
+adapter supports it; there is no selection of the latest conversation. A chief
+replacement uses a new authority generation and the durable project context,
+without transferring the other provider's private conversation. Task amendments
+also advance their generation. Mutations check current authority, attempt and
+version at their effect, including requests which waited in a queue. Prior
+handoffs and reviews cannot silently become evidence for a changed task.
+
+The context compiler keeps current deliveries and new updates identifiable by
+their sources. A native success event or process exit does not accept a task:
+the stored delivery, independent review and verification of the current revision
+remain necessary. See [usage](USAGE.md#reprendre-après-une-interruption),
+[storage guards](STORAGE.md) and [configuration reload](INSTALLATION.md#configuration-avant-le-premier-lancement).
+These runtime rules are distinct from the OS helper tests and from the final
+native end-to-end recipe, which must identify its own candidate and evidence.

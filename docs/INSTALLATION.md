@@ -129,11 +129,28 @@ la CLI résoudre son modèle natif. `--chief`, `--model` et `--max-agents` perme
 des choix pour un run, dans la capacité du service ; ils ne réécrivent pas les
 préférences du projet.
 
-Le Store conserve la configuration du premier enregistrement. **Modifier le
-fichier puis redémarrer ne garantit pas son remplacement dans un projet déjà
-initialisé.** Il n'existe pas encore de commande utilisateur de rafraîchissement
-de configuration ; ne pas supprimer la base pour contourner cette limite.
-Inspecter la configuration persistée dans `status --json`.
+Le service relit ce fichier **à chaque démarrage**, à la racine du projet reconnu
+(y compris depuis un sous-dossier Git). Il valide puis remplace la configuration
+persistée complète, sans réinitialiser l'identité du projet, ses runs ou son
+historique. Il refuse un fichier invalide, symbolique ou de plus de 256 Kio.
+Si le fichier est absent, la configuration déjà persistée est conservée ; un
+projet neuf utilise les valeurs par défaut. Supprimer le fichier ne rétablit donc
+pas automatiquement ces valeurs.
+
+Une modification pendant que le service tourne n'est pas rechargée à chaud.
+Pour l'appliquer, mettre en pause les travaux concernés, attendre leurs arrêts,
+modifier le fichier complet, puis exécuter depuis ce projet :
+
+```sh
+avity-crew service stop
+avity-crew service start
+avity-crew status --json
+```
+
+Inspecter `data.project.config` dans le statut. Les choix déjà enregistrés dans un
+run (chef, modèle, limite propre au run) ne sont pas réécrits par ce rechargement ;
+la capacité du scheduler vient de la configuration du service redémarré. Ne pas
+supprimer la base pour changer des préférences.
 
 `workspace` demande les permissions natives d'édition de workspace ; `read_only`
 demande la lecture seule. Le profil `custom` existe dans le schéma mais est
@@ -181,3 +198,38 @@ Git doivent correspondre ; des chemins déplacés peuvent exiger une réparation
 des worktrees. Les métadonnées restaurées ne prouvent pas qu'un ancien processus
 est arrêté. Ne pas effacer un verrou, une opération ou une clé pour forcer la
 reprise : suivre le [diagnostic de reprise](USAGE.md#reprendre-après-une-interruption).
+
+## Mise à jour et désinstallation locale
+
+Avant une mise à jour, sauvegarder comme ci-dessus et arrêter les services de
+chaque projet utilisant cette installation. Installer le nouveau tarball dans
+le même préfixe, vérifier `avity-crew --version`, puis redémarrer un projet et
+inspecter son statut avant toute reprise explicite. Conserver l'ancien tarball et
+la sauvegarde ; revenir à un ancien exécutable ne garantit pas la compatibilité
+d'une base déjà migrée. Ne pas remplacer la base active par une copie ancienne.
+
+Pour retirer uniquement l'exécutable installé dans le préfixe de cet exemple,
+après arrêt des services :
+
+```sh
+npm uninstall --global --prefix "$HOME/.local" avity-crew
+```
+
+Cette commande ne supprime ni les projets ni leurs données privées. Les conserver
+permet une réinstallation ; leur effacement éventuel est une action distincte,
+à décider après vérification des sauvegardes et de l'arrêt des processus.
+
+## Contrôle du paquet avant distribution
+
+`npm pack --dry-run --json` reconstruit le projet et décrit le contenu prévu sans
+créer de tarball. Vérifier la présence de `bin/avity-crew.mjs`, des modules ESM
+compilés (dont le service et le pont MCP), des schémas et des guides. Les templates
+de contexte et migrations sont intégrés aux modules compilés ; ils ne sont pas
+chargés depuis le workpack de construction.
+
+Vérifier aussi l'absence de données privées : configuration locale, clés,
+conversations, bases et worktrees de recette. Une liste de fichiers correcte ne
+remplace pas l'installation du tarball final dans un préfixe neuf, puis les
+commandes depuis plusieurs projets et la recette native sur cette même source.
+Consigner version, empreinte du tarball et résultats dans le futur rapport de
+recette ; ces instructions ne déclarent pas L11/L12 validés.

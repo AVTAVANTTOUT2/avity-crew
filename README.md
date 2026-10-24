@@ -36,8 +36,8 @@ la conversation du run créé. `q` ou Ctrl+C détachent la vue ; le service cont
 Sans terminal, utiliser `status --json` ou `watch` pour suivre le résultat.
 
 Pour du code neuf, `--mode code --init-git` autorise explicitement une base Git.
-Le mode documentation n'initialise pas Git. Préparer une éventuelle
-`.avity-crew.json` **avant** `init` : voir la [configuration](docs/INSTALLATION.md#configuration-avant-le-premier-lancement).
+Le mode documentation n'initialise pas Git. Une éventuelle `.avity-crew.json`
+est relue au démarrage du service : voir la [configuration](docs/INSTALLATION.md#configuration-avant-le-premier-lancement).
 Une livraison de code acceptée reste sur une référence dédiée ; elle n'avance pas
 automatiquement votre dossier principal et n'est pas poussée sur un serveur.
 
@@ -45,26 +45,28 @@ automatiquement votre dossier principal et n'est pas poussée sur un serveur.
 - [Utiliser la conversation, les commandes et la reprise](docs/USAGE.md)
 - [Référence CLI](docs/CLI.md), [contexte](docs/CONTEXT.md), [workspaces](docs/WORKSPACE.md)
 - [Adaptateur Claude](docs/providers/claude.md), [adaptateur Codex](docs/providers/codex.md)
+- [Développer un adaptateur](docs/ADAPTERS.md), [exemple de mission documentaire](docs/examples/documentation-run.md)
 - [Changelog](CHANGELOG.md)
 
 ## Validation réelle
 
-Commandes documentées depuis les sources `4c003ca` ; état de recette communiqué
-par le coordinateur le 24 octobre 2026, sans acceptation globale.
+La version reste en recette. Le rapport final devra identifier la source exacte,
+les versions natives, les parcours exécutés et le paquet installé. Ces guides
+décrivent le comportement implémenté ; ils ne prononcent pas l'acceptation de L11/L12.
 
-| Périmètre                                                    | Preuve disponible                                                                                                         | Limite                                                                                                         |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Socle, stockage, contexte, adaptateurs, workspaces (L00–L06) | Livraisons acceptées et essais natifs d'adaptateurs distincts                                                             | Ne prouvent pas une orchestration complète                                                                     |
-| Domaine, HTTP/SQLite, CLI et processus locaux                | Suites locales annoncées à 125 puis 143 tests réussis ; scénarios avec fournisseurs simulés identifiés                    | Pas une preuve LLM de bout en bout                                                                             |
-| Boucle native intégrée                                       | Claude a réellement appelé `create_task`, `report_blocker` et `publish_note`, et écrit un document sans Git               | Run en pause : la passation exige encore des empreintes avant capture ; contrat en correction, run non accepté |
-| Installation locale du tarball                               | `npm pack`, installation dans un préfixe isolé et help/init/status/arrêt depuis deux projets, dont un chemin avec espaces | macOS, Node 26.12.0, aucun objectif ni modèle lancé                                                            |
-| L07–L12, équipe mixte et charge jusqu'à sept                 | Pas encore acceptés dans cet état de référence                                                                            | Rapport final et paquet qualifié encore attendus                                                               |
-| Plateformes et CI                                            | Vérifications locales macOS seulement à ce stade                                                                          | Linux, Windows et CI distante non qualifiés par cette documentation                                            |
+| Périmètre                             | Preuve et portée                                                                                                              | Limite                                                                    |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Socle et adaptateurs                  | Livraisons L00–L06 acceptées, avec essais natifs distincts Claude/Codex                                                       | Une recette d'adaptateur ne prouve pas toute l'orchestration              |
+| Domaine, transport, CLI et reprise    | Tests locaux avec SQLite, HTTP, Git et processus POSIX ; fournisseurs simulés identifiés                                      | Une simulation ne démontre pas le comportement d'un modèle natif          |
+| Charge de sept places                 | Banc simulé : chef actif, six workers actifs, septième worker en file puis lancé après libération d'une place ; arrêt observé | Zéro CLI LLM dans ce banc ; aucune acceptation métier forcée              |
+| Recette native et distribution finale | À consigner dans le futur rapport de recette sur le candidat retenu                                                           | Ne pas réutiliser une preuve ancienne comme qualification du paquet final |
+| Plateformes                           | Preuves locales macOS                                                                                                         | Linux, Windows et CI distante restent à qualifier séparément              |
 
-Le premier essai intégré a aussi révélé `IDEMPOTENCY_CONFLICT` sur les événements
-multiples. Les progrès natifs ci-dessus restent des preuves partielles : le
-modèle a refusé d'inventer les empreintes exigées par l'ancienne entrée de
-passation ; leur capture autoritaire côté service est en correction.
+Le service capture désormais les documents demandés par chemin et calcule leurs
+empreintes. Une correction de plan par `amend_task` est auditée et invalide les
+anciennes autorités de la tâche. La clôture exige les livraisons et preuves de
+contrôle applicables à la révision actuelle ; ni une sortie native réussie ni un
+texte « terminé » ne remplacent cette vérification.
 
 ## Développement
 
