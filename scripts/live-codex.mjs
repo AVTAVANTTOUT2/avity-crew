@@ -28,7 +28,8 @@ const cwd = await mkdtemp(resolve(tmpdir(), 'avity codex live '));
 assert.equal(spawnSync('git', ['init', '--quiet', cwd]).status, 0);
 const audit = resolve(cwd, 'mcp-audit.jsonl');
 const token = randomUUID();
-const marker = randomUUID();
+// Keep the comparison nonce distinct from the private PORT='1' sentinel.
+const marker = randomUUID().replaceAll('1', 'x');
 const records = [];
 const artifacts = [];
 const report = {
