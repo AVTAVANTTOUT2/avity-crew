@@ -3,3 +3,4 @@
 - Product schemas live in `packages/contracts/schema`; generated TypeScript is ignored and rebuilt. Build/runtime must not depend on workpack location.
 - Read `mem:tech_stack` for compilation/runtime boundaries; `mem:conventions` for authority/proof rules; `mem:suggested_commands` for local entrypoints; `mem:task_completion` for verification.
 - Module details: docs/STORAGE.md; docs/providers/claude.md; architecture and lot criteria remain in workpack docs/lots.
+- Terminal UI: apps/cli/src/tui (term canvas/diff screen, model, render, app controller), no extra dependency; contract in docs/CLI.md « Interface plein écran ». It reads only status, list_runs, doctor, the get_status tool and export JSON, and acts only through existing admin/ToolCall routes. Non-TTY/--json/--once keep view.ts watchRun.

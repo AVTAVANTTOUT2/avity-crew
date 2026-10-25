@@ -14,10 +14,13 @@ mode, node, cli, project = sys.argv[1:]
 pid, fd = pty.fork()
 if pid == 0:
     os.chdir(project)
+    os.environ['TERM'] = 'xterm-256color'
     os.execv(node, [node, cli] + ([] if mode == 'wizard' else ['attach', '--run', 'run:test']))
-fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack('HHHH', 14, 36, 0, 0))
-deadline = time.monotonic() + 8
+fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack('HHHH', 30, 100, 0, 0))
+deadline = time.monotonic() + 12
 output = bytearray()
+attached = 'Message → '.encode()
+form = 'Lancer la session'.encode()
 typed_at = None
 sent = False
 quit_at = None
@@ -37,13 +40,16 @@ while True:
             output.extend(chunk)
         except OSError:
             break
-    if mode == 'wizard' and b'objectif> ' in output and not wizard_sent:
-        os.write(fd, 'Nouvel objectif é🧪\rDeuxième ligne\r.\rCritère observable\r\r\r\r'.encode())
+    if mode == 'wizard' and form in output and not wizard_sent:
+        # Bracketed paste keeps the pasted newline inside the objective draft.
+        os.write(fd, '\x1b[200~Nouvel objectif é🧪\rDeuxième ligne\x1b[201~\rCritère observable'.encode())
+        os.write(fd, b'\r' * 7)
         wizard_sent = True
-    if mode == 'wizard' and b'crew> ' in output and not sent:
+        output.clear()
+    if mode == 'wizard' and wizard_sent and attached in output and not sent:
         os.write(fd, b'q\r')
         sent = True
-    if mode != 'wizard' and b'crew> ' in output and typed_at is None:
+    if mode != 'wizard' and attached in output and typed_at is None:
         if mode == 'interrupt':
             os.write(fd, b'\x03')
             sent = True

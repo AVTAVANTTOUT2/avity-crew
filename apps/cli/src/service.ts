@@ -10,8 +10,16 @@ import {
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
-import { CrewError } from '../../../packages/contracts/src/index.ts';
-import type { Project } from '../../../packages/contracts/src/index.ts';
+import {
+  CrewError,
+  ident,
+  validate,
+} from '../../../packages/contracts/src/index.ts';
+import type {
+  Message,
+  Project,
+  ToolCall,
+} from '../../../packages/contracts/src/index.ts';
 import { SupervisorClient } from '../../../packages/supervisor/src/client.ts';
 
 export function serviceArguments(
@@ -139,4 +147,46 @@ export async function ensureService(
     'SUPERVISOR_UNAVAILABLE',
     `Service non prêt après 10 s ; consulter ${log}. Aucun objectif n’a été envoyé.`,
   );
+}
+/** Same `send_message` ToolCall as the domain/MCP route, with explicit request identity. */
+export async function sendMessage(
+  client: SupervisorClient,
+  runId: string,
+  content: string,
+  to = 'chief',
+  kind = 'information',
+): Promise<unknown> {
+  const status = (await client.admin({
+    method: 'status',
+    arguments: { run_id: runId, after_seq: 0, limit: 1 },
+  })) as { run?: { version?: number } };
+  if (!Number.isSafeInteger(status.run?.version))
+    throw new CrewError(
+      'NOT_READY',
+      'Version du run indisponible ; message non envoyé.',
+    );
+  const call: ToolCall = {
+    schema_version: 1,
+    request_id: ident('request'),
+    idempotency_key: ident('message'),
+    run_id: runId,
+    expected_version: status.run!.version!,
+    method: 'send_message',
+    arguments: {
+      recipient_kind:
+        to === 'chief' ? 'chief' : to === 'user:local' ? 'user' : 'task',
+      recipient_id: to === 'chief' ? 'chief:current' : to,
+      kind: kind as Message['kind'],
+      content,
+      source_ids: [],
+      requires_ack: true,
+    },
+  };
+  validate('ToolCall', call);
+  const result = await client.execute(call);
+  return {
+    request_id: call.request_id,
+    idempotency_key: call.idempotency_key,
+    result,
+  };
 }
