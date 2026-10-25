@@ -52,9 +52,14 @@ type ActiveTurn = {
   session: AgentSession;
   process: ProviderProcess;
   operation: Operation;
+  /** Resolves once the turn left `active`, including its post-exit checks. */
+  settled: Promise<void>;
 };
 const terminal = (run: Run) =>
   ['completed', 'failed', 'cancelled'].includes(run.status);
+// A stopped worker can still verify its document snapshots (bounded at 10 s);
+// control requests wait for it within CONTROL_TIMEOUT_MS.
+const SETTLE_MS = 15_000;
 // Full events stay well under the transport limit, even for multibyte text, next to the other records.
 const EVENT_CHARS = MAX_JSON_BYTES / 4;
 const text = (value: unknown, name: string): string => {
@@ -79,7 +84,8 @@ export class SupervisorRuntime {
   private readonly active = new Map<string, ActiveTurn>();
   private readonly chiefNeeded = new Set<string>();
   private readonly pumping = new Set<string>();
-  private readonly workerQueued = new Set<string>();
+  /** Queued worker turns: `${run}:${task}` → run id (task IDs are scoped by run). */
+  private readonly workerQueued = new Map<string, string>();
   private readonly chiefQueued = new Set<string>();
   private readonly cancellation = new Map<string, number>();
   private readonly suspending = new Set<string>();
@@ -151,7 +157,7 @@ export class SupervisorRuntime {
             requestId(operation.id, 'recovered-attempt'),
             this.version(runId),
           );
-        const task = this.store.getTask(attempt.task_id);
+        const task = this.store.getTask(runId, attempt.task_id);
         if (task.status === 'running')
           this.store.setTaskWait(
             user,
@@ -183,6 +189,7 @@ export class SupervisorRuntime {
     private readonly endpointFile: string,
     providers: ProviderAdapter[] = [new ClaudeProvider(), new CodexProvider()],
     private readonly shutdown: () => Promise<void> = async () => {},
+    private readonly settleMs = SETTLE_MS,
   ) {
     this.providers = new Map(
       providers.map((provider) => [provider.id, provider]),
@@ -252,16 +259,15 @@ export class SupervisorRuntime {
           continue;
         if (
           run.delivery_mode === 'documentation' &&
-          [...this.workerQueued].some(
-            (id) =>
-              this.store.getRun(this.store.getTask(id).run_id).delivery_mode ===
-              'documentation',
+          [...this.workerQueued.values()].some(
+            (id) => this.store.getRun(id).delivery_mode === 'documentation',
           )
         )
           break;
-        const task = this.store.getTask(delegation.task_id);
+        const task = this.store.getTask(runId, delegation.task_id),
+          queued = runId + ':' + task.id;
         if (
-          this.workerQueued.has(task.id) ||
+          this.workerQueued.has(queued) ||
           [
             'accepted',
             'cancelled',
@@ -277,7 +283,7 @@ export class SupervisorRuntime {
           )
         )
           continue;
-        this.workerQueued.add(task.id);
+        this.workerQueued.set(queued, runId);
         this.scheduler.enqueue({
           id: requestId(delegation.id, 'turn'),
           run_id: runId,
@@ -287,16 +293,14 @@ export class SupervisorRuntime {
             try {
               await this.worker(runId, delegation);
             } finally {
-              this.workerQueued.delete(task.id);
+              this.workerQueued.delete(queued);
               this.wake(runId);
             }
           },
         });
       }
       const hasWorkers =
-        [...this.workerQueued].some(
-          (id) => this.store.getTask(id).run_id === runId,
-        ) ||
+        [...this.workerQueued.values()].includes(runId) ||
         [...this.active.values()].some(
           (turn) => turn.run_id === runId && turn.role === 'worker',
         );
@@ -367,7 +371,7 @@ export class SupervisorRuntime {
   private async worker(runId: string, delegation: Delegation): Promise<void> {
     const run = this.store.getRun(runId),
       user = serviceActor(this.store, runId);
-    let task = this.store.getTask(delegation.task_id);
+    let task = this.store.getTask(runId, delegation.task_id);
     if (terminal(run) || run.status !== 'running') return;
     if (
       this.store
@@ -517,7 +521,7 @@ export class SupervisorRuntime {
           requestId(attempt.id, 'launch-failed'),
           this.version(runId),
         );
-      const currentTask = this.store.getTask(task.id);
+      const currentTask = this.store.getTask(runId, task.id);
       if (currentTask.status === 'running')
         this.store.setTaskWait(
           user,
@@ -553,6 +557,8 @@ export class SupervisorRuntime {
       );
     const user = serviceActor(this.store, run.id),
       invocation = ident('turn');
+    let settle = () => {};
+    const settled = new Promise<void>((resolve) => (settle = resolve));
     const operation = this.store.beginOperation(
       user,
       'provider.turn',
@@ -572,7 +578,7 @@ export class SupervisorRuntime {
           (actor.role !== 'chief' || current.generation === run.generation) &&
           (this.cancellation.get(fence) ?? 0) === cancellation &&
           (!actor.task_id ||
-            this.store.getTask(actor.task_id).status === 'running')
+            this.store.getTask(run.id, actor.task_id).status === 'running')
         );
       };
       const cancelPreparation = () => {
@@ -597,7 +603,7 @@ export class SupervisorRuntime {
             requestId(invocation, 'cancelled-attempt'),
             this.version(run.id),
           );
-          if (this.store.getTask(actor.task_id!).status === 'running')
+          if (this.store.getTask(run.id, actor.task_id!).status === 'running')
             this.store.setTaskWait(
               user,
               actor.task_id!,
@@ -635,7 +641,7 @@ export class SupervisorRuntime {
         this.version(run.id),
       );
       const task = actor.task_id
-        ? this.store.getTask(actor.task_id).spec
+        ? this.store.getTask(run.id, actor.task_id).spec
         : undefined;
       const project = await inspectProject(session.cwd);
       const selection = task
@@ -669,7 +675,7 @@ export class SupervisorRuntime {
       const handoffs = this.store
         .records<Handoff>(run.id, 'handoff')
         .filter((handoff) => {
-          const current = this.store.getTask(handoff.task_id);
+          const current = this.store.getTask(run.id, handoff.task_id);
           return (
             current.active_attempt_id === handoff.attempt_id &&
             current.generation === handoff.generation
@@ -960,6 +966,7 @@ export class SupervisorRuntime {
         session,
         process: native,
         operation,
+        settled,
       });
       let identity: ProcessIdentity | null = null;
       if (native.pid) {
@@ -980,6 +987,7 @@ export class SupervisorRuntime {
         session,
         process: native,
         operation,
+        settled,
       });
       this.store.observeOperation(
         user,
@@ -1103,7 +1111,7 @@ export class SupervisorRuntime {
           this.version(run.id),
         );
         if (actor.task_id) {
-          const current = this.store.getTask(actor.task_id);
+          const current = this.store.getTask(run.id, actor.task_id);
           if (current.status === 'running')
             this.store.setTaskWait(
               user,
@@ -1182,6 +1190,7 @@ export class SupervisorRuntime {
       throw error;
     } finally {
       if (token) this.registry.revoke(token);
+      settle();
     }
   }
 
@@ -1236,7 +1245,7 @@ export class SupervisorRuntime {
         id,
         criterion_ids: nonempty(
           this.store
-            .getTask(taskId)
+            .getTask(runId, taskId)
             .spec.acceptance_criteria.map((criterion) => criterion.id),
         ),
         mode: 'static',
@@ -1378,10 +1387,11 @@ export class SupervisorRuntime {
       });
       return { status: 'stopping' };
     }
+    // Without an explicit run, observe the run still working rather than the last one created.
     const runId =
       typeof args['run_id'] === 'string'
         ? args['run_id']
-        : this.store.listRuns(1)[0]?.id;
+        : this.store.currentRun()?.id;
     if (!runId)
       return {
         project: this.store.project,
@@ -1477,20 +1487,56 @@ export class SupervisorRuntime {
       }
       case 'pause':
       case 'stop': {
-        this.suspending.add(runId);
-        try {
-          this.scheduler.cancelQueued(runId);
-          for (const task of this.store.tasks(runId))
-            this.workerQueued.delete(task.id);
-          this.chiefQueued.delete(runId);
-          this.chiefNeeded.delete(runId);
-          await this.interrupt(runId);
-          return this.store.updateRunStatus(
+        const status = request.method === 'pause' ? 'paused' : 'cancelled';
+        const apply = () =>
+          this.store.updateRunStatus(
             user,
-            request.method === 'pause' ? 'paused' : 'cancelled',
+            status,
             ident(request.method),
             this.version(runId),
           );
+        this.suspending.add(runId);
+        try {
+          this.scheduler.cancelQueued(runId);
+          for (const [queued, id] of this.workerQueued)
+            if (id === runId) this.workerQueued.delete(queued);
+          this.chiefQueued.delete(runId);
+          this.chiefNeeded.delete(runId);
+          await this.interrupt(runId);
+        } catch (error) {
+          const pending = [...this.active.values()]
+            .filter((turn) => turn.run_id === runId)
+            .map((turn) => turn.settled);
+          if (!pending.length) {
+            this.suspending.delete(runId);
+            throw error;
+          }
+          // No new turn may start meanwhile: the request applies once the stopped turns are observed.
+          void Promise.all(pending)
+            .then(() => {
+              if (!terminal(this.store.getRun(runId))) apply();
+            })
+            .catch((failure: unknown) => {
+              try {
+                this.store.observation(user, 'scheduler.blocked', {
+                  code:
+                    failure instanceof CrewError
+                      ? failure.code
+                      : 'INTERNAL_ERROR',
+                  control: request.method,
+                });
+              } catch {
+                /* The service is closing; the run keeps its observed state. */
+              }
+            })
+            .finally(() => this.suspending.delete(runId));
+          throw new CrewError(
+            'CONTROL_IN_PROGRESS',
+            `Stopped turns are still finishing; the run becomes ${status} once their exit is observed`,
+          );
+        }
+        try {
+          return apply();
         } finally {
           this.suspending.delete(runId);
         }
@@ -1635,6 +1681,7 @@ export class SupervisorRuntime {
                 Number(args['after_seq'] ?? 0),
                 200,
                 EVENT_CHARS,
+                { whole: true },
               ),
               event_page_size: 200,
             };
@@ -1670,14 +1717,16 @@ export class SupervisorRuntime {
         await turn.process.result;
       }),
     );
-    for (
-      let index = 0;
-      index < 100 &&
-      [...this.active.values()].some((turn) => turns.includes(turn));
-      index++
-    )
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    if ([...this.active.values()].some((turn) => turns.includes(turn)))
+    // The process has exited; its turn may still record the exit or verify documents.
+    let timer: NodeJS.Timeout | undefined;
+    const settled = await Promise.race([
+      Promise.all(turns.map((turn) => turn.settled)).then(() => true),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(false), this.settleMs);
+      }),
+    ]);
+    clearTimeout(timer);
+    if (!settled)
       throw new CrewError(
         'RECONCILIATION_REQUIRED',
         'Turn exit is not yet observed',

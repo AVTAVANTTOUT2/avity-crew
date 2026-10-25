@@ -626,7 +626,7 @@ test('amendment requires chief authority, an approved scoped decision, stopped a
     f.version(),
   );
   assert.equal(f.store.records(f.run.id, 'task_revision').length, 0);
-  assert.deepEqual(f.store.getTask(spec.id).spec, spec);
+  assert.deepEqual(f.store.getTask(f.run.id, spec.id).spec, spec);
 });
 
 test('ready amendments support an explicit global decision, preserve questions, and reject terminal tasks', (t) => {
@@ -679,12 +679,12 @@ test('ready amendments support an explicit global decision, preserve questions, 
   );
   f.stop(worker.attempt.id);
   f.store.reassignTask(f.user, updated.id, f.key(), f.version());
-  assert.equal(f.store.getTask(updated.id).wait_reason, null);
+  assert.equal(f.store.getTask(f.run.id, updated.id).wait_reason, null);
   const resumed = f.claim(updated.spec);
-  assert.equal(f.store.getTask(updated.id).wait_reason, null);
+  assert.equal(f.store.getTask(f.run.id, updated.id).wait_reason, null);
   const delivered = f.deliver(updated.spec, resumed);
   assert.ok(delivered.id);
-  assert.equal(f.store.getTask(updated.id).wait_reason, null);
+  assert.equal(f.store.getTask(f.run.id, updated.id).wait_reason, null);
   const g = fixture(t),
     accepted = g.accepted(),
     approval = g.decision(accepted.spec.id);
@@ -848,12 +848,12 @@ test('amendment and its revision roll back with the event and replay once after 
     );
     const k = f.key(),
       version = f.version(),
-      before = f.store.getTask(spec.id);
+      before = f.store.getTask(f.run.id, spec.id);
     assert.throws(
       () => f.store.amendTask(f.chief, args, k, version),
       /forced append failure/,
     );
-    assert.deepEqual(f.store.getTask(spec.id), before);
+    assert.deepEqual(f.store.getTask(f.run.id, spec.id), before);
     assert.equal(f.version(), version);
     assert.equal(f.store.records(f.run.id, 'task_revision').length, 0);
     db.exec('DROP TRIGGER fail_amend');
@@ -902,7 +902,7 @@ test('review result, proof and control transition are atomic and idempotent with
       () => f.store.submitReview(reviewer.actor, review, k, version),
       /forced append failure/,
     );
-    assert.equal(f.store.getTask(control.id).status, 'running');
+    assert.equal(f.store.getTask(f.run.id, control.id).status, 'running');
     assert.equal(f.version(), version);
     assert.equal(f.store.records(f.run.id, 'control_result').length, 0);
     assert.equal(f.store.records(f.run.id, 'artifact').length, artifacts);
@@ -927,7 +927,7 @@ test('configuration explicitly applied by the locked service persists without re
     spec = f.task('task:preserved', 'documenter', [f.criteria[0]]);
   const before = structuredClone(f.store.project),
     run = f.store.getRun(f.run.id),
-    state = f.store.getTask(spec.id);
+    state = f.store.getTask(f.run.id, spec.id);
   const config: ProjectConfig = {
     ...structuredClone(before.config),
     max_active_agents: 3,
@@ -947,7 +947,7 @@ test('configuration explicitly applied by the locked service persists without re
   assert.equal(currentConfig.max_active_agents, 3);
   assert.equal(currentConfig.orchestrator.model, 'fixture:configured');
   assert.deepEqual(reopened.getRun(f.run.id), run);
-  assert.deepEqual(reopened.getTask(spec.id), state);
+  assert.deepEqual(reopened.getTask(f.run.id, spec.id), state);
   assert.throws(
     () => f.store.configureProject({ ...previousConfig, max_active_agents: 0 }),
     code('INVALID_INPUT'),
@@ -1038,7 +1038,7 @@ test('an amended same-SHA delivery rejects previous-attempt evidence and complet
     code('STALE_EVIDENCE'),
   );
   assert.equal(f.version(), before);
-  assert.equal(f.store.getTask(state.spec.id).status, 'in_review');
+  assert.equal(f.store.getTask(f.run.id, state.spec.id).status, 'in_review');
   assert.equal(f.store.records(f.run.id, 'acceptance').length, 0);
   const currentEvidence = f.proof(state.spec, state.current, state.handoff);
   assert.deepEqual(currentEvidence.value.criterion_ids, [f.criteria[0].id]);
@@ -1141,10 +1141,11 @@ test('current-attempt proof cannot recycle a criterion removed from the amended 
     code('STALE_EVIDENCE'),
   );
   assert.equal(f.version(), before);
-  assert.equal(f.store.getTask(state.spec.id).status, 'in_review');
-  assert.deepEqual(f.store.getTask(state.spec.id).spec.acceptance_criteria, [
-    f.criteria[0],
-  ]);
+  assert.equal(f.store.getTask(f.run.id, state.spec.id).status, 'in_review');
+  assert.deepEqual(
+    f.store.getTask(f.run.id, state.spec.id).spec.acceptance_criteria,
+    [f.criteria[0]],
+  );
   assert.deepEqual(
     f.store.getRun(f.run.id).acceptance_criteria,
     f.run.acceptance_criteria,

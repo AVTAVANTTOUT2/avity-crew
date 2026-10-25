@@ -606,7 +606,7 @@ test(
       baseline,
       'Revocation during promotion must leave the actual delivery ref unchanged',
     );
-    assert.equal(store.getTask(writerSpec.id).status, 'in_review');
+    assert.equal(store.getTask(run.id, writerSpec.id).status, 'in_review');
     assert.deepEqual(store.records(run.id, 'acceptance'), []);
     if (outcome.ok)
       assert.fail('A revoked promotion must return an HTTP denial');
@@ -685,7 +685,10 @@ test(
       refsBefore,
       'Revoked preparation must not create or change its Git delivery ref',
     );
-    assert.equal(f.store.getTask(f.writerSpec.id).status, 'in_review');
+    assert.equal(
+      f.store.getTask(f.writerSpec.run_id, f.writerSpec.id).status,
+      'in_review',
+    );
     if (outcome.ok)
       assert.fail('Revoked preparation must return an HTTP denial');
     assert.ok(outcome.error instanceof CrewError);

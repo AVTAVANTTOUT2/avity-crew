@@ -318,7 +318,7 @@ export interface ProviderAdapter {
 
 export interface StoragePort {
   getRun(id: string): Run;
-  getTask(id: string): TaskState;
+  getTask(runId: string, id: string): TaskState;
   events(runId: string, afterSeq: number, limit: number): CrewEvent[];
   submitHandoff(actor: Actor, handoff: Handoff, key: string): Handoff;
 }

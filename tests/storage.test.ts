@@ -162,7 +162,7 @@ test('SQLite persists documentary tasks, decisions, message observations and a d
     producer_attempt_id: attempt.id,
   }));
   f.store.submitHandoff(worker, handoff, 'submit:handoff', f.version());
-  assert.equal(f.store.getTask(f.task.id).status, 'in_review');
+  assert.equal(f.store.getTask(f.run.id, f.task.id).status, 'in_review');
   assert.equal(f.store.getRun(f.run.id).status, 'planning');
   const decision: Decision = {
     schema_version: 1,
@@ -216,7 +216,10 @@ test('SQLite persists documentary tasks, decisions, message observations and a d
   f.store.close();
   const reopened = new Store(f.project);
   t.after(() => reopened.close());
-  assert.equal(reopened.getTask(f.task.id).active_attempt_id, attempt.id);
+  assert.equal(
+    reopened.getTask(f.run.id, f.task.id).active_attempt_id,
+    attempt.id,
+  );
   assert.equal(
     reopened.getRecord<Decision>(f.run.id, 'decision', decision.id).approved_by,
     f.actor.id,
@@ -348,7 +351,7 @@ test(
     const exits = await Promise.all(workers.map((worker) => worker.finished));
     assert.deepEqual(exits.sort(), [0, 1]);
     assert.equal(f.store.attempts(f.run.id).length, 1);
-    assert.equal(f.store.getTask(f.task.id).status, 'running');
+    assert.equal(f.store.getTask(f.run.id, f.task.id).status, 'running');
   },
 );
 
@@ -403,7 +406,10 @@ test('heartbeat expiry does not release ownership, and a late previous attempt i
     () => f.store.submitHandoff(worker, stale, 'submit:stale', f.version()),
     code('STALE_ATTEMPT'),
   );
-  assert.equal(f.store.getTask(f.task.id).active_attempt_id, second.id);
+  assert.equal(
+    f.store.getTask(f.run.id, f.task.id).active_attempt_id,
+    second.id,
+  );
 });
 
 test('a failed event insert rolls back domain mutation, version and idempotency key together', (t) => {
@@ -464,7 +470,7 @@ test('migration from the previous version preserves data and rejects future data
   );
   previous.close();
   const migrated = new Store(f.project);
-  assert.equal(migrated.getTask(f.task.id).spec.base_revision, null);
+  assert.equal(migrated.getTask(f.run.id, f.task.id).spec.base_revision, null);
   migrated.close();
   const direct = new DatabaseSync(f.store.filename);
   direct.exec('PRAGMA user_version=99;');
@@ -805,4 +811,142 @@ test('reopening after Git initialization refreshes detection and preserves work 
   assert.equal(reopened.project.map_version, 8);
   assert.equal(reopened.project.config.max_active_agents, 3);
   assert.equal(reopened.getRun(f.run.id).objective, f.run.objective);
+});
+
+test('task IDs are scoped by run: two runs reuse one ID and a duplicate in a run is a mission conflict', (t) => {
+  const f = fixture(t);
+  f.addTask();
+  const other: Run = { ...f.run, id: 'run:second' };
+  f.store.createRun(other, 'create:second');
+  const actor: Actor = { ...f.actor, run_id: other.id };
+  const version = () => f.store.getRun(other.id).version;
+  const reused = f.store.createTask(
+    actor,
+    { ...f.task, run_id: other.id, objective: 'Second guide' },
+    'create:second-task',
+    version(),
+  );
+  assert.equal(reused.id, f.task.id);
+  assert.equal(
+    f.store.getTask(f.run.id, f.task.id).spec.objective,
+    f.task.objective,
+  );
+  assert.equal(
+    f.store.getTask(other.id, f.task.id).spec.objective,
+    'Second guide',
+  );
+  // Each run claims its own task; the one-active-attempt guard is per run.
+  for (const [owner, run] of [
+    [f.actor, f.run],
+    [actor, other],
+  ] as const) {
+    const attempt = f.store.claimTask(
+      owner,
+      f.task.id,
+      { ...f.session(`session:${run.id}`), run_id: run.id },
+      `claim:${run.id}`,
+      f.store.getRun(run.id).version,
+    );
+    assert.equal(attempt.run_id, run.id);
+    assert.equal(
+      f.store.getTask(run.id, f.task.id).active_attempt_id,
+      attempt.id,
+    );
+  }
+  assert.throws(
+    () =>
+      f.store.createTask(
+        actor,
+        { ...f.task, run_id: other.id },
+        'create:duplicate',
+        version(),
+      ),
+    code('TASK_EXISTS'),
+  );
+  assert.throws(
+    () => f.store.getTask(other.id, 'task:missing'),
+    code('NOT_FOUND'),
+  );
+});
+
+test('a version 2 database migrates to run-scoped task keys without losing references', (t) => {
+  const f = fixture(t);
+  f.addTask();
+  const attempt = f.store.claimTask(
+    f.actor,
+    f.task.id,
+    f.session(),
+    'claim:task',
+    f.version(),
+  );
+  f.store.close();
+  // Rebuild the exact version 2 schema (global task IDs) around the same rows.
+  const legacy = join(f.directory, 'legacy.sqlite');
+  const old = new DatabaseSync(legacy);
+  old.exec(`CREATE TABLE project (id TEXT PRIMARY KEY, data TEXT NOT NULL CHECK(json_valid(data))) STRICT;
+   CREATE TABLE runs (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES project(id), status TEXT NOT NULL, version INTEGER NOT NULL, data TEXT NOT NULL CHECK(json_valid(data))) STRICT;
+   CREATE TABLE tasks (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES runs(id), status TEXT NOT NULL, generation INTEGER NOT NULL, active_attempt_id TEXT REFERENCES attempts(id) DEFERRABLE INITIALLY DEFERRED, data TEXT NOT NULL CHECK(json_valid(data))) STRICT;
+   CREATE TABLE attempts (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES runs(id), task_id TEXT NOT NULL REFERENCES tasks(id), status TEXT NOT NULL, generation INTEGER NOT NULL, data TEXT NOT NULL CHECK(json_valid(data))) STRICT;
+   CREATE TABLE records (run_id TEXT NOT NULL REFERENCES runs(id), kind TEXT NOT NULL, id TEXT NOT NULL, task_id TEXT REFERENCES tasks(id), actor_id TEXT NOT NULL, data TEXT NOT NULL CHECK(json_valid(data)), PRIMARY KEY(run_id, kind, id)) STRICT;
+   CREATE TABLE events (run_id TEXT NOT NULL REFERENCES runs(id), seq INTEGER NOT NULL, data TEXT NOT NULL CHECK(json_valid(data)), PRIMARY KEY(run_id, seq)) STRICT;
+   CREATE TABLE requests (run_id TEXT NOT NULL REFERENCES runs(id), key TEXT NOT NULL, fingerprint TEXT NOT NULL, response TEXT NOT NULL CHECK(json_valid(response)), PRIMARY KEY(run_id, key)) STRICT;
+   CREATE UNIQUE INDEX one_active_attempt ON attempts(task_id) WHERE status IN ('queued','running','unknown');
+   CREATE INDEX tasks_by_run ON tasks(run_id, status);
+   CREATE INDEX records_by_task ON records(run_id, task_id, kind);`);
+  old.exec(
+    `ATTACH DATABASE '${f.store.filename.replaceAll("'", "''")}' AS current; BEGIN;`,
+  );
+  for (const table of [
+    'project',
+    'runs',
+    'tasks',
+    'attempts',
+    'records',
+    'events',
+    'requests',
+  ])
+    old.exec(`INSERT INTO main.${table} SELECT * FROM current.${table}`);
+  old.exec('COMMIT; DETACH DATABASE current; PRAGMA user_version=2;');
+  old.close();
+  rmSync(f.store.filename);
+  writeFileSync(f.store.filename, readFileSync(legacy), { mode: 0o600 });
+  const migrated = new Store(f.project);
+  t.after(() => migrated.close());
+  const task = migrated.getTask(f.run.id, f.task.id);
+  assert.equal(task.active_attempt_id, attempt.id);
+  assert.equal(migrated.getAttempt(attempt.id).task_id, f.task.id);
+  assert.ok(migrated.events(f.run.id).length > 0);
+  const direct = new DatabaseSync(f.store.filename);
+  t.after(() => direct.close());
+  assert.equal(
+    direct.prepare('PRAGMA user_version').get()?.['user_version'],
+    3,
+  );
+  assert.deepEqual(direct.prepare('PRAGMA foreign_key_check').all(), []);
+  assert.match(
+    String(
+      direct
+        .prepare("SELECT sql FROM sqlite_schema WHERE name='tasks'")
+        .get()?.['sql'],
+    ),
+    /PRIMARY KEY\(run_id, id\)/,
+  );
+});
+
+test('without an explicit run, the current run is the newest one not terminal', (t) => {
+  const f = fixture(t);
+  assert.equal(f.store.currentRun()?.id, f.run.id);
+  const later: Run = { ...f.run, id: 'run:later' };
+  f.store.createRun(later, 'create:later');
+  assert.equal(f.store.currentRun()?.id, later.id);
+  f.store.updateRunStatus(
+    { ...f.actor, run_id: later.id },
+    'cancelled',
+    'cancel:later',
+    f.store.getRun(later.id).version,
+  );
+  // The older run still works: status, watch and attach observe it.
+  assert.equal(f.store.currentRun()?.id, f.run.id);
+  f.store.updateRunStatus(f.actor, 'cancelled', 'cancel:first', f.version());
+  assert.equal(f.store.currentRun()?.id, later.id);
 });

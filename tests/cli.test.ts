@@ -22,7 +22,11 @@ import {
   serviceArguments,
   userClient,
 } from '../apps/cli/src/service.ts';
-import { now, runtimeSchema } from '../packages/contracts/src/index.ts';
+import {
+  CrewError,
+  now,
+  runtimeSchema,
+} from '../packages/contracts/src/index.ts';
 import type { Actor, Run } from '../packages/contracts/src/index.ts';
 import { identifyProject, Store } from '../packages/storage/src/index.ts';
 import { CapabilityRegistry } from '../packages/supervisor/src/capabilities.ts';
@@ -165,6 +169,14 @@ async function fixture(t: TestContext) {
       );
       if (request.method === 'status')
         return snapshot(Number(request.arguments.after_seq ?? 0));
+      if (
+        request.method === 'create_run' &&
+        request.arguments.objective === 'Sans Git'
+      )
+        throw new CrewError(
+          'GIT_INITIALIZATION_REQUIRED',
+          'Code mode requires a Git baseline',
+        );
       if (request.method === 'create_run') {
         run.status = 'running';
         return { ...run, fake: true, verification: 'unverified' };
@@ -313,6 +325,27 @@ test('CLI parsing validates every mutation option before project/service side ef
     assert.equal(JSON.parse(result.stdout).ok, false);
     assert.equal(existsSync(data), false);
     assert.equal(existsSync(join(root, '.git')), false);
+    const missing = await child(
+      ['run', '--prompt-file', 'absent.md', '--criterion', 'OK'],
+      root,
+      data,
+    );
+    assert.equal(missing.code, 2);
+    assert.match(
+      missing.stderr,
+      /CLI_USAGE : Fichier objectif introuvable : absent\.md/,
+    );
+    const folder = await child(
+      ['run', '--prompt-file', '.', '--criterion', 'OK', '--json'],
+      root,
+      data,
+    );
+    assert.equal(folder.code, 2);
+    assert.match(
+      JSON.parse(folder.stdout).error.message,
+      /n'est pas un fichier/,
+    );
+    assert.equal(existsSync(data), false);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -517,6 +550,21 @@ test('CLI file/stdin objectives and every control route preserve the explicit ad
   assert.equal(f.calls('replace_chief')[0].provider, 'claude');
   assert.equal(f.calls('replace_chief')[0].model, 'configured-model');
   assert.equal(f.calls('reassign')[0].task_id, 'task:one');
+  assert.equal(f.calls('export').at(-1).format, 'markdown');
+  assert.equal(
+    (await child(['export', '--run', 'run:test', '--json'], f.root, f.dataHome))
+      .code,
+    0,
+  );
+  assert.equal(f.calls('export').at(-1).format, 'json');
+  const refused = await child(
+    ['run', 'Sans Git', '--criterion', 'OK', '--mode', 'code'],
+    f.root,
+    f.dataHome,
+  );
+  assert.equal(refused.code, 2);
+  assert.match(refused.stderr, /GIT_INITIALIZATION_REQUIRED : .*--init-git/);
+  assert.match(refused.stderr, /--mode documentation/);
 });
 
 test('internal mcp remains pure JSON-RPC over the same capability-backed call', async (t) => {
@@ -731,6 +779,21 @@ test('terminal rendering escapes agent controls and keeps Unicode clipping valid
     18,
   );
   assert.match(view, /attente fournisseur/);
+  assert.match(
+    renderSnapshot(
+      {
+        project: { root: '/p' },
+        run: { id: 'run:test', objective: 'Guide', status: 'running' },
+        tasks: [],
+        sessions: [],
+        events: [],
+        contexts: [],
+      },
+      80,
+      18,
+    ),
+    /^Run : run:test\nObjectif : Guide$/m,
+  );
   assert.ok(!view.includes('\u001b]52'));
   assert.ok(!view.includes('%'));
   assert.match(view, /usage réel : indisponible|Contexte/);

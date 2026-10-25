@@ -1,7 +1,4 @@
 import { execFile, spawnSync } from 'node:child_process';
-import { access } from 'node:fs/promises';
-import { constants } from 'node:fs';
-import { delimiter, isAbsolute, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { CrewError, now } from '../../contracts/src/index.ts';
 import type {
@@ -13,6 +10,7 @@ import type {
 } from '../../contracts/src/index.ts';
 import {
   classifyNativeError,
+  executable,
   runNative,
   validateProviderRequest,
 } from './process.ts';
@@ -260,23 +258,7 @@ export class CodexProvider implements ProviderAdapter {
   constructor(private readonly binary = 'codex') {}
 
   async probe(): Promise<ProviderCapabilities> {
-    const candidates =
-      isAbsolute(this.binary) || this.binary.includes('/')
-        ? [resolve(this.binary)]
-        : (process.env.PATH ?? '')
-            .split(delimiter)
-            .filter(Boolean)
-            .map((dir) => resolve(dir, this.binary));
-    let binaryPath: string | undefined;
-    for (const candidate of candidates) {
-      try {
-        await access(candidate, constants.X_OK);
-        binaryPath = candidate;
-        break;
-      } catch {
-        // Try the next PATH entry.
-      }
-    }
+    const binaryPath = executable(this.binary);
     if (!binaryPath)
       throw new CrewError(
         'PROVIDER_UNAVAILABLE',
@@ -342,10 +324,11 @@ export class CodexProvider implements ProviderAdapter {
   }
 
   start(request: ProviderRequest): ProviderProcess {
+    const binary = executable(this.binary) ?? this.binary;
     return runNative(
       this.id,
-      this.binary,
-      codexArguments(this.binary, request),
+      binary,
+      codexArguments(binary, request),
       request,
       decodeCodexEvent,
     );
@@ -363,10 +346,11 @@ export class CodexProvider implements ProviderAdapter {
         'INVALID_INPUT',
         'Codex resume requires an explicit native session UUID',
       );
+    const binary = executable(this.binary) ?? this.binary;
     return runNative(
       this.id,
-      this.binary,
-      codexArguments(this.binary, request, request.native_session_id),
+      binary,
+      codexArguments(binary, request, request.native_session_id),
       request,
       decodeCodexEvent,
     );

@@ -970,7 +970,17 @@ export class Controller {
         this.lastRuns = s.now;
         if (this.initial) {
           this.initial = false;
-          const latest = str(s.runs[0]?.id);
+          // Join the run still working; otherwise show the last one created.
+          const latest = str(
+            (
+              s.runs.find(
+                (run) =>
+                  !['completed', 'failed', 'cancelled'].includes(
+                    str(run.status) ?? '',
+                  ),
+              ) ?? s.runs[0]
+            )?.id,
+          );
           if (latest) this.open(latest);
           else this.openForm();
         }

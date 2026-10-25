@@ -57,10 +57,21 @@ const canonical = (value: unknown): string => {
     );
   return JSON.stringify(value) ?? 'null';
 };
+/** Stands for an event that alone exceeds a page; its text stays in the export. */
+const omitted = (event: CrewEvent, characters: number): CrewEvent => ({
+  ...event,
+  payload: {
+    omitted: true,
+    characters,
+    detail:
+      'Événement trop volumineux pour cette page ; texte complet dans export',
+  },
+});
 /**
  * Cursor page of events bounded by count and serialized size. `next_seq` is the
  * last event consumed (shown or filtered out); at least one shown event is kept
- * so a paginating reader always progresses.
+ * so a paginating reader always progresses. An event larger than the room left
+ * is replaced by its envelope without payload, unless `whole` keeps it (export).
  */
 export function eventPage(
   store: Store,
@@ -68,18 +79,26 @@ export function eventPage(
   afterSeq: number,
   limit: number,
   maxChars: number,
-  select: (event: CrewEvent) => unknown = (event) => event,
+  {
+    select = (event) => event,
+    whole = false,
+  }: { select?: (event: CrewEvent) => unknown; whole?: boolean } = {},
 ): { events: unknown[]; next_seq: number; has_more: boolean } {
   const page = store.events(runId, afterSeq, limit);
   const events: unknown[] = [];
   let next_seq = afterSeq,
     room = maxChars;
   for (const event of page) {
-    const item = select(event);
+    let item = select(event);
     if (item !== null) {
-      const size = JSON.stringify(item).length + 1;
-      if (size > room && events.length)
-        return { events, next_seq, has_more: true };
+      let size = JSON.stringify(item).length + 1;
+      if (size > room) {
+        if (events.length) return { events, next_seq, has_more: true };
+        if (!whole) {
+          item = omitted(event, size - 1);
+          size = JSON.stringify(item).length + 1;
+        }
+      }
       room -= size;
       events.push(item);
     }
@@ -89,6 +108,7 @@ export function eventPage(
 }
 // Native MCP clients refuse large tool results (Claude Code: ~25k tokens); provider transcripts dominate events.
 const STATUS_CHARS = 40_000,
+  EVENT_ROOM = 8_000,
   EVENT_TEXT = 600;
 const clip = (value: unknown): unknown =>
   typeof value === 'string'
@@ -190,18 +210,24 @@ export class Coordinator implements SupervisorApi {
           'VERSION_CONFLICT',
           `Current run version is ${this.store.getRun(call.run_id).version}`,
         );
-      const receipt = this.store.beginOperation(
-        user,
-        'tool.' + call.method,
-        canonical({ actor, method: call.method, arguments: call.arguments }),
-        key,
-        this.store.getRun(call.run_id).version,
-      );
-      const current = this.store.getRecord<Operation>(
-        call.run_id,
-        'operation',
-        receipt.id,
-      );
+      // A failed dispatch stays failed in the journal; reusing its key (after a
+      // lost reply, or once state allows it) is recorded as a new attempt.
+      let current: Operation;
+      for (let attempt = 0; ; attempt++) {
+        const receipt = this.store.beginOperation(
+          user,
+          'tool.' + call.method,
+          canonical({ actor, method: call.method, arguments: call.arguments }),
+          attempt ? requestId(`${key}:${attempt}`, 'tool') : key,
+          this.store.getRun(call.run_id).version,
+        );
+        current = this.store.getRecord<Operation>(
+          call.run_id,
+          'operation',
+          receipt.id,
+        );
+        if (current.status !== 'failed') break;
+      }
       if (current.status === 'completed')
         return {
           result: current.result,
@@ -218,7 +244,7 @@ export class Coordinator implements SupervisorApi {
         );
         this.store.observeOperation(
           user,
-          receipt.id,
+          current.id,
           'completed',
           result,
           requestId(key, 'done'),
@@ -226,10 +252,19 @@ export class Coordinator implements SupervisorApi {
         );
         return { result, run_version: this.store.getRun(call.run_id).version };
       } catch (error) {
+        const code = error instanceof CrewError ? error.code : 'INTERNAL_ERROR';
+        this.store.observeOperation(
+          user,
+          current.id,
+          'failed',
+          { business_success: false, error: { code } },
+          requestId(current.id, 'failed'),
+          this.store.getRun(call.run_id).version,
+        );
         this.store.observation(user, 'tool.failed', {
-          operation_id: receipt.id,
+          operation_id: current.id,
           method: call.method,
-          code: error instanceof CrewError ? error.code : 'INTERNAL_ERROR',
+          code,
         });
         throw error;
       }
@@ -255,7 +290,7 @@ export class Coordinator implements SupervisorApi {
     taskId: string,
     allowReviewer = false,
   ): void {
-    const task = this.store.getTask(taskId);
+    const task = this.store.getTask(actor.run_id, taskId);
     if (
       task.run_id !== actor.run_id ||
       (!['user', 'chief'].includes(actor.role) &&
@@ -292,24 +327,34 @@ export class Coordinator implements SupervisorApi {
           (message.recipient_kind === 'task' &&
             message.recipient_id === actor.task_id),
       );
-    const status = {
+    const records = (limit: number) => ({
       run: this.store.getRun(actor.run_id),
-      tasks: tasks.slice(0, args.limit),
+      tasks: tasks.slice(0, limit),
       task_count: tasks.length,
-      messages: messages.slice(-args.limit),
+      messages: messages.slice(-limit),
       questions: all
-        ? this.store.records(actor.run_id, 'question').slice(-args.limit)
+        ? this.store.records(actor.run_id, 'question').slice(-limit)
         : [],
       user_responses: all
-        ? this.store.records(actor.run_id, 'user_response').slice(-args.limit)
+        ? this.store.records(actor.run_id, 'user_response').slice(-limit)
         : [],
       delegations: all
-        ? this.store.records(actor.run_id, 'delegation').slice(-args.limit)
+        ? this.store.records(actor.run_id, 'delegation').slice(-limit)
         : [],
       verifications: all
-        ? this.store.records(actor.run_id, 'verification').slice(-args.limit)
+        ? this.store.records(actor.run_id, 'verification').slice(-limit)
         : [],
-    };
+    });
+    let limit = args.limit,
+      status = records(limit);
+    // An agent reads this page through its MCP client: shorten the lists (newest
+    // kept) so the records leave room for events; record_limit reports it.
+    while (
+      actor.role !== 'user' &&
+      limit > 1 &&
+      JSON.stringify(status).length > STATUS_CHARS - EVENT_ROOM
+    )
+      status = records((limit = Math.ceil(limit / 2)));
     // Events fill the room left by the records; continue from next_seq while has_more.
     const page = eventPage(
       this.store,
@@ -317,12 +362,18 @@ export class Coordinator implements SupervisorApi {
       args.after_seq,
       args.limit,
       STATUS_CHARS - JSON.stringify(status).length,
-      (event) =>
-        all || event.task_id === actor.task_id || event.actor_id === actor.id
-          ? { ...event, payload: clip(event.payload) }
-          : null,
+      {
+        select: (event) =>
+          all || event.task_id === actor.task_id || event.actor_id === actor.id
+            ? { ...event, payload: clip(event.payload) }
+            : null,
+      },
     );
-    return { ...status, ...page };
+    return {
+      ...status,
+      ...(limit < args.limit ? { record_limit: limit } : {}),
+      ...page,
+    };
   }
 
   private scopedSpec(input: TaskSpec): TaskSpec {
@@ -369,7 +420,7 @@ export class Coordinator implements SupervisorApi {
       case 'inspect_project': {
         const project = await inspectProject(this.store.project.root);
         const scope = actor.task_id
-          ? this.store.getTask(actor.task_id).spec.scope
+          ? this.store.getTask(actor.run_id, actor.task_id).spec.scope
           : {
               read_paths: ['**'],
               excluded_paths: this.store.project.config.context.exclude_paths,
@@ -601,7 +652,10 @@ export class Coordinator implements SupervisorApi {
           'handoff',
           call.arguments.handoff_id,
         );
-        if (this.store.getTask(handoff.task_id).status !== 'accepted') {
+        if (
+          this.store.getTask(actor.run_id, handoff.task_id).status !==
+          'accepted'
+        ) {
           this.store.validateDelivery(actor, call.arguments);
           if (run.delivery_mode === 'code') {
             const candidate = this.store
@@ -687,7 +741,7 @@ export class Coordinator implements SupervisorApi {
         'WORKSPACE_REQUIRED',
         'No observed workspace belongs to this attempt',
       );
-    const task = this.store.getTask(actor.task_id);
+    const task = this.store.getTask(actor.run_id, actor.task_id);
     const manager = new WorkspaceManager(
       this.store,
       serviceActor(this.store, actor.run_id),
@@ -846,7 +900,7 @@ export class Coordinator implements SupervisorApi {
             id,
             criterion_ids: nonempty(
               this.store
-                .getTask(handoff.task_id)
+                .getTask(actor.run_id, handoff.task_id)
                 .spec.acceptance_criteria.map((item) => item.id),
             ),
             mode: 'static',

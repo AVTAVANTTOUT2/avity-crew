@@ -141,6 +141,37 @@ function excludedPath(path: string): string | null {
   return null;
 }
 
+/**
+ * `git status --porcelain -z` as short lines, without the paths whose contents
+ * the context never reads: their names alone can disclose a secret file.
+ */
+function visibleStatus(raw: string): string {
+  const entries = raw.split('\0');
+  const lines: string[] = [];
+  let hidden = 0;
+  for (let index = 0; index < entries.length; index++) {
+    const entry = entries[index]!;
+    if (!entry) continue;
+    const code = entry.slice(0, 2),
+      path = entry.slice(3);
+    const from = /[RC]/.test(code) ? entries[++index] : undefined;
+    if (
+      [path, from].some(
+        (item) =>
+          item !== undefined &&
+          ['sensitive_path', 'private_tool_or_credential_directory'].includes(
+            excludedPath(item.replace(/\/$/, '')) ?? '',
+          ),
+      )
+    )
+      hidden++;
+    else
+      lines.push(`${code} ${from === undefined ? path : `${from} -> ${path}`}`);
+  }
+  if (hidden) lines.push(`(${hidden} chemin(s) sensible(s) non affiché(s))`);
+  return lines.join('\n');
+}
+
 function safeRelative(path: string): string {
   if (
     typeof path !== 'string' ||
@@ -285,13 +316,13 @@ export async function inspectProject(
         timeout: 5000,
         maxBuffer: 1024 * 1024,
       }).catch(() => null),
-      execute('git', ['-C', root, 'status', '--short'], {
+      execute('git', ['-C', root, 'status', '--porcelain', '-z'], {
         timeout: 5000,
         maxBuffer: 1024 * 1024,
       }),
     ]);
     git.revision = revision ? `git:${revision.stdout.trim()}` : null;
-    git.status = redactContext(status.stdout.trim());
+    git.status = redactContext(visibleStatus(status.stdout));
   } catch (failure) {
     const code = (failure as NodeJS.ErrnoException).code;
     if (gitPresent || code === 'ENOENT')

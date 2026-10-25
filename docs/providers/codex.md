@@ -4,7 +4,7 @@ La V1 utilise la CLI officielle avec `codex exec --json`. Cette voie non interac
 
 ## Version et découverte
 
-Version de référence : **Codex CLI 0.163.0**, vérifiée le 24 octobre 2026 sur macOS. `CodexProvider.probe()` cherche le binaire dans `PATH` (ou utilise le chemin fourni au constructeur), puis exécute `--version`, `exec --help` et `exec resume --help`, avec délai et taille de sortie bornés. Un exécutable absent ou inutilisable produit `PROVIDER_UNAVAILABLE`.
+Version de référence : **Codex CLI 0.163.0**, vérifiée le 24 octobre 2026 sur macOS. `CodexProvider.probe()` cherche le binaire dans les répertoires absolus du `PATH` (ou utilise le chemin fourni au constructeur) ; les entrées vides ou relatives, qui désigneraient le répertoire courant, sont ignorées et le lancement utilise exactement le chemin sondé. Elle exécute ensuite `--version`, `exec --help` et `exec resume --help`, avec délai et taille de sortie bornés. Un exécutable absent ou inutilisable produit `PROVIDER_UNAVAILABLE`.
 
 Le modèle est celui de `ProviderRequest.model` lorsqu'il est renseigné. Sinon Codex résout le modèle avec ses préférences natives chargées ; l'adaptateur n'invente pas un nom de modèle à partir d'événements qui ne l'exposent pas. L'accessibilité effective du modèle est vérifiée par Codex à l'exécution.
 

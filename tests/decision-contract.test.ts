@@ -101,7 +101,7 @@ test('a Decision read back from Store validates and compiles without dropping it
     generation: 1,
   };
   const original = decision(run.id);
-  store.recordDecision(
+  const returned = store.recordDecision(
     user,
     original,
     'record:decision',
@@ -113,6 +113,8 @@ test('a Decision read back from Store validates and compiles without dropping it
     provenance: { basis: 'technical_judgment', user_response_id: null },
   };
   assert.deepEqual(decisions, [expected]);
+  // The caller receives what was persisted, provenance included.
+  assert.deepEqual(returned, expected);
   validate('Decision', decisions[0]);
   const compiled = compileContext({
     id: 'context:decision',

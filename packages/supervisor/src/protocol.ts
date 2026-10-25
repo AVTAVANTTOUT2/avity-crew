@@ -4,6 +4,8 @@ import type { CapabilityRegistry, Principal } from './capabilities.ts';
 export const LOCAL_PROTOCOL = 1;
 export const MAX_JSON_BYTES = 1024 * 1024;
 export const REQUEST_TIMEOUT_MS = 10_000;
+/** Pause, stop and replacements wait until stopped turns finish their post-exit checks. */
+export const CONTROL_TIMEOUT_MS = 30_000;
 
 export interface ToolDescriptor {
   name: ToolCall['method'];

@@ -382,6 +382,7 @@ async function fixture(
   provider: ScriptedProvider,
   maximum = 1,
   mode: Run['delivery_mode'] = 'documentation',
+  settleMs?: number,
 ) {
   const directory = mkdtempSync(join(tmpdir(), 'crew runtime simulated '));
   const root = join(directory, 'project with spaces');
@@ -421,6 +422,8 @@ async function fixture(
     store,
     join(project.data_dir, 'endpoint.json'),
     [provider],
+    undefined,
+    settleMs,
   );
   const transport = await startTransport({
     directory: project.data_dir,
@@ -1589,7 +1592,7 @@ test(
     )!;
     assert.equal(f.store.readArtifact(oldFile).toString('utf8'), contents[0]);
     assert.equal(
-      f.store.getTask('task:correctable').accepted_revision,
+      f.store.getTask(run.id, 'task:correctable').accepted_revision,
       handoffs[1]!.source_revision,
     );
     assert.equal(f.store.records(run.id, 'acceptance').length, 1);
@@ -1645,6 +1648,80 @@ test(
     );
     assert.equal(f.store.getRun(run.id).status, 'paused');
     assert.deepEqual(provider.failures, []);
+  },
+);
+
+test(
+  'pause waits for a stopped turn still finishing after its process exited',
+  { timeout: 15_000 },
+  async (t) => {
+    let started!: () => void;
+    const running = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    // Post-exit work longer than the former 2 s budget, like document verification.
+    const provider = new ScriptedProvider(async ({ signal }) => {
+      started();
+      await untilInterrupted(signal!);
+      await delay(2_500);
+    });
+    const f = await fixture(t, provider);
+    const run = await f.create();
+    await bounded(running, 'The chief turn did not start');
+    const paused = (await f.owner.admin({
+      method: 'pause',
+      arguments: { run_id: run.id },
+    })) as Run;
+    assert.equal(paused.status, 'paused');
+    await f.runtime.scheduler.idle();
+    assert.equal(provider.turns.length, 1);
+    assert.equal(f.store.getRun(run.id).status, 'paused');
+  },
+);
+
+test(
+  'a pause outlasting its wait keeps the run suspended and applies once the turn is observed',
+  { timeout: 15_000 },
+  async (t) => {
+    let started!: () => void, release!: () => void;
+    const running = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const drained = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const provider = new ScriptedProvider(async ({ signal }) => {
+      started();
+      await untilInterrupted(signal!);
+      await drained;
+    });
+    const f = await fixture(t, provider, 1, 'documentation', 100);
+    const run = await f.create();
+    await bounded(running, 'The chief turn did not start');
+    await assert.rejects(
+      f.owner.admin({ method: 'pause', arguments: { run_id: run.id } }),
+      hasCode('CONTROL_IN_PROGRESS'),
+    );
+    assert.equal(f.store.getRun(run.id).status, 'running');
+    // The suspension stays: no other control and no new turn meanwhile.
+    f.runtime.wake(run.id);
+    await assert.rejects(
+      f.owner.admin({ method: 'stop', arguments: { run_id: run.id } }),
+      hasCode('CONTROL_IN_PROGRESS'),
+    );
+    release();
+    const deadline = Date.now() + 5_000;
+    while (f.store.getRun(run.id).status !== 'paused') {
+      assert.ok(Date.now() < deadline, 'The requested pause was not applied');
+      await delay(10);
+    }
+    await f.runtime.scheduler.idle();
+    assert.equal(provider.turns.length, 1);
+    const resumed = (await f.owner.admin({
+      method: 'resume',
+      arguments: { run_id: run.id },
+    })) as Run;
+    assert.equal(resumed.status, 'running');
   },
 );
 
@@ -2652,7 +2729,7 @@ test(
       f.store.tasks(run.id).every((item) => item.status === 'accepted'),
     );
     assert.equal(
-      f.store.getTask(sourceIds[2]!).spec.base_revision,
+      f.store.getTask(run.id, sourceIds[2]!).spec.base_revision,
       failed.candidateRevision,
     );
     assert.equal(
@@ -2916,8 +2993,11 @@ test(
       assert.equal(failedAttempt.status, 'exited');
       assert.equal(failedAttempt.pid, null);
       assert.equal(failedAttempt.exit_code, null);
-      assert.equal(f.store.getTask(recoveryTask).status, 'blocked');
-      assert.equal(f.store.getTask(recoveryTask).wait_reason, failureMessage);
+      assert.equal(f.store.getTask(run.id, recoveryTask).status, 'blocked');
+      assert.equal(
+        f.store.getTask(run.id, recoveryTask).wait_reason,
+        failureMessage,
+      );
       assert.equal(
         f.store
           .attempts(run.id)
@@ -2925,7 +3005,7 @@ test(
         2,
       );
       await wait(
-        () => f.store.getTask(independentTask).status === 'in_review',
+        () => f.store.getTask(run.id, independentTask).status === 'in_review',
         'The independent mission must continue after the unrelated recovery failure',
       );
       for (let wake = 0; wake < 5; wake++) f.runtime.wake(run.id);
@@ -2963,7 +3043,7 @@ test(
       assert.notEqual(retry.id, queued.id);
       f.runtime.wake(run.id, false);
       await wait(
-        () => f.store.getTask(recoveryTask).status === 'in_review',
+        () => f.store.getTask(run.id, recoveryTask).status === 'in_review',
         'A new explicit delegation must be able to recover after the preparation blocker is removed',
       );
       await f.runtime.scheduler.idle();
@@ -2989,7 +3069,7 @@ test(
         developerStarts.filter((id) => id === recoveryTask).length,
         1,
       );
-      assert.equal(f.store.getTask(recoveryTask).wait_reason, null);
+      assert.equal(f.store.getTask(run.id, recoveryTask).wait_reason, null);
       assert.equal(f.store.getRun(run.id).status, 'running');
       assert.equal(f.store.records(run.id, 'final').length, 0);
       assert.equal(

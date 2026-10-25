@@ -1,6 +1,6 @@
 # Claude Code adapter
 
-`ClaudeProvider(binary = 'claude')` uses the installed CLI and its native authentication. No API key is copied or required by Avity Crew. The protocol fixture and live matrix target Claude Code 2.1.304. Other versions remain `unverified` even when their local help advertises the required options.
+`ClaudeProvider(binary = 'claude')` uses the installed CLI and its native authentication. A bare name is looked up in the absolute `PATH` directories only (empty or relative entries would name whichever directory is current) and the probed path is the one launched. No API key is copied or required by Avity Crew. The protocol fixture and live matrix target Claude Code 2.1.304. Other versions remain `unverified` even when their local help advertises the required options.
 
 Prompts travel on stdin. The adapter uses print mode with `stream-json` and `--verbose`, captures the exact `session_id`, and resumes only that UUID. A resumed turn receives its new team context in the prompt; changing the original system prompt is not assumed to replace the session's stored instructions. Models come from `ProviderRequest.model` or the native default.
 

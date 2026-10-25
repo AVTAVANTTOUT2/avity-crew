@@ -15,6 +15,7 @@ import { now } from '../packages/contracts/src/index.ts';
 import type {
   Actor,
   CrewEvent,
+  Operation,
   Run,
   TaskSpec,
   ToolCall,
@@ -239,4 +240,219 @@ test('a task agent pages a bounded status and is not refused by an unrelated chi
     ),
     { code: 'VERSION_CONFLICT' },
   );
+});
+
+test('a chief status page stays bounded when its records and a single event exceed the room', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'avity status bound '));
+  const store = new Store(identifyProject(directory, join(directory, 'data')));
+  t.after(() => {
+    store.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+  const coordinator = new Coordinator(store, {
+    wake: () => {},
+    admin: async () => null,
+  });
+  const timestamp = now();
+  const run: Run = {
+    id: 'run:status-bound',
+    project_id: store.project.id,
+    objective: 'Keep the chief page within native tool limits',
+    constraints: [],
+    acceptance_criteria: [
+      {
+        id: 'criterion:bound',
+        description: 'Status stays readable',
+        required: true,
+        verification: 'test',
+      },
+    ],
+    delivery_mode: 'documentation',
+    status: 'planning',
+    chief_provider: 'fake',
+    chief_model: null,
+    generation: 1,
+    version: 0,
+    max_active_agents: 2,
+    created_at: timestamp,
+    updated_at: timestamp,
+  };
+  store.createRun(run, 'run:create');
+  const version = () => store.getRun(run.id).version;
+  const user: Actor = {
+    id: 'user:local',
+    project_id: store.project.id,
+    run_id: run.id,
+    role: 'user',
+    task_id: null,
+    attempt_id: null,
+    generation: 1,
+  };
+  store.updateRunStatus(user, 'running', 'run:running', version());
+  // One event whose clipped payload alone exceeds a page.
+  store.observation(user, 'provider.tool', {
+    items: Array.from({ length: 200 }, () => 'y'.repeat(500)),
+  });
+  store.observation(user, 'provider.text', { text: 'small' });
+  // 120 user messages of 1 000 characters: the records alone exceed the page.
+  for (let index = 0; index < 120; index++)
+    store.sendMessage(
+      user,
+      {
+        id: `message:${index}`,
+        run_id: run.id,
+        sender_id: user.id,
+        recipient_kind: 'chief',
+        recipient_id: `control:${run.id}`,
+        kind: 'information',
+        content: `${index}:` + 'm'.repeat(1_000),
+        source_ids: [],
+        status: 'queued',
+        created_at: timestamp,
+      },
+      `message:${index}`,
+      version(),
+    );
+  const chief = {
+    kind: 'agent' as const,
+    actor: { ...user, id: 'session:chief', role: 'chief' as const },
+  };
+  type Page = {
+    result: {
+      events: CrewEvent[];
+      messages: unknown[];
+      record_limit?: number;
+      next_seq: number;
+      has_more: boolean;
+    };
+  };
+  const seen: string[] = [];
+  let after = 0;
+  for (let request = 1; ; request++) {
+    const page = (await coordinator.execute(chief, {
+      schema_version: 1,
+      request_id: `request:${request}`,
+      idempotency_key: `key:${request}`,
+      run_id: run.id,
+      expected_version: version(),
+      method: 'get_status',
+      arguments: { after_seq: after, limit: 200, task_id: null },
+    })) as Page;
+    assert.ok(JSON.stringify(page).length < 41_000);
+    assert.ok(page.result.record_limit! < 200);
+    assert.ok(page.result.messages.length > 0);
+    assert.ok(page.result.next_seq > after, 'Each page must progress');
+    for (const event of page.result.events)
+      if (event.type.startsWith('provider.'))
+        seen.push(
+          'omitted' in event.payload ? `${event.type}:omitted` : event.type,
+        );
+    if (!page.result.has_more) break;
+    after = page.result.next_seq;
+  }
+  assert.deepEqual(seen, ['provider.tool:omitted', 'provider.text']);
+});
+
+test('a failed tool call closes its operation and its key can still complete as a new attempt', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'avity tool journal '));
+  const store = new Store(identifyProject(directory, join(directory, 'data')));
+  t.after(() => {
+    store.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+  const coordinator = new Coordinator(store, {
+    wake: () => {},
+    admin: async () => null,
+  });
+  const timestamp = now();
+  const run: Run = {
+    id: 'run:tool-journal',
+    project_id: store.project.id,
+    objective: 'Journal every tool outcome',
+    constraints: [],
+    acceptance_criteria: [
+      {
+        id: 'criterion:journal',
+        description: 'Operations are closed',
+        required: true,
+        verification: 'test',
+      },
+    ],
+    delivery_mode: 'documentation',
+    status: 'planning',
+    chief_provider: 'fake',
+    chief_model: null,
+    generation: 1,
+    version: 0,
+    max_active_agents: 2,
+    created_at: timestamp,
+    updated_at: timestamp,
+  };
+  store.createRun(run, 'run:create');
+  const version = () => store.getRun(run.id).version;
+  const user: Actor = {
+    id: 'user:local',
+    project_id: store.project.id,
+    run_id: run.id,
+    role: 'user',
+    task_id: null,
+    attempt_id: null,
+    generation: 1,
+  };
+  store.updateRunStatus(user, 'running', 'run:running', version());
+  const owner = { kind: 'user' as const, project_id: store.project.id };
+  const message = (): ToolCall => ({
+    schema_version: 1,
+    request_id: 'request:message',
+    idempotency_key: 'key:message',
+    run_id: run.id,
+    expected_version: version(),
+    method: 'send_message',
+    arguments: {
+      recipient_kind: 'task',
+      recipient_id: 'task:later',
+      kind: 'information',
+      content: 'Contexte pour la mission',
+      source_ids: [],
+      requires_ack: false,
+    },
+  });
+  const journal = () =>
+    store
+      .records<Operation>(run.id, 'operation')
+      .filter((operation) => operation.kind === 'tool.send_message')
+      .map((operation) => operation.status);
+  await assert.rejects(coordinator.execute(owner, message()), {
+    code: 'NOT_FOUND',
+  });
+  assert.deepEqual(journal(), ['failed']);
+  assert.deepEqual(store.uncertainOperations(run.id), []);
+  store.createTask(
+    user,
+    {
+      schema_version: 1,
+      id: 'task:later',
+      run_id: run.id,
+      title: 'Later',
+      objective: 'Receive context',
+      role: 'documenter',
+      acceptance_criteria: [run.acceptance_criteria[0]!],
+      depends_on: [],
+      scope: { read_paths: ['**'], write_paths: ['**'], excluded_paths: [] },
+      base_revision: null,
+      context_source_ids: [],
+      expected_deliverables: ['Notes'],
+      created_at: timestamp,
+    },
+    'task:create',
+    version(),
+  );
+  const sent = await coordinator.execute(owner, message());
+  assert.deepEqual(journal(), ['failed', 'completed']);
+  // A lost reply is replayed from the completed attempt without a new one.
+  assert.deepEqual(
+    (await coordinator.execute(owner, message())) as { result: unknown },
+    { ...(sent as object), run_version: version() },
+  );
+  assert.deepEqual(journal(), ['failed', 'completed']);
 });

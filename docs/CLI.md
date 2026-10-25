@@ -38,11 +38,11 @@ avity-crew inspect-context --run run:ID --subject task:ID --json
 avity-crew export --run run:ID --format markdown
 ```
 
-Les réponses affichent le résultat observé du service. Un enregistrement `queued` n'est pas une réception : `delivered`, `acknowledged` et `applied` gardent leurs sens distincts. Une commande de pause/arrêt ne prétend pas que tous les processus sont déjà terminés. `message` utilise le même ToolCall `send_message` que le domaine/MCP, avec version actuelle du run, request_id et idempotency_key explicites ; `chief` désigne `chief:current`, résolu par le serveur.
+Les réponses affichent le résultat observé du service. Un enregistrement `queued` n'est pas une réception : `delivered`, `acknowledged` et `applied` gardent leurs sens distincts. Une commande de pause/arrêt ne prétend pas que tous les processus sont déjà terminés. Elle attend que les tours arrêtés aient fini leurs contrôles de sortie (vérification documentaire comprise) ; si cette fin n'est pas observée à temps, elle répond `CONTROL_IN_PROGRESS`, aucun nouveau tour ne démarre et la pause ou l'arrêt s'applique dès la fin observée. `message` utilise le même ToolCall `send_message` que le domaine/MCP, avec version actuelle du run, request_id et idempotency_key explicites ; `chief` désigne `chief:current`, résolu par le serveur.
 
 `status` accepte `--after-seq N` et `--limit N` (1 à 1000). Le viewer réutilise son curseur lors d'une reconnexion et ne crée jamais un nouveau run. Il n'avance le curseur qu'après présentation d'une page. En mode humain, les grandes pages sont résumées et signalent comment obtenir leur contenu complet en JSON. Les tâches, sessions, capacité configurée, dépendances, questions, blocages, décisions et vérifications sont distingués ; le contexte indique une estimation lorsqu'elle existe, et l'usage réel est indiqué indisponible tant qu'il n'est pas fourni. Aucun pourcentage n'est inventé.
 
-Sans `--run`, la vue se fixe sur le run observé et ne bascule pas vers un objectif créé ailleurs ; la colonne Sessions (Ctrl+B, Ctrl+P/Ctrl+N) permet de changer explicitement d'objectif. Les compteurs de tours actifs/en file viennent du scheduler et restent distincts des sessions connues. Les tokens ne sont affichés comme usage déclaré que lorsqu'un événement live les fournit, sans total ou coût facturé inventé.
+Sans `--run`, `status`, `watch` et `attach` observent le run non terminé le plus récent, ou à défaut le dernier créé ; `avity-crew` seul rejoint ce run en cours, sinon ouvre l'accueil. La vue se fixe ensuite sur le run observé et ne bascule pas vers un objectif créé ailleurs ; la colonne Sessions (Ctrl+B, Ctrl+P/Ctrl+N) permet de changer explicitement d'objectif. Les compteurs de tours actifs/en file viennent du scheduler et restent distincts des sessions connues. Les tokens ne sont affichés comme usage déclaré que lorsqu'un événement live les fournit, sans total ou coût facturé inventé.
 
 ### Interface plein écran
 
@@ -56,7 +56,7 @@ Elle lit uniquement des capacités existantes : `status` (curseur `after_seq`), 
 
 La palette `/` affiche pour chaque entrée la valeur actuelle, la cible (chef, session, projet, interface) et la prise d'effet. `/provider` et `/model` remplacent le chef via `replace_chief` ; `/effort` (« puissance ») est désactivé car le moteur ne transmet aucun effort aux CLI ; `/permissions` affiche le profil du projet en lecture seule (modification par configuration puis redémarrage du service). Un refus de permission observé est présenté comme un fait accompli : le moteur n'expose aucune approbation interactive.
 
-Dans une vue terminal : `q`, `:q` ou `/quit` détachent ; Ctrl+C interrompt seulement l'affichage. `/answer ID texte` répond à une question ; `/compose` rappelle que la saisie est déjà multiligne (Alt+Entrée ou Ctrl+J) et `/cancel` efface le brouillon. Les chaînes d'agents sont nettoyées des contrôles ANSI/OSC et découpées par graphèmes Unicode. Les événements et journaux complets restent dans le service ; l'interface garde au plus 4000 événements par session en mémoire.
+Dans une vue terminal : `q`, `:q` ou `/quit` détachent ; Ctrl+C interrompt seulement l'affichage. `/answer question:ID texte` répond à une question (hors vue : `avity-crew answer --run ID --question question:ID "texte"`) ; `/compose` rappelle que la saisie est déjà multiligne (Alt+Entrée ou Ctrl+J) et `/cancel` efface le brouillon. Les chaînes d'agents sont nettoyées des contrôles ANSI/OSC et découpées par graphèmes Unicode. Les événements et journaux complets restent dans le service ; l'interface garde au plus 4000 événements par session en mémoire.
 
 Une vue terminal reste ouverte sur un résultat final jusqu'au détachement explicite ; une vue non interactive se termine à l'état final ou après `--timeout MS`. Sans timeout, `watch` reste attaché ; `--once` réalise une seule observation. Le service continue après fermeture de la vue, tant que la machine reste allumée. L'ouverture directe d'une session native n'est pas simulée par l'interface.
 
@@ -72,13 +72,13 @@ Le client relit les métadonnées d'endpoint à chaque requête. Une déconnexio
 
 ## Sorties et codes
 
-`--json` produit `{schema_version:1,ok:true,data:...}` ou `{schema_version:1,ok:false,error:{code,message}}`. `watch --json` produit une telle enveloppe par observation ; une déconnexion transitoire conserve `ok:false` avec `retrying:true` pendant la reconnexion. Le flux MCP interne suit son protocole distinct. Les messages humains vont sur stderr en cas d'erreur et aucun ANSI n'est imposé aux scripts.
+`export --json` sans `--format` produit le rapport JSON complet ; `--format markdown --json` enveloppe le Markdown. `--json` produit `{schema_version:1,ok:true,data:...}` ou `{schema_version:1,ok:false,error:{code,message}}`. `watch --json` produit une telle enveloppe par observation ; une déconnexion transitoire conserve `ok:false` avec `retrying:true` pendant la reconnexion. Le flux MCP interne suit son protocole distinct. Les messages humains vont sur stderr en cas d'erreur et aucun ANSI n'est imposé aux scripts.
 
 | Code | Sens                                                                                                                  |
 | ---- | --------------------------------------------------------------------------------------------------------------------- |
 | 0    | Requête exécutée/état lu, ou objectif `completed` observé par watch ; un `run` enregistré n'est pas une preuve de fin |
 | 1    | Commande échouée ou objectif `failed` observé                                                                         |
-| 2    | Usage, options ou entrée contractuelle invalides                                                                      |
+| 2    | Usage, options ou entrée contractuelle invalides (fichier objectif absent, mode code sans Git ni `--init-git`)        |
 | 3    | Service indisponible, authentification locale refusée, métadonnée privée invalide ou service non construit            |
 | 4    | Vue détachée/délai sur objectif non vérifié ou encore en attente                                                      |
 | 5    | Vue bornée observant une attente utilisateur                                                                          |

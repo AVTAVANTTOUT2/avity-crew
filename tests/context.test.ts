@@ -672,9 +672,15 @@ test('new projects, real Git state and recovery preserve prerequisites without i
     await writeFile(join(root, 'README.md'), 'Uncommitted local project');
     await writeFile(join(root, '.gitignore'), 'ignored.txt\n');
     await writeFile(join(root, 'ignored.txt'), 'PRIVATE_IGNORED_VALUE');
+    // Unignored secrets are excluded from reading; their names stay out of the brief too.
+    await writeFile(join(root, '.env.production'), 'TOKEN=1');
+    await mkdir(join(root, 'keys'));
+    await writeFile(join(root, 'keys', 'deploy.pem'), 'PEM');
     const git = await inspectProject(root);
     assert.equal(git.git.revision, null);
-    assert.match(git.git.status!, /README.md/);
+    assert.match(git.git.status!, /^\?\? README\.md$/m);
+    assert.doesNotMatch(git.git.status!, /\.env|\.pem/);
+    assert.match(git.git.status!, /chemin\(s\) sensible\(s\) non affiché/);
     assert.ok(!git.files.includes('ignored.txt'));
     assert.ok(
       git.exclusions.some(
