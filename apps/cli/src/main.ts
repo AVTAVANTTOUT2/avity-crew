@@ -19,7 +19,9 @@ import type { CliCommand } from './args.ts';
 import { ensureService, userClient } from './service.ts';
 import { cleanText, renderSnapshot, watchRun } from './view.ts';
 
-export const HELP = `Avity Crew 0.1.0 — équipe locale Claude Code / Codex
+const VERSION = '0.1.0'; // x-release-please-version
+
+export const HELP = `Avity Crew ${VERSION} — équipe locale Claude Code / Codex
 
 avity-crew                         Conversation interactive du projet courant
 avity-crew init | doctor | status [--run ID] [--json] | list
@@ -235,7 +237,7 @@ async function execute(command: CliCommand, cwd: string): Promise<number> {
     return 0;
   }
   if (command.name === 'version') {
-    output('0.1.0', command.json);
+    output(VERSION, command.json);
     return 0;
   }
   if (command.name === 'internal-mcp') {

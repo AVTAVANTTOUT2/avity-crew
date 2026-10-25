@@ -1,0 +1,42 @@
+name: Signaler un bug
+description: Un comportement reproductible d'Avity Crew.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Pour une vulnérabilité, utilisez le signalement privé indiqué dans SECURITY.md.
+        Ne joignez aucun secret, conversation privée ou fichier SQLite réel.
+  - type: input
+    id: version
+    attributes:
+      label: Version d'Avity Crew
+      description: Résultat de `avity-crew --version` ou commit utilisé.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environnement
+      description: OS, version Node, versions Claude/Codex si concernées.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction minimale
+      description: Commandes et étapes avec un projet de test et des données synthétiques.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportement attendu et résultat observé
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs expurgés
+      description: Retirez les jetons, chemins privés et contenus confidentiels.
+      render: text

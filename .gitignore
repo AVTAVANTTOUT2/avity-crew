@@ -7,6 +7,10 @@
 # AVITY_CREW_WORKPACK:END
 
 .DS_Store
+.env
+.env.*
+!.env.example
+SHA256SUMS
 node_modules/
 dist/
 *.tgz

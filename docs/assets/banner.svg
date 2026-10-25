@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320" role="img" aria-labelledby="title desc">
+  <title id="title">Avity Crew</title>
+  <desc id="desc">Claude Code et Codex réunis dans une équipe locale, avec contexte, isolation et preuves.</desc>
+  <defs>
+    <linearGradient id="background" x2="1" y2="1">
+      <stop stop-color="#101626"/>
+      <stop offset="1" stop-color="#201b3a"/>
+    </linearGradient>
+    <linearGradient id="accent" x2="1">
+      <stop stop-color="#a78bfa"/>
+      <stop offset="1" stop-color="#67e8f9"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="320" rx="24" fill="url(#background)"/>
+  <circle cx="1130" cy="20" r="210" fill="#8b5cf6" opacity=".06"/>
+  <path d="M60 66h42M60 74h26" stroke="url(#accent)" stroke-width="4" stroke-linecap="round"/>
+  <g font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">
+    <text x="60" y="150" fill="#f8fafc" font-size="62" font-weight="750" letter-spacing="-2">Avity Crew</text>
+    <text x="62" y="196" fill="#c4b5fd" font-size="23">Claude Code × Codex</text>
+    <text x="62" y="252" fill="#b8c3d6" font-size="18">Contexte. Isolation. Preuves.</text>
+    <path d="M840 115v40m-95 0h190m-190 0v33m190-33v33" fill="none" stroke="#70668f" stroke-width="2"/>
+    <rect x="755" y="58" width="170" height="58" rx="14" fill="#30264b" stroke="#a78bfa"/>
+    <text x="840" y="94" fill="#ede9fe" text-anchor="middle" font-size="20" font-weight="600">Chef</text>
+    <rect x="650" y="188" width="190" height="64" rx="14" fill="#202d3f" stroke="#67e8f9"/>
+    <text x="745" y="227" fill="#cffafe" text-anchor="middle" font-size="20">Claude Code</text>
+    <rect x="850" y="188" width="170" height="64" rx="14" fill="#202d3f" stroke="#67e8f9"/>
+    <text x="935" y="227" fill="#cffafe" text-anchor="middle" font-size="20">Codex</text>
+    <circle cx="840" cy="155" r="5" fill="#a78bfa"/>
+  </g>
+</svg>

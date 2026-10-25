@@ -2,6 +2,22 @@
   "name": "avity-crew",
   "version": "0.1.0",
   "description": "Équipe locale Claude Code et Codex, avec contexte et preuves persistants",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AVTAVANTTOUT2/avity-crew.git"
+  },
+  "homepage": "https://github.com/AVTAVANTTOUT2/avity-crew#readme",
+  "bugs": {
+    "url": "https://github.com/AVTAVANTTOUT2/avity-crew/issues"
+  },
+  "keywords": [
+    "claude-code",
+    "codex",
+    "multi-agent",
+    "cli",
+    "local-first"
+  ],
   "type": "module",
   "private": true,
   "engines": {
@@ -32,6 +48,8 @@
     "!dist/tests",
     "README.md",
     "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
     "docs",
     "packages/contracts/schema"
   ],

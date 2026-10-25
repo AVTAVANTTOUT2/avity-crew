@@ -1,7 +1,9 @@
 # Installation et configuration
 
-Avity Crew 0.1.0 est en recette : consulter la [validation réelle](../README.md#validation-réelle)
-avant de confondre installation réussie et objectif vérifié.
+Avity Crew 0.1.0 a été qualifiée localement sur macOS arm64 : consulter la
+[validation réelle](../README.md#validation-réelle) et le
+[rapport de recette](https://github.com/AVTAVANTTOUT2/avity-crew/blob/146277aa82840de3b66d5e3e16c45bacde39df66/avity-crew-workpack/validation/RELEASE_REPORT.md)
+pour les versions, scénarios et limites vérifiés.
 
 ## Prérequis
 
@@ -231,5 +233,5 @@ Vérifier aussi l'absence de données privées : configuration locale, clés,
 conversations, bases et worktrees de recette. Une liste de fichiers correcte ne
 remplace pas l'installation du tarball final dans un préfixe neuf, puis les
 commandes depuis plusieurs projets et la recette native sur cette même source.
-Consigner version, empreinte du tarball et résultats dans le futur rapport de
-recette ; ces instructions ne déclarent pas L11/L12 validés.
+Consigner version, empreinte du tarball et résultats pour chaque nouvelle
+distribution. Le rapport historique de 0.1.0 ne qualifie pas les paquets futurs.

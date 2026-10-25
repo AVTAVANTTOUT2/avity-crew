@@ -1,0 +1,22 @@
+name: Proposer une amélioration
+description: Un besoin concret et un résultat vérifiable.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: Quel problème souhaitez-vous résoudre ?
+      description: Décrire un cas d'usage réel et ses limites actuelles.
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Résultat attendu
+      description: Comment vérifier que l'amélioration répond au besoin ?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives envisagées

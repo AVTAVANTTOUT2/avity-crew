@@ -1,6 +1,18 @@
 # Changelog
 
-## 0.1.0 — Candidat local
+Les nouvelles entrées sont préparées automatiquement par les PR de version
+[Release Please](CONTRIBUTING.md#commits-et-changelog-automatique).
+
+## 0.1.0 — Première publication GitHub
+
+### Publication
+
+- Première publication GitHub : licence MIT, présentation, guides de contribution
+  et de sécurité, formulaires d'issues et modèle de PR.
+- Versions, changelog et paquets GitHub automatisés ; suivi des dépendances
+  avec Dependabot et actions épinglées à une révision.
+
+### Construction et recette locale
 
 - L00 : racine et outils audités, interfaces CLI et reprises minimales réelles
   vérifiées séparément ; cadrage accepté par une session indépendante.
