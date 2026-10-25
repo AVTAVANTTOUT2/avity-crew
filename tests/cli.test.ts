@@ -781,7 +781,7 @@ const ptyAvailable =
   process.platform !== 'win32' &&
   spawnSync('python3', ['--version']).status === 0;
 test(
-  'real PTY wizard accepts a pasted multiline goal and remains attached to the newly created Run',
+  'real PTY home form accepts a pasted multiline goal and attaches the full-screen view to the new Run',
   { skip: !ptyAvailable },
   async (t) => {
     const f = await fixture(t);
@@ -820,7 +820,7 @@ test(
   },
 );
 test(
-  'real PTY preserves typed Unicode across events/resize and q/CtrlC only detach',
+  'real PTY full-screen view preserves typed Unicode across events/resize and q/CtrlC only detach',
   { skip: !ptyAvailable },
   async (t) => {
     const f = await fixture(t);

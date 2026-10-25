@@ -227,3 +227,19 @@ export function parseCli(argv: readonly string[]): CliCommand {
     );
   return command;
 }
+/** `create_run` arguments shared by `run` and the terminal form. */
+export function runArguments(
+  command: CliCommand,
+  objective: string,
+): Record<string, unknown> {
+  return {
+    objective,
+    criteria: command.criteria,
+    constraints: command.constraints,
+    ...(command.chief ? { chief_provider: command.chief } : {}),
+    ...(command.model ? { chief_model: command.model } : {}),
+    ...(command.maxAgents ? { max_active_agents: command.maxAgents } : {}),
+    delivery_mode: command.mode ?? 'code',
+    ...(command.initGit ? { initialize_git: true } : {}),
+  };
+}

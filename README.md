@@ -69,8 +69,9 @@ avity-crew run "Rédiger un guide de démarrage" \
 ```
 
 `init` prépare le service sans lancer de modèle ; `run` utilise réellement les
-CLI et les ressources de vos comptes. En terminal interactif, la commande rejoint
-la conversation du run créé. `q` ou Ctrl+C détachent la vue ; le service continue.
+CLI et les ressources de vos comptes. En terminal interactif, la commande ouvre
+l'interface plein écran du run créé (Activité, Carte, Conversation). `q` ou Ctrl+C
+détachent la vue ; le service continue.
 Sans terminal, utiliser `status --json` ou `watch` pour suivre le résultat.
 
 Pour du code neuf, `--mode code --init-git` autorise explicitement une base Git.

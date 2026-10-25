@@ -1,22 +1,15 @@
 import { readFile, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { createInterface } from 'node:readline/promises';
-import {
-  CrewError,
-  ident,
-  validate,
-} from '../../../packages/contracts/src/index.ts';
-import type {
-  Message,
-  ToolCall,
-} from '../../../packages/contracts/src/index.ts';
+import { CrewError, validate } from '../../../packages/contracts/src/index.ts';
+import type { ToolCall } from '../../../packages/contracts/src/index.ts';
 import { identifyProject } from '../../../packages/storage/src/index.ts';
 import { SupervisorClient } from '../../../packages/supervisor/src/client.ts';
 import { runMcpFromEnv } from '../../../packages/supervisor/src/mcp.ts';
 import { MAX_JSON_BYTES } from '../../../packages/supervisor/src/protocol.ts';
-import { parseCli } from './args.ts';
+import { parseCli, runArguments } from './args.ts';
 import type { CliCommand } from './args.ts';
-import { ensureService, userClient } from './service.ts';
+import { ensureService, sendMessage, userClient } from './service.ts';
+import { runTui } from './tui/app.ts';
 import { cleanText, renderSnapshot, watchRun } from './view.ts';
 
 const VERSION = '0.1.0'; // x-release-please-version
@@ -103,133 +96,35 @@ async function objective(command: CliCommand, cwd: string): Promise<string> {
     throw new CrewError('CLI_USAGE', 'Objectif supérieur à 1 MiB.');
   return value;
 }
-async function message(
+/** Terminal views open the full-screen interface; scripts keep the JSON/once watcher. */
+function view(
   client: SupervisorClient,
-  runId: string,
-  content: string,
-  to = 'chief',
-  kind = 'information',
-): Promise<unknown> {
-  const status = (await client.admin({
-    method: 'status',
-    arguments: { run_id: runId, after_seq: 0, limit: 1 },
-  })) as { run?: { version?: number } };
-  if (!Number.isSafeInteger(status.run?.version))
-    throw new CrewError(
-      'NOT_READY',
-      'Version du run indisponible ; message non envoyé.',
-    );
-  const call: ToolCall = {
-    schema_version: 1,
-    request_id: ident('request'),
-    idempotency_key: ident('message'),
-    run_id: runId,
-    expected_version: status.run!.version!,
-    method: 'send_message',
-    arguments: {
-      recipient_kind:
-        to === 'chief' ? 'chief' : to === 'user:local' ? 'user' : 'task',
-      recipient_id: to === 'chief' ? 'chief:current' : to,
-      kind: kind as Message['kind'],
-      content,
-      source_ids: [],
-      requires_ack: true,
-    },
-  };
-  validate('ToolCall', call);
-  const result = await client.execute(call);
-  return {
-    request_id: call.request_id,
-    idempotency_key: call.idempotency_key,
-    result,
-  };
+  command: CliCommand,
+  project: string,
+): Promise<number> {
+  if (
+    process.stdin.isTTY &&
+    process.stdout.isTTY &&
+    !command.json &&
+    !command.once
+  )
+    return runTui(client, { project, run: command.run ?? null });
+  return watchRun(client, command);
 }
-async function wizard(command: CliCommand, cwd: string): Promise<number> {
+async function interactive(command: CliCommand, cwd: string): Promise<number> {
   const project = identifyProject(
     command.project ? resolve(cwd, command.project) : cwd,
   );
   const client = await ensureService(project);
   const current = (await client.admin({ method: 'status', arguments: {} })) as {
-    run?: { status?: string };
+    run?: { id?: string; status?: string };
   };
-  if (
+  const active =
     current.run &&
     !['completed', 'failed', 'cancelled'].includes(current.run.status ?? '')
-  )
-    return watchRun(client, command, {
-      answer: (question_id, answer, run_id) =>
-        client.admin({
-          method: 'answer',
-          arguments: { run_id, question_id, answer },
-        }),
-      message: (content, runId) => message(client, runId, content),
-    });
-  output(await client.admin({ method: 'doctor', arguments: {} }), false);
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    terminal: true,
-  });
-  rl.on('SIGINT', () => rl.close());
-  const inputLines = rl[Symbol.asyncIterator]();
-  const ask = async (prompt: string): Promise<string> => {
-    try {
-      rl.setPrompt(prompt);
-      rl.prompt();
-      const line = await inputLines.next();
-      if (line.done) throw new Error('input closed');
-      if (Buffer.byteLength(line.value) > MAX_JSON_BYTES)
-        throw new CrewError('CLI_USAGE', 'Ligne supérieure à 1 MiB.');
-      return line.value;
-    } catch (failure) {
-      if (failure instanceof CrewError) throw failure;
-      throw new CrewError(
-        'CLI_INTERRUPTED',
-        'Saisie annulée ; aucun objectif envoyé.',
-      );
-    }
-  };
-  let parsed: CliCommand;
-  try {
-    process.stdout.write(
-      'Objectif multiligne : une ligne contenant . termine la saisie.\n',
-    );
-    const lines: string[] = [];
-    let goalBytes = 0;
-    let line: string;
-    while ((line = await ask('objectif> ')) !== '.') {
-      goalBytes += Buffer.byteLength(line) + 1;
-      if (goalBytes > MAX_JSON_BYTES)
-        throw new CrewError('CLI_USAGE', 'Objectif supérieur à 1 MiB.');
-      lines.push(line);
-    }
-    const criteria: string[] = [];
-    while (true) {
-      const criterion = await ask(
-        criteria.length
-          ? 'Autre critère (Entrée termine)> '
-          : 'Critère observable obligatoire> ',
-      );
-      if (!criterion.trim() && criteria.length) break;
-      if (criterion.trim()) criteria.push(criterion);
-    }
-    const chief = (
-      await ask('Chef claude/codex (Entrée = configuration)> ')
-    ).trim();
-    const model = (await ask('Modèle (Entrée = configuration)> ')).trim();
-    parsed = parseCli([
-      'run',
-      ...criteria.flatMap((criterion) => ['--criterion', criterion]),
-      ...(chief ? ['--chief', chief] : []),
-      ...(model ? ['--model', model] : []),
-      ...(command.project ? ['--project', command.project] : []),
-      '--',
-      lines.join('\n'),
-    ]);
-  } finally {
-    rl.close();
-  }
-  return execute(parsed, cwd);
+      ? (current.run.id ?? null)
+      : null;
+  return runTui(client, { project: project.root, run: active, home: !active });
 }
 async function execute(command: CliCommand, cwd: string): Promise<number> {
   if (command.name === 'help') {
@@ -267,7 +162,7 @@ async function execute(command: CliCommand, cwd: string): Promise<number> {
   }
   if (command.name === 'interactive')
     return process.stdin.isTTY && process.stdout.isTTY
-      ? wizard(command, cwd)
+      ? interactive(command, cwd)
       : (output(HELP, command.json), 0);
   const goal = command.name === 'run' ? await objective(command, cwd) : null;
   const project = identifyProject(
@@ -282,16 +177,7 @@ async function execute(command: CliCommand, cwd: string): Promise<number> {
     client.admin({ method, arguments: args });
   let result: unknown;
   if (command.name === 'run')
-    result = await admin('create_run', {
-      objective: goal,
-      criteria: command.criteria,
-      constraints: command.constraints,
-      ...(command.chief ? { chief_provider: command.chief } : {}),
-      ...(command.model ? { chief_model: command.model } : {}),
-      ...(command.maxAgents ? { max_active_agents: command.maxAgents } : {}),
-      delivery_mode: command.mode ?? 'code',
-      ...(command.initGit ? { initialize_git: true } : {}),
-    });
+    result = await admin('create_run', runArguments(command, goal!));
   else if (command.name === 'init' || command.name === 'service-start')
     result = {
       service: 'ready',
@@ -315,7 +201,7 @@ async function execute(command: CliCommand, cwd: string): Promise<number> {
       answer: command.text,
     });
   else if (command.name === 'message')
-    result = await message(
+    result = await sendMessage(
       client,
       command.run!,
       command.text!,
@@ -346,11 +232,7 @@ async function execute(command: CliCommand, cwd: string): Promise<number> {
       format: command.format ?? 'markdown',
     });
   else if (command.name === 'attach' || command.name === 'watch')
-    return watchRun(client, command, {
-      answer: (question_id, answer, run_id) =>
-        admin('answer', { run_id, question_id, answer }),
-      message: (content, runId) => message(client, runId, content),
-    });
+    return view(client, command, project.root);
   else throw new CrewError('CLI_USAGE', 'Commande non disponible.');
   output(result, command.json);
   if (
@@ -371,14 +253,10 @@ async function execute(command: CliCommand, cwd: string): Promise<number> {
         'TRANSPORT_PROTOCOL_ERROR',
         'Objectif enregistré sans identité lisible ; consulter status avant toute nouvelle demande.',
       );
-    return watchRun(
+    return view(
       client,
       { ...command, name: 'attach', run: runId },
-      {
-        answer: (question_id, answer, run_id) =>
-          admin('answer', { run_id, question_id, answer }),
-        message: (content, id) => message(client, id, content),
-      },
+      project.root,
     );
   }
   return 0;

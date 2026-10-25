@@ -1,4 +1,3 @@
-import { createInterface } from 'node:readline';
 import { stripVTControlCharacters } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { CrewError } from '../../../packages/contracts/src/index.ts';
@@ -27,7 +26,9 @@ const text = (value: unknown): string =>
   typeof value === 'string' || typeof value === 'number'
     ? String(value)
     : 'indisponible';
-const states: Record<string, string> = {
+export const states: Record<string, string> = {
+  planned: 'planifiée',
+  changes_requested: 'corrections demandées',
   planning: 'planification',
   running: 'en cours',
   queued: 'en file',
@@ -45,6 +46,14 @@ const states: Record<string, string> = {
   blocked: 'bloquée',
   interrupted: 'interrompue',
 };
+/** Terminal columns of one grapheme: emoji presentation and East Asian scripts are wide; text symbols such as ⚠ or ✓ are not. */
+export function cellWidth(segment: string): number {
+  return /[\p{Emoji_Presentation}️\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(
+    segment,
+  )
+    ? 2
+    : 1;
+}
 export function clipLine(value: string, width: number): string {
   const limit = Math.max(1, width);
   const parts: { text: string; width: number }[] = [];
@@ -52,12 +61,7 @@ export function clipLine(value: string, width: number): string {
   for (const { segment } of new Intl.Segmenter('fr', {
     granularity: 'grapheme',
   }).segment(cleanText(value))) {
-    const columns =
-      /[\p{Extended_Pictographic}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(
-        segment,
-      )
-        ? 2
-        : 1;
+    const columns = cellWidth(segment);
     if (used + columns > limit) {
       while (used >= limit && parts.length) used -= parts.pop()!.width;
       return parts.map((part) => part.text).join('') + '…';
@@ -130,12 +134,7 @@ export function renderSnapshot(
         columns = 0,
         displayed = 0;
       for (const part of parts) {
-        const size =
-          /[\p{Extended_Pictographic}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(
-            part,
-          )
-            ? 2
-            : 1;
+        const size = cellWidth(part);
         if (part === '\n' || columns + size > width) {
           lines.push(line);
           line = '';
@@ -229,39 +228,16 @@ export function runExit(snapshot: unknown): number {
           ? 5
           : 4;
 }
-export interface WatchActions {
-  answer(questionId: string, answer: string, runId: string): Promise<unknown>;
-  message(content: string, runId: string): Promise<unknown>;
-}
+/** Script/non-TTY observer; terminal views use the full-screen interface instead. */
 export async function watchRun(
   client: SupervisorClient,
   command: CliCommand,
-  actions: WatchActions,
 ): Promise<number> {
   let cursor = command.afterSeq,
     last: unknown = null,
-    done = false,
-    interrupted = false,
-    busy = false;
+    interrupted = false;
   let activeRun = command.run;
-  const conversation = new Map<number, Record<string, unknown>>();
-  let latestUsage: unknown = null;
   const started = Date.now();
-  const interactive = Boolean(
-    process.stdin.isTTY &&
-    process.stdout.isTTY &&
-    !command.json &&
-    !command.once,
-  );
-  const rl = interactive
-    ? createInterface({
-        input: process.stdin,
-        output: process.stdout,
-        terminal: true,
-        prompt: 'crew> ',
-      })
-    : undefined;
-  let compose: string[] | null = null;
   const notify = (value: unknown): void => {
     process.stdout.write(
       command.json
@@ -273,101 +249,21 @@ export async function watchRun(
     );
   };
   const render = (): void => {
-    if (!last || busy || (rl && (rl.line.length > 0 || compose))) return;
-    if (interactive) process.stdout.write('\u001b[2J\u001b[H');
+    if (!last) return;
     if (command.json) notify(last);
     else
       process.stdout.write(
-        renderSnapshot(
-          interactive
-            ? {
-                ...record(last),
-                viewer_messages: [...conversation.values()],
-                viewer_usage: latestUsage,
-              }
-            : last,
-          process.stdout.columns ?? 100,
-          interactive ? Math.max(5, (process.stdout.rows ?? 30) - 3) : 100,
-        ) + '\n',
+        renderSnapshot(last, process.stdout.columns ?? 100, 100) + '\n',
       );
-    if (rl) {
-      process.stdout.write(
-        'q : détacher ; texte : message chef ; /compose puis . : multiligne ; /answer ID texte\n',
-      );
-      rl.prompt(true);
-    }
     for (const event of items(record(last).events))
       if (typeof event.seq === 'number') cursor = Math.max(cursor, event.seq);
   };
   const stopView = (): void => {
     interrupted = true;
-    done = true;
-    rl?.close();
   };
-  const resized = (): void => render();
   process.on('SIGINT', stopView);
-  process.stdout.on('resize', resized);
-  rl?.on('SIGINT', stopView);
-  rl?.on('close', () => {
-    done = true;
-  });
-  let pending = Promise.resolve();
-  rl?.on('line', (line) => {
-    pending = pending.then(async () => {
-      if (['q', ':q', '/quit'].includes(line.trim())) {
-        done = true;
-        rl.close();
-        return;
-      }
-      if (line.trim() === '/compose' && !compose) {
-        compose = [];
-        process.stdout.write(
-          'Message multiligne : . termine, /cancel annule.\n',
-        );
-        rl.prompt();
-        return;
-      }
-      if (compose) {
-        if (line === '/cancel') {
-          compose = null;
-          render();
-          return;
-        }
-        if (line !== '.') {
-          compose.push(line);
-          rl.prompt();
-          return;
-        }
-        line = compose.join('\n');
-        compose = null;
-      }
-      if (!line.trim()) {
-        render();
-        return;
-      }
-      busy = true;
-      try {
-        const runId = activeRun ?? text(record(record(last).run).id);
-        if (line.startsWith('/answer ')) {
-          const match = /^\/answer\s+(\S+)\s+([\s\S]+)$/.exec(line);
-          if (!match)
-            throw new CrewError('CLI_USAGE', '/answer ID réponse attendus.');
-          notify(await actions.answer(match[1]!, match[2]!, runId));
-        } else notify(await actions.message(line, runId));
-      } catch (failure) {
-        notify(
-          failure instanceof CrewError
-            ? `${failure.code} : ${failure.message}`
-            : 'Commande non exécutée.',
-        );
-      } finally {
-        busy = false;
-        render();
-      }
-    });
-  });
   try {
-    while (!done) {
+    while (!interrupted) {
       try {
         const snapshot = await client.admin({
           method: 'status',
@@ -384,21 +280,10 @@ export async function watchRun(
         const fresh = items(data.events).filter(
           (event) => typeof event.seq === 'number' && event.seq > cursor,
         );
-        for (const event of fresh) {
-          if (event.type === 'provider.text')
-            conversation.set(Number(event.seq), event);
-          if (event.type === 'provider.usage') latestUsage = event.payload;
-        }
-        while (conversation.size > 20)
-          conversation.delete(conversation.keys().next().value!);
         last = { ...data, events: fresh, viewer_after_seq: cursor };
         render();
         const state = runExit(last);
-        if (
-          command.once ||
-          !data.run ||
-          (!interactive && [0, 1, 130].includes(state))
-        )
+        if (command.once || !data.run || [0, 1, 130].includes(state))
           return state;
       } catch (failure) {
         if (
@@ -406,36 +291,31 @@ export async function watchRun(
           failure.code !== 'SUPERVISOR_UNAVAILABLE'
         )
           throw failure;
-        if (!rl?.line && !compose)
-          if (command.json)
-            process.stdout.write(
-              JSON.stringify({
-                schema_version: 1,
-                ok: false,
-                error: {
-                  code: 'SUPERVISOR_UNAVAILABLE',
-                  message:
-                    'Service indisponible ; reconnexion en cours. Aucun nouveau run créé.',
-                  retrying: !command.once,
-                },
-              }) + '\n',
-            );
-          else
-            notify(
-              'Service indisponible ; reconnexion en cours. Aucun nouveau run créé.',
-            );
+        if (command.json)
+          process.stdout.write(
+            JSON.stringify({
+              schema_version: 1,
+              ok: false,
+              error: {
+                code: 'SUPERVISOR_UNAVAILABLE',
+                message:
+                  'Service indisponible ; reconnexion en cours. Aucun nouveau run créé.',
+                retrying: !command.once,
+              },
+            }) + '\n',
+          );
+        else
+          notify(
+            'Service indisponible ; reconnexion en cours. Aucun nouveau run créé.',
+          );
         if (command.once) return 3;
       }
       if (command.timeout && Date.now() - started >= command.timeout)
         return last ? runExit(last) : 3;
       await delay(500);
     }
-    await pending;
-    return interrupted ? 130 : last ? runExit(last) : 4;
+    return 130;
   } finally {
-    done = true;
-    rl?.close();
     process.off('SIGINT', stopView);
-    process.stdout.off('resize', resized);
   }
 }

@@ -57,11 +57,12 @@ créer d'objectif ; sa réussite ne prouve pas un tour LLM ou la disponibilité 
 
 ## Conversation et suivi
 
-Dans un terminal, `avity-crew` sans argument rejoint un objectif actif ou ouvre
-un assistant : objectif multiligne terminé par une ligne `.`, critères, puis
-choix facultatif du chef et du modèle. Hors terminal, cette commande affiche
-l'aide. `run` en terminal rejoint la vue du run créé ; conserver son ID pour
-le suivre depuis un autre terminal :
+Dans un terminal, `avity-crew` sans argument ouvre l'interface plein écran :
+elle rejoint l'objectif actif, ou affiche l'accueil (logo AVT et formulaire
+« Nouvelle session » : objectif multiligne, critères, contraintes, chef, modèle,
+mode et nombre d'agents). Hors terminal, cette commande affiche l'aide. `run` et
+`attach` en terminal ouvrent la même interface sur le run concerné ; conserver
+son ID pour le suivre depuis un autre terminal :
 
 ```sh
 avity-crew list --json
@@ -77,21 +78,39 @@ Le curseur `after_seq` sert à relire les événements suivants ; le viewer ne c
 pas de second objectif. `status --limit N` borne sa page, pas une preuve de
 présence de tous les éléments du chantier.
 
-Dans la vue :
+L'interface présente trois vues (Tab pour passer de l'une à l'autre) :
 
-| Entrée                                  | Action                                         |
-| --------------------------------------- | ---------------------------------------------- |
-| Texte puis Entrée                       | Envoyer une précision au chef                  |
-| `/compose` puis plusieurs lignes et `.` | Envoyer un message multiligne                  |
-| `/cancel` pendant la composition        | Annuler la saisie                              |
-| `/answer question:ID texte`             | Répondre à cette question                      |
-| `q`, `:q`, `/quit` ou Ctrl+C            | Détacher la vue, laisser le service travailler |
+- **Activité** : le chef en haut (fournisseur, état, dernière réponse,
+  décision, délégations), puis une mosaïque d'un panneau par agent réel (deux
+  colonnes si la largeur le permet) : mission, état, commandes et résultats,
+  fichiers et extraits de diff fournis par la CLI, compte rendu, et la ligne
+  « terminé / testé / validé ». Entrée agrandit l'agent sélectionné ; Échap
+  revient à la mosaïque.
+- **Carte** : le chef au centre, les agents autour, et le journal
+  « heure · émetteur → destinataire · résumé » avec le statut de transmission.
+  Un petit terminal affiche une arborescence à la place.
+- **Conversation** : messages, réponses du chef, questions, décisions et
+  comptes rendus, avec l'émetteur et le destinataire.
 
-Les mises à jour préservent le texte en cours de saisie et suivent le
-redimensionnement du terminal. Le cache visible de conversation est borné ; il
-ne remplace pas l'état durable. Les tâches, les sessions connues, les tours actifs
-et les tours en file sont distincts. Les budgets de contexte sont des estimations ;
-les tokens réels restent « indisponibles » lorsqu'aucun événement ne les expose.
+| Entrée                       | Action                                                        |
+| ---------------------------- | ------------------------------------------------------------- |
+| Texte puis Entrée            | Envoyer au destinataire affiché (chef par défaut)             |
+| Alt+Entrée ou Ctrl+J         | Nouvelle ligne ; un collage multiligne reste un brouillon     |
+| Entrée sur une saisie vide   | Agrandir l'agent ou le chef sélectionné                       |
+| ↑ ↓ ← → sur une saisie vide  | Sélectionner un agent ou défiler l'historique                 |
+| PgPréc, PgSuiv, Début, Fin   | Parcourir l'historique sans retour forcé en bas               |
+| `/`                          | Palette : `/provider`, `/model`, `/effort`, `/permissions`, … |
+| Ctrl+T                       | Destinataire : chef, agent sélectionné ou question ouverte    |
+| Ctrl+B ; Ctrl+P / Ctrl+N     | Colonne Sessions ; session précédente / suivante              |
+| `/answer question:ID texte`  | Répondre à cette question                                     |
+| `q`, `:q`, `/quit` ou Ctrl+C | Détacher la vue, laisser le service travailler                |
+
+Chaque session conserve son brouillon, sa sélection et sa position de lecture.
+Les mises à jour ne déplacent ni le texte saisi ni le curseur. Une question du
+chef ou un refus de permission observé apparaît dans un encart au-dessus de la
+saisie. Les tâches, les sessions connues, les tours actifs et les tours en file
+sont distincts. Aucun pourcentage, coût ou durée n'est affiché ; les tokens ne
+sont montrés que lorsqu'un événement live les déclare.
 
 Une vue TTY attend le détachement même après un résultat final. Hors terminal,
 `watch` se termine à un état final ou au délai demandé ; `--once` lit un seul état.
