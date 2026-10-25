@@ -3,6 +3,19 @@
 Les nouvelles entrées sont préparées automatiquement par les PR de version
 [Release Please](CONTRIBUTING.md#commits-et-changelog-automatique).
 
+## [0.2.0](https://github.com/AVTAVANTTOUT2/avity-crew/compare/v0.1.0...v0.2.0) (2026-10-25)
+
+
+### Features
+
+* **cli:** interface terminal plein écran AVT ([#5](https://github.com/AVTAVANTTOUT2/avity-crew/issues/5)) ([1bf5272](https://github.com/AVTAVANTTOUT2/avity-crew/commit/1bf52729e1dc6049a81a6885d746d8a2f47849bc))
+
+
+### Bug Fixes
+
+* corriger les constats de l'audit fonctionnel du 25 octobre 2026 ([#9](https://github.com/AVTAVANTTOUT2/avity-crew/issues/9)) ([8e0f36e](https://github.com/AVTAVANTTOUT2/avity-crew/commit/8e0f36e4e3f363efb8087f95cf02cd1d54112a6f))
+* **supervisor:** débloquer la boucle complète observée lors de l'essai réel ([#7](https://github.com/AVTAVANTTOUT2/avity-crew/issues/7)) ([60e5eb5](https://github.com/AVTAVANTTOUT2/avity-crew/commit/60e5eb537d6eba8a79219be9aeb0628217de0e53))
+
 ## 0.1.0 — Première publication GitHub
 
 ### Publication

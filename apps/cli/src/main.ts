@@ -12,7 +12,7 @@ import { ensureService, sendMessage, userClient } from './service.ts';
 import { runTui } from './tui/app.ts';
 import { cleanText, renderSnapshot, watchRun } from './view.ts';
 
-const VERSION = '0.1.0'; // x-release-please-version
+const VERSION = '0.2.0'; // x-release-please-version
 
 export const HELP = `Avity Crew ${VERSION} — équipe locale Claude Code / Codex
 
