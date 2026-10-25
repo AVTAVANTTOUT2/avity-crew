@@ -832,7 +832,7 @@ test('self-review and stale review cannot close either the producer or its contr
         f.key(),
         f.version(),
       ),
-    code('STALE_REVIEW'),
+    code('REVIEW_SOURCE_MISMATCH'),
   );
   assert.equal(f.store.getTask(control.id).status, 'running');
 });

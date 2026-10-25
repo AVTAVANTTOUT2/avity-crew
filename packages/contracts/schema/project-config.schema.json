@@ -96,6 +96,37 @@
       },
       "minItems": 0
     },
+    "workspace_setup": {
+      "description": "Commandes exécutées dans chaque worktree neuf (agent et candidat) avant le travail et les contrôles, par exemple npm ci.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+          },
+          "argv": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          },
+          "cwd": {
+            "const": "."
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": ["id", "argv", "cwd", "timeout_seconds"],
+        "additionalProperties": false
+      },
+      "minItems": 0
+    },
     "delivery": {
       "type": "object",
       "properties": {

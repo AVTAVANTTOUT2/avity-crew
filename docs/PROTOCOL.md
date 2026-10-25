@@ -54,6 +54,10 @@ Requêtes/réponses JSON et lignes MCP sont limitées à 1 MiB. Métadonnées pr
 
 Le fallback CLI interne doit construire le même `ToolCall` et appeler `execute`. La capability arrive par environnement ou canal privé, jamais par argument de processus ou prompt. Conserver `request_id`, `idempotency_key`, `run_id`, `expected_version` et `arguments` lors d'une reprise. L'idempotence et les effets sont traités par le métier/Store, pas par un compteur HTTP ou un identifiant JSON-RPC.
 
+`expected_version` ordonne les décisions de l'utilisateur et du chef : une valeur périmée y produit `VERSION_CONFLICT`. Pour un agent de tâche (worker, reviewer…), le Store vérifie déjà tentative active, génération et état de la tâche ; la version du run y est indicative, afin qu'une mutation du chef ne rejette pas une passation ou une revue préparée entre-temps.
+
+`get_status` reste lisible par un client MCP natif : textes d'événements abrégés, réponse bornée (environ 40 000 caractères) et pagination par `next_seq`/`has_more`. Le statut et l'export administratifs gardent les événements complets, par pages bornées sous la limite de 1 MiB. Comme seuls les codes traversent le transport, un défaut précis reçoit un code distinct : `REVIEW_SOURCE_MISMATCH` signale une revue dont `source_revision` n'est pas celle de la passation (le SHA du candidat combiné va dans `tested_revision`).
+
 ## Pont MCP stdio
 
 `runMcpBridge({client, runId, input?, output?})` utilise le même client. `runMcpFromEnv()` lit exclusivement les variables `AVITY_CREW_ENDPOINT_FILE`, `AVITY_CREW_CAPABILITY`, `AVITY_CREW_RUN_ID`. Le service prépare cet environnement pour le pont natif ; `avity-crew internal mcp` expose la même entrée. stdout contient uniquement JSON-RPC MCP, une ligne UTF-8 par message, avec backpressure.

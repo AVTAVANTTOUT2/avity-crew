@@ -1008,7 +1008,10 @@ export class Controller {
         }
       }
       s.connection = 'connecté';
-      return list(rec(page).events).length < PAGE;
+      // A size-bounded page can be short while events remain.
+      return (
+        rec(page).has_more !== true && list(rec(page).events).length < PAGE
+      );
     } catch (error) {
       if (
         error instanceof CrewError &&

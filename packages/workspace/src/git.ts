@@ -17,6 +17,7 @@ export function runCommand(
   command: readonly string[],
   timeoutMs = 60_000,
   maxBytes = 1_048_576,
+  env: Record<string, string> = {},
 ): Promise<CommandResult> {
   if (!command.length || command.some((part) => typeof part !== 'string'))
     throw new CrewError(
@@ -31,7 +32,7 @@ export function runCommand(
   return new Promise((resolve) => {
     const child = spawn(command[0]!, command.slice(1), {
       cwd,
-      env: { ...process.env, LC_ALL: 'C' },
+      env: { ...process.env, ...env, LC_ALL: 'C' },
       detached: process.platform !== 'win32',
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -92,8 +93,15 @@ export async function git(
   cwd: string,
   args: readonly string[],
   allowFailure = false,
+  env: Record<string, string> = {},
 ): Promise<CommandResult> {
-  const result = await runCommand(cwd, ['git', ...args], 120_000, 8_388_608);
+  const result = await runCommand(
+    cwd,
+    ['git', ...args],
+    120_000,
+    8_388_608,
+    env,
+  );
   if (
     result.error ||
     result.truncated ||

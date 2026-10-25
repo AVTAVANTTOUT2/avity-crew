@@ -99,6 +99,8 @@ export interface IntegrationCandidate {
   candidateRef: string;
   path: string;
   deliveryOperationIds: readonly string[];
+  /** Configured workspace_setup observations; not verifications of criteria. */
+  setup: CheckProof[];
   proofs: CheckProof[];
   conflicts: string[];
 }
@@ -241,6 +243,48 @@ export class WorkspaceManager {
         `A completed ${kind} operation is required`,
       );
     return result;
+  }
+  private async observe(
+    path: string,
+    revision: string,
+    id: string,
+    command: readonly string[],
+    timeoutMs?: number,
+  ): Promise<CheckProof> {
+    const startedAt = now();
+    const observed = await runCommand(path, command, timeoutMs);
+    return {
+      id,
+      command,
+      candidateRevision: revision,
+      cwd: path,
+      // A spawn or timeout error without an exit status must not read as success.
+      exitCode:
+        observed.error && observed.exitCode === 0 ? null : observed.exitCode,
+      signal: observed.signal,
+      output: redactSecrets(
+        observed.stdout + observed.stderr + (observed.error ?? ''),
+      ),
+      truncated: observed.truncated,
+      startedAt,
+      endedAt: now(),
+    };
+  }
+  /** Prepares a fresh worktree (dependencies...) with the project's workspace_setup; stops at the first failure. */
+  private async setup(path: string, revision: string): Promise<CheckProof[]> {
+    const proofs: CheckProof[] = [];
+    for (const step of this.store.project.config.workspace_setup ?? []) {
+      const proof = await this.observe(
+        path,
+        revision,
+        step.id,
+        step.argv,
+        step.timeout_seconds * 1000,
+      );
+      proofs.push(proof);
+      if (proof.exitCode !== 0 || proof.signal) break;
+    }
+    return proofs;
   }
 
   async initializeRepository(
@@ -401,6 +445,20 @@ export class WorkspaceManager {
             );
         }
         path = realpathSync(path);
+        const failed = (await this.setup(path, request.baseRevision)).find(
+          (proof) => proof.exitCode !== 0 || proof.signal,
+        );
+        if (failed)
+          throw new CrewError(
+            'WORKSPACE_SETUP_FAILED',
+            `Workspace preparation ${failed.id} failed; fix workspace_setup or the environment, then delegate again`,
+            {
+              id: failed.id,
+              exitCode: failed.exitCode,
+              signal: failed.signal,
+              output: failed.output.slice(-2000),
+            },
+          );
         const record: Workspace = {
           id,
           run_id: this.actor.run_id,
@@ -852,6 +910,7 @@ export class WorkspaceManager {
           candidateRef,
           path,
           deliveryOperationIds: request.deliveryOperationIds,
+          setup: [],
           proofs: [],
           conflicts: [],
         };
@@ -866,6 +925,18 @@ export class WorkspaceManager {
               'Delivery is not the recorded immutable snapshot',
             );
           assertCurrent();
+          // Same base + same snapshots => same candidate SHA, so a re-run keeps its reviews and proofs comparable.
+          const committed = line(
+            (
+              await git(this.root, [
+                'log',
+                '-1',
+                '--format=%cd',
+                '--date=raw',
+                source,
+              ])
+            ).stdout,
+          );
           const cherry = await git(
             path,
             [
@@ -873,10 +944,17 @@ export class WorkspaceManager {
               'user.name=Avity Crew',
               '-c',
               'user.email=avity-crew@localhost',
+              '-c',
+              'commit.gpgSign=false',
               'cherry-pick',
               source,
             ],
             true,
+            {
+              GIT_COMMITTER_NAME: 'Avity Crew',
+              GIT_COMMITTER_EMAIL: 'avity-crew@localhost',
+              GIT_COMMITTER_DATE: committed,
+            },
           );
           if (cherry.exitCode !== 0) {
             candidate.status = 'conflict';
@@ -896,29 +974,27 @@ export class WorkspaceManager {
         }
         candidate.candidateRevision = `git:${line((await git(path, ['rev-parse', 'HEAD'])).stdout)}`;
         if (candidate.status !== 'conflict') {
-          for (const check of request.checks) {
+          assertCurrent();
+          candidate.setup = await this.setup(path, candidate.candidateRevision);
+          if (
+            candidate.setup.some(
+              (proof) => proof.exitCode !== 0 || proof.signal,
+            )
+          )
+            candidate.status = 'validation_failed';
+          for (const check of candidate.status === 'validated'
+            ? request.checks
+            : []) {
             assertCurrent();
-            const startedAt = now();
-            const observed = await runCommand(
+            const proof = await this.observe(
               path,
+              candidate.candidateRevision,
+              check.id,
               check.command,
               check.timeoutMs,
             );
-            candidate.proofs.push({
-              id: check.id,
-              command: check.command,
-              candidateRevision: candidate.candidateRevision,
-              cwd: path,
-              exitCode: observed.exitCode,
-              signal: observed.signal,
-              output: redactSecrets(
-                observed.stdout + observed.stderr + (observed.error ?? ''),
-              ),
-              truncated: observed.truncated,
-              startedAt,
-              endedAt: now(),
-            });
-            if (observed.exitCode !== 0 || observed.signal || observed.error)
+            candidate.proofs.push(proof);
+            if (proof.exitCode !== 0 || proof.signal)
               candidate.status = 'validation_failed';
           }
           const state = await inspectRepository(path);

@@ -75,7 +75,22 @@ ultérieur.
 ## Candidat, revue et promotion
 
 `prepareIntegration` sérialise les écritures d'intégration par projet, crée une
-branche/worktree de candidat et applique les snapshots. Une branche de livraison
+branche/worktree de candidat et applique les snapshots. Le commit de chaque
+snapshot appliqué reprend la date de ce snapshot et une identité fixe : mêmes
+livraisons sur la même base donnent le même SHA de candidat. Relancer la
+préparation avec une nouvelle clé crée un worktree neuf, réexécute préparation
+et contrôles, et produit de nouvelles preuves sur ce même SHA ; une revue de ce
+candidat reste donc applicable.
+
+`workspace_setup` (configuration projet, optionnelle) liste des commandes
+exécutées avec `cwd: "."` dans chaque worktree neuf : celui de l'agent à sa
+création, puis celui du candidat avant les contrôles (`npm ci` par exemple).
+L'agent n'a ainsi pas besoin de droits d'installation. Un échec dans le worktree
+de l'agent refuse sa création (`WORKSPACE_SETUP_FAILED`, tâche bloquée) ; dans le
+candidat, il le rend `validation_failed` sans lancer les contrôles. Ces
+observations sont conservées à part (`candidate.setup`) : elles ne deviennent pas
+des vérifications de critères. Leurs fichiers doivent être ignorés par Git, sinon
+le candidat a des changements et échoue. Une branche de livraison
 encore absente est créée depuis la base explicite avec comparaison atomique.
 Chaque contrôle reçoit le dossier du candidat ; la preuve contient le SHA exact,
 argv, dates, code de sortie, signal et sortie expurgée/bornée. Un contrôle qui

@@ -28,6 +28,14 @@
       "timeout_seconds": 600
     }
   ],
+  "workspace_setup": [
+    {
+      "id": "setup:deps",
+      "argv": ["npm", "ci"],
+      "cwd": ".",
+      "timeout_seconds": 600
+    }
+  ],
   "delivery": {
     "mode": "branch",
     "target_ref": "main"

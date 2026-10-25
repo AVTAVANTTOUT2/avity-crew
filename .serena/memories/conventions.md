@@ -2,4 +2,6 @@
 - Separate task/attempt/internal session/native session/process identities. Revocation/reassignment changes generation; same-session continuation does not. A stale attempt cannot submit even if its own Handoff fields are consistent.
 - Source delivery, independent review, combined candidate tests and live-provider evidence are separate. Process exit0 and model satisfaction do not accept work. Simulation stays explicitly fake/simulated and cannot satisfy a live proof.
 - Mutations use an idempotency key and optimistic run version. Mutation/event/dedup response commit together. Expired heartbeat requires reconciliation, never automatic release.
+- The Coordinator enforces `expected_version` only for user/chief calls; task agents (worker, reviewer…) are fenced by attempt/generation/task state in the Store, so chief activity cannot reject a handoff or review in preparation.
+- Only error codes cross the transport (no messages): give a distinct code to each agent-fixable defect (e.g. REVIEW_SOURCE_MISMATCH) instead of reusing a generic one.
 - Spawn native CLIs with argv arrays and prompt stdin, no shell interpolation/bypass. Consume events concurrently with result; native runner applies bounded output/backpressure. Unsupported mid-turn send must fail explicitly; supervisor owns durable message queues.
