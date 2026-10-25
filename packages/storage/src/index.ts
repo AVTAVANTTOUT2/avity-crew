@@ -1863,7 +1863,6 @@ export class Store {
           review.run_id !== actor.run_id ||
           target.run_id !== actor.run_id ||
           handoff.task_id !== target.id ||
-          review.source_revision !== handoff.source_revision ||
           this.currentHandoff(actor.run_id, target.id).id !== handoff.id ||
           target.active_attempt_id !== producerAttempt.id ||
           target.generation !== handoff.generation ||
@@ -1872,6 +1871,12 @@ export class Store {
           throw new CrewError(
             'STALE_REVIEW',
             'Review must refer to the current handoff and source',
+          );
+        // Only the code reaches agents: a distinct code names the field to fix.
+        if (review.source_revision !== handoff.source_revision)
+          throw new CrewError(
+            'REVIEW_SOURCE_MISMATCH',
+            `source_revision must equal the handoff source ${handoff.source_revision}; a combined candidate SHA belongs in tested_revision`,
           );
         const producerSession = this.getRecord<AgentSession>(
           actor.run_id,

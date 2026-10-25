@@ -226,12 +226,25 @@ async function execute(command: CliCommand, cwd: string): Promise<number> {
       run_id: command.run,
       subject_id: command.subject ?? command.task,
     });
-  else if (command.name === 'export')
+  else if (command.name === 'export') {
     result = await admin('export', {
       run_id: command.run,
       format: command.format ?? 'markdown',
     });
-  else if (command.name === 'attach' || command.name === 'watch')
+    // JSON events are paged by size; gather every page so the export is complete.
+    type Page = { events: unknown[]; next_seq: number; has_more: boolean };
+    const report = result as Page;
+    while (command.format === 'json' && report.has_more) {
+      const page = (await admin('export', {
+        run_id: command.run,
+        format: 'json',
+        after_seq: report.next_seq,
+      })) as Page;
+      report.events.push(...page.events);
+      report.next_seq = page.next_seq;
+      report.has_more = page.has_more && page.events.length > 0;
+    }
+  } else if (command.name === 'attach' || command.name === 'watch')
     return view(client, command, project.root);
   else throw new CrewError('CLI_USAGE', 'Commande non disponible.');
   output(result, command.json);

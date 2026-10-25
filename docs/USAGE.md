@@ -185,12 +185,13 @@ sources, versions, raisons, couches et budget ; un contexte insuffisant, une
 source manquante ou une omission doit rester explicite. `status` affiche des
 résumés de contexte ; l'inspection ciblée conserve le détail enregistré.
 
-Les exports contiennent tâches, décisions et preuves observées. Le JSON expose
-une page d'événements avec `event_page_size` ; le Markdown est une projection,
-pas une sauvegarde ni une archive exhaustive du journal. Pour davantage
-d'événements, paginer `status --after-seq ... --limit ... --json` jusqu'à la page
-vide. Relire les rapports avant de les partager, même lorsque les secrets connus
-sont expurgés : le contenu du projet peut rester privé.
+Les exports contiennent tâches, décisions et preuves observées. Côté service,
+chaque page d'événements est bornée en nombre (`event_page_size`) et en taille,
+avec `next_seq` et `has_more` ; `export --format json` rassemble toutes les pages
+dans un seul fichier. Le Markdown est une projection, pas une sauvegarde ni une
+archive exhaustive du journal. `status --after-seq ... --limit ... --json` suit
+la même pagination bornée. Relire les rapports avant de les partager, même
+lorsque les secrets connus sont expurgés : le contenu du projet peut rester privé.
 
 La fin native d'un tour, une phrase « terminé » ou un test simulé vert ne suffit
 pas à accepter une tâche. La livraison doit référencer le snapshot, la revue
@@ -258,11 +259,15 @@ mises à jour, avec sources et omissions explicites. Les générations du chef e
 des tâches, les tentatives actives et les versions restent vérifiées côté service :
 un ancien agent ne récupère pas son autorité parce qu'il possède encore un ancien
 prompt ou qu'une requête attendait dans la file.
-Une mission Git reprise peut partir de son snapshot partiel. Sa livraison finale
+Une mission Git reprise part d'un snapshot du dernier worktree de la tâche, y
+compris son travail non soumis, même si la tentative intermédiaire n'a jamais
+obtenu de worktree ou si `reassign` a libéré la tentative. Sa livraison finale
 reste cumulative depuis la base assignée à la mission, avec les mêmes contrôles
 de scope et d'exclusion. Si une base amendée n'est pas ancêtre du workspace
-conservé, `BASE_CHANGED` exige une nouvelle attribution depuis cette base ; le
-service conserve les fichiers et ne les rebase pas automatiquement.
+conservé, `BASE_CHANGED` exige une nouvelle attribution depuis cette base : après
+`reassign`, la tentative suivante part alors de la base amendée (événement
+`recovery.skipped`) ; le service conserve les fichiers et ne les rebase pas
+automatiquement.
 Une mutation dont la réponse HTTP s'est perdue peut avoir été exécutée. La CLI
 ne la rejoue pas automatiquement : vérifier l'état avant de répéter l'action.
 Voir les garanties et limites [POSIX de reprise](RECOVERY.md) et la
@@ -276,7 +281,10 @@ provient exclusivement de la capability fournie par le service, pas d'un acteur
 écrit dans le JSON. `schema_version`, `request_id`, `idempotency_key`, `run_id`,
 `expected_version`, `method` et `arguments` doivent respecter le contrat.
 Conserver une même clé et un même contenu pour rejouer une mutation incertaine,
-et rafraîchir la version avant une nouvelle action.
+et rafraîchir la version avant une nouvelle action. Seuls l'utilisateur et le
+chef sont soumis à `VERSION_CONFLICT` : pour un worker ou un reviewer, sa
+tentative, sa génération et l'état de sa tâche font autorité, et une action du
+chef pendant la préparation d'une passation ne la rejette plus.
 
 Ces interfaces reçoivent `AVITY_CREW_ENDPOINT_FILE`, `AVITY_CREW_CAPABILITY` et,
 pour MCP, `AVITY_CREW_RUN_ID` via l'environnement préparé par le service. Ne pas

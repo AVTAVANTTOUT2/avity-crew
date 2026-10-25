@@ -5,6 +5,7 @@ import type {
   Actor,
   ArtifactRef,
   ContextBundle,
+  CrewEvent,
   Decision,
   Handoff,
   Message,
@@ -23,6 +24,7 @@ import {
 import { Store } from '../../storage/src/index.ts';
 import { WorkspaceManager } from '../../workspace/src/index.ts';
 import type {
+  CheckProof,
   Delivery,
   IntegrationCandidate,
   WorkspaceHandle,
@@ -55,6 +57,55 @@ const canonical = (value: unknown): string => {
     );
   return JSON.stringify(value) ?? 'null';
 };
+/**
+ * Cursor page of events bounded by count and serialized size. `next_seq` is the
+ * last event consumed (shown or filtered out); at least one shown event is kept
+ * so a paginating reader always progresses.
+ */
+export function eventPage(
+  store: Store,
+  runId: string,
+  afterSeq: number,
+  limit: number,
+  maxChars: number,
+  select: (event: CrewEvent) => unknown = (event) => event,
+): { events: unknown[]; next_seq: number; has_more: boolean } {
+  const page = store.events(runId, afterSeq, limit);
+  const events: unknown[] = [];
+  let next_seq = afterSeq,
+    room = maxChars;
+  for (const event of page) {
+    const item = select(event);
+    if (item !== null) {
+      const size = JSON.stringify(item).length + 1;
+      if (size > room && events.length)
+        return { events, next_seq, has_more: true };
+      room -= size;
+      events.push(item);
+    }
+    next_seq = event.seq;
+  }
+  return { events, next_seq, has_more: page.length === limit };
+}
+// Native MCP clients refuse large tool results (Claude Code: ~25k tokens); provider transcripts dominate events.
+const STATUS_CHARS = 40_000,
+  EVENT_TEXT = 600;
+const clip = (value: unknown): unknown =>
+  typeof value === 'string'
+    ? value.length > EVENT_TEXT
+      ? `${value.slice(0, EVENT_TEXT)}… [${value.length - EVENT_TEXT} caractères omis ; texte complet dans export]`
+      : value
+    : Array.isArray(value)
+      ? value.map(clip)
+      : value && typeof value === 'object'
+        ? Object.fromEntries(
+            Object.entries(value).map(([key, entry]) => [key, clip(entry)]),
+          )
+        : value;
+const brief = (proof: CheckProof): CheckProof =>
+  proof.output.length > 4000
+    ? { ...proof, output: proof.output.slice(-4000), truncated: true }
+    : proof;
 export function serviceActor(store: Store, runId: string): Actor {
   const run = store.getRun(runId);
   return {
@@ -127,8 +178,12 @@ export class Coordinator implements SupervisorApi {
       const previous = this.store
         .records<Operation>(call.run_id, 'operation')
         .find((operation) => operation.idempotency_key === key);
+      // Task agents are fenced by attempt, generation and task state in the Store;
+      // the run version orders only user/chief decisions, so a chief mutation no
+      // longer rejects a worker handoff or a review being prepared meanwhile.
       if (
         !previous &&
+        ['user', 'chief'].includes(actor.role) &&
         this.store.getRun(call.run_id).version !== call.expected_version
       )
         throw new CrewError(
@@ -228,13 +283,6 @@ export class Coordinator implements SupervisorApi {
           ? task.id === args.task_id
           : all || task.id === actor.task_id,
       );
-    const page = this.store.events(actor.run_id, args.after_seq, args.limit);
-    const events = all
-      ? page
-      : page.filter(
-          (event) =>
-            event.task_id === actor.task_id || event.actor_id === actor.id,
-        );
     const messages = this.store
       .records<Message>(actor.run_id, 'message')
       .filter(
@@ -244,12 +292,10 @@ export class Coordinator implements SupervisorApi {
           (message.recipient_kind === 'task' &&
             message.recipient_id === actor.task_id),
       );
-    return {
+    const status = {
       run: this.store.getRun(actor.run_id),
       tasks: tasks.slice(0, args.limit),
       task_count: tasks.length,
-      events,
-      next_seq: page.at(-1)?.seq ?? args.after_seq,
       messages: messages.slice(-args.limit),
       questions: all
         ? this.store.records(actor.run_id, 'question').slice(-args.limit)
@@ -264,6 +310,19 @@ export class Coordinator implements SupervisorApi {
         ? this.store.records(actor.run_id, 'verification').slice(-args.limit)
         : [],
     };
+    // Events fill the room left by the records; continue from next_seq while has_more.
+    const page = eventPage(
+      this.store,
+      actor.run_id,
+      args.after_seq,
+      args.limit,
+      STATUS_CHARS - JSON.stringify(status).length,
+      (event) =>
+        all || event.task_id === actor.task_id || event.actor_id === actor.id
+          ? { ...event, payload: clip(event.payload) }
+          : null,
+    );
+    return { ...status, ...page };
   }
 
   private scopedSpec(input: TaskSpec): TaskSpec {
@@ -551,6 +610,8 @@ export class Coordinator implements SupervisorApi {
                 (operation) =>
                   operation.kind === 'integration.prepare' &&
                   operation.status === 'completed' &&
+                  (operation.result as IntegrationCandidate).status ===
+                    'validated' &&
                   (operation.result as IntegrationCandidate)
                     .candidateRevision === call.arguments.accepted_revision,
               );
@@ -819,6 +880,11 @@ export class Coordinator implements SupervisorApi {
           );
         }
     }
-    return candidate;
+    // Full outputs stay in the operation record and test_log artifacts; the agent gets their tail.
+    return {
+      ...candidate,
+      setup: (candidate.setup ?? []).map(brief),
+      proofs: candidate.proofs.map(brief),
+    };
   }
 }

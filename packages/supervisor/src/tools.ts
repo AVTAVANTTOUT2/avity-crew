@@ -25,14 +25,14 @@ const descriptions: Record<ToolCall['method'], string> = {
   delegate_task:
     'Enregistrer une délégation et retourner immédiatement ; le superviseur lance les tours prêts.',
   get_status:
-    'Lire le run, les tâches accessibles, la version courante et une page d’événements.',
+    'Lire le run, les tâches accessibles, la version courante et une page d’événements bornée (textes longs abrégés) ; continuer avec after_seq = next_seq tant que has_more.',
   send_message:
     'Envoyer une information ciblée ; queued ne signifie pas que son destinataire l’a lue.',
   collect_delivery: 'Lire une passation et ses preuves conservées.',
   request_user_input:
     'Enregistrer une question et les seules tâches bloquées par sa réponse.',
   propose_integration:
-    'Construire un candidat Git réunissant les snapshots et exécuter les contrôles configurés.',
+    'Construire un candidat Git réunissant les snapshots, le préparer (workspace_setup) et exécuter les contrôles configurés. Mêmes livraisons et même base donnent le même SHA : une nouvelle idempotency_key relance les contrôles sur ce candidat.',
   finish_run:
     'Demander la clôture avec preuves ; le moteur refuse les critères ou livraisons manquants.',
   read_context: 'Lire le contexte exact envoyé et ses sources autorisées.',
@@ -44,7 +44,7 @@ const descriptions: Record<ToolCall['method'], string> = {
   record_decision:
     'Enregistrer un choix technique ou adopter une réponse utilisateur réellement référencée.',
   submit_review:
-    'Relire une livraison indépendante ; une demande de correction peut précéder le candidat.',
+    'Relire une livraison indépendante ; une demande de correction peut précéder le candidat. source_revision = handoff.source_revision ; tested_revision = SHA exact du candidat combiné relu.',
   accept_delivery:
     'Demander l’acceptation après revue indépendante et vérifications de la révision exacte.',
 };

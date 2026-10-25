@@ -115,6 +115,14 @@ Exemple pour un projet Node disposant de `npm test` :
       "timeout_seconds": 120
     }
   ],
+  "workspace_setup": [
+    {
+      "id": "setup:deps",
+      "argv": ["npm", "ci"],
+      "cwd": ".",
+      "timeout_seconds": 600
+    }
+  ],
   "delivery": { "mode": "local", "target_ref": null },
   "permissions": {
     "profile": "workspace",
@@ -126,7 +134,9 @@ Exemple pour un projet Node disposant de `npm test` :
 
 Adapter les commandes de vérification au projet ; ce sont de vraies commandes
 locales exécutées sur le candidat, avec `cwd: "."` pour l'intégration actuelle.
-Un tableau vide n'apporte pas les tests métier manquants. `model: null` laisse
+Un tableau vide n'apporte pas les tests métier manquants. Chaque worktree (agent
+ou candidat) part d'un checkout neuf, sans `node_modules` : `workspace_setup`,
+optionnel, y installe les dépendances avant le travail et les contrôles. `model: null` laisse
 la CLI résoudre son modèle natif. `--chief`, `--model` et `--max-agents` permettent
 des choix pour un run, dans la capacité du service ; ils ne réécrivent pas les
 préférences du projet.

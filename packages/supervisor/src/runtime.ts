@@ -33,10 +33,12 @@ import { runCommand } from '../../workspace/src/git.ts';
 import { CapabilityRegistry } from './capabilities.ts';
 import {
   Coordinator,
+  eventPage,
   nonempty,
   requestId,
   serviceActor,
 } from './coordinator.ts';
+import { MAX_JSON_BYTES } from './protocol.ts';
 import type { AdminRequest } from './protocol.ts';
 import { TurnScheduler } from './scheduler.ts';
 import { toolsFor } from './tools.ts';
@@ -53,6 +55,8 @@ type ActiveTurn = {
 };
 const terminal = (run: Run) =>
   ['completed', 'failed', 'cancelled'].includes(run.status);
+// Full events stay well under the transport limit, even for multibyte text, next to the other records.
+const EVENT_CHARS = MAX_JSON_BYTES / 4;
 const text = (value: unknown, name: string): string => {
   if (typeof value !== 'string' || !value.trim())
     throw new CrewError('INVALID_INPUT', `${name} is required`);
@@ -380,7 +384,19 @@ export class SupervisorRuntime {
     const manager = new WorkspaceManager(this.store, user);
     let recoveryBase: string | null = null;
     let nativeSession: AgentSession | undefined;
-    let oldWorkspace: Operation | undefined;
+    // The task's latest code workspace holds its newest work, submitted or not,
+    // even when an explicit reassignment already cleared the active attempt.
+    const oldWorkspace = this.store
+      .records<Operation>(runId, 'operation')
+      .filter(
+        (operation) =>
+          operation.kind === 'workspace.create' &&
+          operation.status === 'completed' &&
+          (operation.result as WorkspaceHandle).taskId === task.id &&
+          (operation.result as WorkspaceHandle).mode === 'code',
+      )
+      .at(-1);
+    const reassigned = !task.active_attempt_id;
     if (task.active_attempt_id) {
       const previous = this.store.getAttempt(task.active_attempt_id);
       nativeSession = this.store.getRecord<AgentSession>(
@@ -388,14 +404,6 @@ export class SupervisorRuntime {
         'session',
         previous.session_id,
       );
-      oldWorkspace = this.store
-        .records<Operation>(runId, 'operation')
-        .find(
-          (operation) =>
-            operation.kind === 'workspace.create' &&
-            operation.status === 'completed' &&
-            (operation.result as WorkspaceHandle).attemptId === previous.id,
-        );
     }
     if (task.active_attempt_id)
       task = this.store.reassignTask(
@@ -437,20 +445,35 @@ export class SupervisorRuntime {
     };
     try {
       if (run.delivery_mode === 'code' && oldWorkspace) {
-        const snapshot = await manager.collectDelivery(
-          oldWorkspace.id,
-          {
-            writePaths: task.spec.scope.write_paths,
-            excludedPaths: task.spec.scope.excluded_paths,
-          },
-          requestId(delegation.id, 'recovery-snapshot'),
-        );
-        recoveryBase = snapshot.sourceRevision;
-        this.store.observation(user, 'recovery.snapshot', {
-          task_id: task.id,
-          revision: recoveryBase,
-          business_success: false,
-        });
+        try {
+          const snapshot = await manager.collectDelivery(
+            oldWorkspace.id,
+            {
+              writePaths: task.spec.scope.write_paths,
+              excludedPaths: task.spec.scope.excluded_paths,
+            },
+            requestId(delegation.id, 'recovery-snapshot'),
+          );
+          recoveryBase = snapshot.sourceRevision;
+          this.store.observation(user, 'recovery.snapshot', {
+            task_id: task.id,
+            revision: recoveryBase,
+            business_success: false,
+          });
+        } catch (error) {
+          // An explicit reassignment is how an amended baseline is adopted; the old worktree stays on disk.
+          if (
+            !reassigned ||
+            !(error instanceof CrewError && error.code === 'BASE_CHANGED')
+          )
+            throw error;
+          this.store.observation(user, 'recovery.skipped', {
+            task_id: task.id,
+            reason: 'BASE_CHANGED',
+            preserved_path: (oldWorkspace.result as WorkspaceHandle).path,
+            business_success: false,
+          });
+        }
       }
       const previous = this.store
         .records<Handoff>(runId, 'handoff')
@@ -706,7 +729,7 @@ export class SupervisorRuntime {
             includes_active_chief: true,
           },
           instructions:
-            'Les outils crew sont la seule autorité de coordination. Lire get_status pour la version courante avant mutation. Créer des request_id et idempotency_key uniques par action ; réutiliser exactement la clé après perte de réponse. Les missions reprennent les IDs des critères du run qu’elles couvrent. delegate_task retourne queued sans attendre. Après délégation, terminer le tour pour libérer sa place. Une sortie native réussie ne vaut jamais acceptation. Pour soumettre un document neuf : document_paths contient les chemins relatifs à capturer ; handoff.artifacts et handoff.verifications restent vides et handoff.source_revision vaut null. Le serveur calcule les empreintes et les preuves observées ; ne pas inventer de hash ni de résultat. Le reviewer lit collect_delivery puis submit_review, sans submit_handoff ni dépendance d’acceptation sur la tâche relue. La revue documentaire porte sur le hash exact du snapshot ; une revue de code approuve le candidat combiné et son SHA exact après propose_integration. Les IDs des vérifications observées sont fournis par collect_delivery et get_status.',
+            'Les outils crew sont la seule autorité de coordination. Le chef lit get_status pour la version courante avant mutation ; pour un worker ou un reviewer, expected_version est indicatif et sa tentative fait autorité. get_status est paginé et borné : continuer avec after_seq = next_seq tant que has_more. Créer des request_id et idempotency_key uniques par action ; réutiliser exactement la clé après perte de réponse. Les missions reprennent les IDs des critères du run qu’elles couvrent. delegate_task retourne queued sans attendre. Après délégation, terminer le tour pour libérer sa place. Une sortie native réussie ne vaut jamais acceptation. Pour soumettre un document neuf : document_paths contient les chemins relatifs à capturer ; handoff.artifacts et handoff.verifications restent vides et handoff.source_revision vaut null. Le serveur calcule les empreintes et les preuves observées ; ne pas inventer de hash ni de résultat. Le reviewer lit collect_delivery puis submit_review, sans submit_handoff ni dépendance d’acceptation sur la tâche relue. La revue documentaire porte sur le hash exact du snapshot ; une revue de code approuve le candidat combiné et son SHA exact après propose_integration : review.source_revision reste handoff.source_revision, le SHA du candidat va dans tested_revision. Relancer propose_integration avec une nouvelle idempotency_key reconstruit le même SHA pour les mêmes livraisons sur la même base et réexécute workspace_setup puis les contrôles. Les IDs des vérifications observées sont fournis par collect_delivery et get_status.',
           planning_rules: [
             'Attribuer les critères d’écriture à leur exécutant et les critères de revue à une mission reviewer distincte. Les critères globaux du run restent obligatoires ; ne pas demander à un writer de revendiquer une revue ou une clôture qu’il ne réalise pas.',
             'Pour corriger une mission arrêtée ou une passation à resoumettre : record_decision approved technical_judgment avec affects_task_ids, puis amend_task avec la TaskSpec complète et une raison, puis delegate_task. Le run garde ses critères. Toute nouvelle livraison exige sa revue indépendante.',
@@ -1390,14 +1413,13 @@ export class SupervisorRuntime {
       case 'status': {
         const after = Number(args['after_seq'] ?? 0),
           limit = Number(args['limit'] ?? 100);
-        const events = this.store.events(runId, after, limit);
+        const page = eventPage(this.store, runId, after, limit, EVENT_CHARS);
         const contexts = this.store.records<ContextBundle>(runId, 'context');
         return {
           project: this.store.project,
           run,
           tasks: this.store.tasks(runId).slice(0, limit),
-          events,
-          next_seq: events.at(-1)?.seq ?? after,
+          ...page,
           sessions: this.store.records(runId, 'session').slice(-limit),
           questions: this.store.records(runId, 'question').slice(-limit),
           activity: this.scheduler.snapshot(),
@@ -1606,10 +1628,13 @@ export class SupervisorRuntime {
               verifications: this.store.records(runId, 'verification'),
               acceptances: this.store.records(runId, 'acceptance'),
               questions: this.store.records(runId, 'question'),
-              events: this.store.events(
+              // Continue with after_seq = next_seq while has_more; `export` in the CLI does it.
+              ...eventPage(
+                this.store,
                 runId,
                 Number(args['after_seq'] ?? 0),
                 200,
+                EVENT_CHARS,
               ),
               event_page_size: 200,
             };

@@ -2688,7 +2688,8 @@ test(
         );
         assert.equal(
           readFileSync(join(request.cwd, 'features/recovered.txt'), 'utf8'),
-          'Preserved first-attempt work\n',
+          'Unsubmitted later work\n',
+          'Recovery starts from the latest worktree, not only the last handoff',
         );
         writeFileSync(
           join(request.cwd, 'features/recovered.txt'),
@@ -2844,6 +2845,12 @@ test(
       'fixture:submit-prior-partial',
       version(),
     );
+    // Work after the handoff, never submitted: the failed attempt below has no
+    // worktree of its own, so only the task's latest worktree still holds it.
+    writeFileSync(
+      join(oldWorkspace.path, 'features/recovered.txt'),
+      'Unsubmitted later work\n',
+    );
     f.store.observeAttempt(
       user,
       oldAttempt.id,
@@ -2987,7 +2994,7 @@ test(
       assert.equal(f.store.records(run.id, 'final').length, 0);
       assert.equal(
         readFileSync(join(oldWorkspace.path, 'features/recovered.txt'), 'utf8'),
-        'Preserved first-attempt work\n',
+        'Unsubmitted later work\n',
       );
     } finally {
       try {

@@ -17,7 +17,11 @@ import { join } from 'node:path';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
-import { Store, identifyProject } from '../packages/storage/src/index.ts';
+import {
+  Store,
+  defaultConfig,
+  identifyProject,
+} from '../packages/storage/src/index.ts';
 import { CrewError, now } from '../packages/contracts/src/index.ts';
 import type {
   Actor,
@@ -26,6 +30,7 @@ import type {
   AgentSession,
   ArtifactRef,
   Handoff,
+  ProjectConfig,
 } from '../packages/contracts/src/index.ts';
 import {
   WorkspaceManager,
@@ -46,7 +51,7 @@ const check = (source: string): Check[] => [
   { id: 'check:fixture', command: [process.execPath, '-e', source] },
 ];
 
-function fixture(t: TestContext, initialize = true) {
+function fixture(t: TestContext, initialize = true, config = defaultConfig()) {
   const directory = mkdtempSync(join(tmpdir(), 'avity crew workspace ')),
     root = join(directory, 'project with spaces');
   mkdirSync(root);
@@ -65,7 +70,7 @@ function fixture(t: TestContext, initialize = true) {
       'baseline',
     );
   }
-  const project = identifyProject(root, join(directory, 'data'));
+  const project = identifyProject(root, join(directory, 'data'), config);
   let store = new Store(project);
   const run: Run = {
     id: 'run:workspace',
@@ -1296,3 +1301,93 @@ test(
     );
   },
 );
+
+const prepared = (source: string): ProjectConfig => ({
+  ...defaultConfig(),
+  workspace_setup: [
+    {
+      id: 'setup:deps',
+      argv: [process.execPath, '-e', source],
+      cwd: '.',
+      timeout_seconds: 30,
+    },
+  ],
+});
+
+test('workspace_setup prepares agent and candidate worktrees, and a re-run rebuilds the same candidate SHA', async (t) => {
+  const f = fixture(
+    t,
+    true,
+    prepared(
+      "require('node:fs').mkdirSync('deps');require('node:fs').writeFileSync('deps/ready','1')",
+    ),
+  );
+  // Like node_modules: ignored, so preparation leaves the checkout clean.
+  writeFileSync(join(f.root, '.git/info/exclude'), 'deps/\n');
+  const base = `git:${git(f.root, 'rev-parse', 'HEAD')}`;
+  const workspace = await f.manager.createWorkspace(
+    { ...f.task(), mode: 'code' },
+    'workspace:prepared',
+  );
+  assert.equal(readFileSync(join(workspace.path, 'deps/ready'), 'utf8'), '1');
+  writeFileSync(join(workspace.path, 'feature.txt'), 'prepared');
+  const delivery = await f.manager.collectDelivery(
+    workspace.operationId,
+    { writePaths: ['**'] },
+    'delivery:prepared',
+  );
+  const request = {
+    targetRef: 'refs/heads/crew-prepared',
+    expectedBase: base,
+    deliveryOperationIds: [delivery.operationId],
+    checks: check("require('node:fs').accessSync('deps/ready')"),
+  };
+  const first = await f.manager.prepareIntegration(request, 'integration:one');
+  // Commit dates have one-second resolution: only an input-derived date keeps the SHA.
+  await new Promise((resolve) => setTimeout(resolve, 1100));
+  const rerun = await f.manager.prepareIntegration(request, 'integration:two');
+  assert.equal(first.status, 'validated');
+  assert.equal(rerun.status, 'validated');
+  assert.equal(first.setup[0]!.exitCode, 0);
+  assert.notEqual(rerun.path, first.path);
+  assert.equal(rerun.candidateRevision, first.candidateRevision);
+  assert.equal(rerun.proofs[0]!.candidateRevision, first.candidateRevision);
+});
+
+test('a failed preparation fails the candidate without running its checks', async (t) => {
+  // feature.txt exists only once the delivery is applied, so the agent worktree prepares fine.
+  const f = fixture(
+    t,
+    true,
+    prepared(
+      "process.exit(require('node:fs').existsSync('feature.txt') ? 3 : 0)",
+    ),
+  );
+  const base = `git:${git(f.root, 'rev-parse', 'HEAD')}`;
+  const workspace = await f.manager.createWorkspace(
+    { ...f.task(), mode: 'code' },
+    'workspace:unprepared',
+  );
+  writeFileSync(join(workspace.path, 'feature.txt'), 'x');
+  const delivery = await f.manager.collectDelivery(
+    workspace.operationId,
+    { writePaths: ['**'] },
+    'delivery:unprepared',
+  );
+  const candidate = await f.manager.prepareIntegration(
+    {
+      targetRef: 'refs/heads/crew-unprepared',
+      expectedBase: base,
+      deliveryOperationIds: [delivery.operationId],
+      checks: check('process.exit(0)'),
+    },
+    'integration:unprepared',
+  );
+  assert.equal(candidate.status, 'validation_failed');
+  assert.equal(candidate.setup[0]!.exitCode, 3);
+  assert.deepEqual(candidate.proofs, []);
+  await assert.rejects(
+    f.manager.promoteIntegration(candidate.operationId, 'promotion:refused'),
+    code('UNVERIFIED_CANDIDATE'),
+  );
+});
