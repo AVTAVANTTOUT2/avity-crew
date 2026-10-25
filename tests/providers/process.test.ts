@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join, relative } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import test from 'node:test';
 import type {
@@ -11,6 +11,7 @@ import type {
 } from '../../packages/contracts/src/index.ts';
 import {
   classifyNativeError,
+  executable,
   runNative,
   validateProviderRequest,
 } from '../../packages/providers/src/process.ts';
@@ -328,4 +329,28 @@ test('native error classification distinguishes actionable failures', () => {
     ['unexpected exit', 'process'],
   ])
     assert.equal(classifyNativeError(message!).kind, kind);
+});
+
+test('provider binaries resolve from absolute PATH entries only, so probe and launch agree', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'avity provider path '));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const installed = join(directory, 'installed'),
+    decoy = join(directory, 'workspace');
+  for (const folder of [installed, decoy]) {
+    await mkdir(folder);
+    await writeFile(join(folder, 'codex'), '#!/bin/sh\nexit 0\n', {
+      mode: 0o755,
+    });
+  }
+  const saved = process.env.PATH;
+  t.after(() => {
+    process.env.PATH = saved;
+  });
+  // Empty and relative entries depend on the searching process's directory.
+  const relativeDecoy = relative(process.cwd(), decoy);
+  process.env.PATH = ['', relativeDecoy, installed, ''].join(delimiter);
+  assert.equal(executable('codex'), join(installed, 'codex'));
+  process.env.PATH = ['', relativeDecoy].join(delimiter);
+  assert.equal(executable('codex'), null);
+  assert.equal(executable(join(decoy, 'codex')), join(decoy, 'codex'));
 });

@@ -1,7 +1,4 @@
 import { execFile } from 'node:child_process';
-import { access } from 'node:fs/promises';
-import { constants } from 'node:fs';
-import { delimiter, isAbsolute, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { CrewError, now } from '../../contracts/src/index.ts';
 import type {
@@ -13,6 +10,7 @@ import type {
 } from '../../contracts/src/index.ts';
 import {
   classifyNativeError,
+  executable,
   runNative,
   validateProviderRequest,
 } from './process.ts';
@@ -130,22 +128,7 @@ export class ClaudeProvider implements ProviderAdapter {
   constructor(private readonly binary = 'claude') {}
 
   async probe(): Promise<ProviderCapabilities> {
-    let binaryPath: string | undefined;
-    const candidates =
-      isAbsolute(this.binary) || this.binary.includes('/')
-        ? [resolve(this.binary)]
-        : (process.env.PATH ?? '')
-            .split(delimiter)
-            .map((directory) => resolve(directory, this.binary));
-    for (const candidate of candidates) {
-      try {
-        await access(candidate, constants.X_OK);
-        binaryPath = candidate;
-        break;
-      } catch {
-        /* Try the next PATH entry. */
-      }
-    }
+    const binaryPath = executable(this.binary);
     if (!binaryPath)
       throw new CrewError(
         'PROVIDER_UNAVAILABLE',
@@ -265,6 +248,12 @@ export class ClaudeProvider implements ProviderAdapter {
     }
     if (request.model !== null) args.push('--model', request.model);
     if (nativeSessionId) args.push('--resume', nativeSessionId);
-    return runNative(this.id, this.binary, args, request, decodeClaudeEvent);
+    return runNative(
+      this.id,
+      executable(this.binary) ?? this.binary,
+      args,
+      request,
+      decodeClaudeEvent,
+    );
   }
 }

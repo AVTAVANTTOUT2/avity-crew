@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { emitKeypressEvents } from 'node:readline';
+import { PassThrough } from 'node:stream';
 import { test } from 'node:test';
 import { runArguments, parseCli } from '../apps/cli/src/args.ts';
 import {
@@ -340,4 +342,52 @@ test('editor moves by graphemes and lines; tool events become readable actions',
     ).lines[0],
     { kind: 'del', text: 'a.ts (diff non fourni par Codex)', at: null },
   );
+});
+
+test('Ctrl+J and Alt+Enter, decoded by Node from raw terminal bytes, insert a line; Enter sends', async () => {
+  const state = loaded(3);
+  const { io, calls } = fakeIo(3);
+  const controller = new Controller(state, io);
+  const input = new PassThrough();
+  emitKeypressEvents(input);
+  const keys: Promise<void>[] = [];
+  input.on('keypress', (text: string | undefined, key: Key | undefined) =>
+    keys.push(controller.key(text, key ?? {})),
+  );
+  // Raw mode sends LF for Ctrl+J, ESC CR for Alt+Enter and CR for Enter.
+  const settle = async () => {
+    await new Promise((resolve) => setImmediate(resolve));
+    await Promise.all(keys);
+  };
+  input.write('un\ndeux\u001b\rtrois');
+  await settle();
+  assert.equal(controller.draft().text, 'un\ndeux\ntrois');
+  assert.equal(calls.filter(([method]) => method === 'send').length, 0);
+  input.write('\r');
+  await settle();
+  assert.equal(
+    calls.find(([method]) => method === 'send')?.[1]?.['content'],
+    'un\ndeux\ntrois',
+  );
+});
+
+test('attaching without a run joins the run still working rather than the last one created', async () => {
+  const state = createState('/projets/factures', null);
+  const { io } = fakeIo(3);
+  const controller = new Controller(
+    state,
+    {
+      ...io,
+      admin: async (method, args) =>
+        method === 'list_runs'
+          ? [
+              { id: 'run:done', status: 'completed' },
+              { id: 'run:demo', status: 'running' },
+            ]
+          : io.admin(method, args),
+    },
+    () => {},
+  );
+  await controller.poll();
+  assert.equal(state.current, 'run:demo');
 });

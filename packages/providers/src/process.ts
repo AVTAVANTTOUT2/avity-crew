@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
-import { isAbsolute } from 'node:path';
+import { accessSync, constants } from 'node:fs';
+import { delimiter, isAbsolute, join, resolve } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
 import { setTimeout as delay } from 'node:timers/promises';
 import { CrewError, runtimeSchema } from '../../contracts/src/index.ts';
@@ -21,6 +22,31 @@ const crewMethods = new Set<string>(
     (entry) => entry.properties.method.const,
   ),
 );
+
+/**
+ * The executable a provider probes and launches: an explicit path, or the first
+ * absolute PATH directory that holds it. Empty or relative PATH entries name the
+ * current directory of whichever process searches (the service when probing, a
+ * workspace when launching), so they are ignored rather than diverging.
+ */
+export function executable(binary: string): string | null {
+  const candidates =
+    isAbsolute(binary) || binary.includes('/')
+      ? [resolve(binary)]
+      : (process.env.PATH ?? '')
+          .split(delimiter)
+          .filter((directory) => isAbsolute(directory))
+          .map((directory) => join(directory, binary));
+  for (const candidate of candidates) {
+    try {
+      accessSync(candidate, constants.X_OK);
+      return candidate;
+    } catch {
+      /* Try the next PATH entry. */
+    }
+  }
+  return null;
+}
 
 export function validateProviderRequest(request: ProviderRequest): void {
   const valid =

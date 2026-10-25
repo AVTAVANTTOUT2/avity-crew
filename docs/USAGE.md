@@ -300,7 +300,7 @@ dans un exemple. `internal mcp` réserve stdout à JSON-RPC. Voir le
 | `VERSION_CONFLICT`                                | Relire le statut et distinguer nouvelle action/rejeu de la même action                                             |
 | `IDEMPOTENCY_CONFLICT`                            | Même clé avec contenu différent : examiner le journal ; ne pas générer des clés en boucle pour contourner l'erreur |
 | `RECONCILIATION_REQUIRED`                         | Conserver base, worktrees et opérations ; faire constater la propriété et la fin du processus avant réattribution  |
-| `CONTROL_IN_PROGRESS`                             | Laisser finir la pause, l'arrêt ou l'autre contrôle en cours, puis relire le statut avant une nouvelle action      |
+| `CONTROL_IN_PROGRESS`                             | Le contrôle en cours s'appliquera à la fin observée des tours arrêtés ; relire le statut avant une nouvelle action |
 | Permission native refusée                         | Ajuster la mission ou répondre au besoin réel de permission ; aucun bypass global n'est ajouté                     |
 | Vue ou export trop grand                          | Réduire la page d'événements et inspecter un contexte ciblé ; ne pas supprimer les preuves                         |
 

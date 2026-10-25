@@ -29,6 +29,14 @@ attendue du run. La transition, son événement et la réponse dédupliquée son
 commis ensemble. Une clé réutilisée avec un contenu différent est refusée.
 Le contrôle de portée/génération précède aussi le retour d'une réponse rejouée.
 
+Les identifiants de tâche sont choisis par le chef et propres à un run : la
+clé SQLite est `(run_id, id)` depuis la migration 3, qui reconstruit `tasks`,
+`attempts` et `records` sans perte puis vérifie `foreign_key_check` avant commit.
+`getTask(runId, id)` ne lit que le run demandé ; un identifiant connu seulement
+d'un autre run donne `WRONG_RUN`, et une création en double dans un run
+`TASK_EXISTS`. `currentRun()` désigne le run non terminé le plus récent, ou à
+défaut le dernier créé : c'est la cible des commandes sans `--run`.
+
 `claimTask` réserve sans attendre le processus. Une tentative `queued` doit être
 observée `running` par le superviseur avant de livrer. Une expiration de heartbeat
 est un diagnostic : `overdueAttempts` ne réattribue rien. `reassignTask` exige
@@ -98,7 +106,7 @@ sont libérées. `recordDecision` accepte un cinquième argument
 `{basis, user_response_id}` ; le mode `user_response` exige cette réponse réelle,
 sa source et sa portée, avec l'approbateur utilisateur conservé. Le jugement
 technique garde l'approbateur authentifié du chef ou de l'utilisateur.
-La décision persistée conserve cette provenance dans son champ optionnel
+La décision persistée, et retournée à l'appelant, conserve cette provenance dans son champ optionnel
 `provenance` : le schéma strict et le compilateur de contexte l'acceptent sans
 la supprimer. Les anciens enregistrements sans ce champ restent valides ;
 les liens et l'autorité d'une réponse utilisateur restent contrôlés par Store.
@@ -132,6 +140,9 @@ avec la Review persistée comme résultat, par les transitions internes
 
 `saveVerification(user, taskId, verification, key, version, artifacts = [])`
 conserve les preuves du service et leurs snapshots après le handoff immuable.
+Une preuve `live`, ici ou déclarée dans un handoff, passe `assertLiveVerification` :
+une simulation (`fake`) ne peut pas s'y présenter. Les preuves du service restent
+`static`, issues d'une commande réellement exécutée.
 Les nouveaux artefacts doivent appartenir à une tentative de cette tâche,
 figurer dans la preuve et passer `readArtifact`. Une même métadonnée déjà
 conservée peut être réutilisée ; elle ne peut pas être remplacée.

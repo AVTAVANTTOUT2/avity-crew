@@ -353,7 +353,7 @@ test('delegation is a durable queued acknowledgment; claim consumes it atomicall
   const queued = f.store.delegateTask(f.chief, args, k, version);
   assert.deepEqual(f.store.delegateTask(f.chief, args, k, version), queued);
   assert.equal(queued.status, 'queued');
-  assert.equal(f.store.getTask(b.id).status, 'waiting_dependency');
+  assert.equal(f.store.getTask(f.run.id, b.id).status, 'waiting_dependency');
   assert.equal(f.store.attempts(f.run.id).length, 0);
   assert.throws(
     () =>
@@ -483,7 +483,10 @@ test('blocking questions gate only listed tasks and user responses retain genuin
     code('INVALID_PROVENANCE'),
   );
   f.claim(a);
-  assert.equal(f.store.getTask(b.id).active_attempt_id, worker.attempt.id);
+  assert.equal(
+    f.store.getTask(f.run.id, b.id).active_attempt_id,
+    worker.attempt.id,
+  );
 });
 
 test('worker notes and blockers require the current own assignment; waits enforce domain transitions', (t) => {
@@ -536,7 +539,7 @@ test('worker notes and blockers require the current own assignment; waits enforc
     f.version(),
   );
   assert.equal(blocker.task_id, a.id);
-  assert.equal(f.store.getTask(a.id).status, 'blocked');
+  assert.equal(f.store.getTask(f.run.id, a.id).status, 'blocked');
   f.stop(worker.attempt.id);
   const delegated = f.store.delegateTask(
     f.chief,
@@ -571,7 +574,7 @@ test('a cancelled run keeps late writer results and reassignment outside the dom
     code('RUN_TERMINAL'),
   );
   assert.equal(f.version(), before + 1);
-  assert.equal(f.store.getTask(spec.id).status, 'running');
+  assert.equal(f.store.getTask(f.run.id, spec.id).status, 'running');
 });
 
 test('changes_requested is an accepted control result and permits targeted correction without accepting the producer', (t) => {
@@ -592,8 +595,11 @@ test('changes_requested is an accepted control result and permits targeted corre
       },
     ],
   });
-  assert.equal(f.store.getTask(control.review_task_id).status, 'accepted');
-  assert.equal(f.store.getTask(a.id).status, 'changes_requested');
+  assert.equal(
+    f.store.getTask(f.run.id, control.review_task_id).status,
+    'accepted',
+  );
+  assert.equal(f.store.getTask(f.run.id, a.id).status, 'changes_requested');
   f.store.delegateTask(
     f.chief,
     { task_id: a.id, provider: 'codex', model: null },
@@ -668,7 +674,7 @@ test('document delivery needs a stopped writer, independent review and a real ha
     f.store.acceptDelivery(f.chief, args, k, version).status,
     'accepted',
   );
-  assert.equal(f.store.getTask(dependent.id).status, 'ready');
+  assert.equal(f.store.getTask(f.run.id, dependent.id).status, 'ready');
   assert.equal(f.project.git_common_dir, null);
 });
 
@@ -729,7 +735,7 @@ test('a corrupted or missing artifact rolls back acceptance and cannot be final 
     code('ARTIFACT_CHANGED'),
   );
   assert.equal(f.version(), before);
-  assert.equal(f.store.getTask(ready.spec.id).status, 'in_review');
+  assert.equal(f.store.getTask(f.run.id, ready.spec.id).status, 'in_review');
 });
 
 test('run completion validates criterion bindings atomically and records one replayable final result', (t) => {
@@ -816,7 +822,7 @@ test('self-review and stale review cannot close either the producer or its contr
     code('SELF_REVIEW'),
   );
   assert.equal(f.version(), before);
-  assert.equal(f.store.getTask(spec.id).status, 'in_review');
+  assert.equal(f.store.getTask(f.run.id, spec.id).status, 'in_review');
   const control = f.task('task:review', 'reviewer'),
     reviewer = f.claim(control);
   assert.throws(
@@ -834,7 +840,34 @@ test('self-review and stale review cannot close either the producer or its contr
       ),
     code('REVIEW_SOURCE_MISMATCH'),
   );
-  assert.equal(f.store.getTask(control.id).status, 'running');
+  assert.equal(f.store.getTask(f.run.id, control.id).status, 'running');
+});
+
+test('a proof declared live from the simulated provider is refused before storage', (t) => {
+  const f = fixture(t),
+    ready = f.ready();
+  const simulated: Verification = {
+    ...ready.evidence.value,
+    id: 'verification:simulated-live',
+    mode: 'live',
+    provider: 'fake',
+  };
+  assert.throws(
+    () =>
+      f.store.saveVerification(
+        f.user,
+        ready.spec.id,
+        simulated,
+        f.key(),
+        f.version(),
+      ),
+    code('SIMULATED_EVIDENCE'),
+  );
+  assert.ok(
+    !f.store
+      .records<Verification>(f.run.id, 'verification')
+      .some((proof) => proof.id === simulated.id),
+  );
 });
 
 test('acceptance rejects failed, unrelated and wrong-revision proof records', (t) => {
@@ -895,7 +928,7 @@ test('acceptance rejects failed, unrelated and wrong-revision proof records', (t
       ),
     code('INVALID_EVIDENCE'),
   );
-  assert.equal(f.store.getTask(ready.spec.id).status, 'in_review');
+  assert.equal(f.store.getTask(f.run.id, ready.spec.id).status, 'in_review');
 });
 
 test('partial or limited delivery and a source-only review cannot pass delivery acceptance', (t) => {
@@ -963,7 +996,7 @@ test('required claims and review evidence remain mandatory even with a successfu
     () => f.store.acceptDelivery(f.chief, args, f.key(), f.version()),
     code('MISSING_CRITERIA'),
   );
-  assert.equal(f.store.getTask(spec.id).status, 'in_review');
+  assert.equal(f.store.getTask(f.run.id, spec.id).status, 'in_review');
 });
 
 test('questions, decisions and evidence retain run isolation', (t) => {
@@ -986,7 +1019,7 @@ test('questions, decisions and evidence retain run isolation', (t) => {
         f.key(),
         f.store.getRun(run.id).version,
       ),
-    code('INVALID_QUESTION'),
+    code('WRONG_RUN'),
   );
   assert.throws(
     () =>
@@ -1149,7 +1182,7 @@ test('code delivery accepts only the exact validated and promoted Git candidate 
     () => f.store.acceptDelivery(f.chief, args, f.key(), f.version()),
     code('INTEGRATION_REQUIRED'),
   );
-  assert.equal(f.store.getTask(spec.id).status, 'in_review');
+  assert.equal(f.store.getTask(f.run.id, spec.id).status, 'in_review');
   await manager.promoteIntegration(
     candidate.operationId,
     'integration:promote',

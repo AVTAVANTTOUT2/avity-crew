@@ -109,8 +109,8 @@ export function renderSnapshot(
     'Avity Crew — état observé du projet',
     `Projet : ${text(record(data.project).root ?? record(data.project).id)}`,
     `État : ${states[text(run.status)] ?? text(run.status)}`,
-    `Objectif : ${text(run.id)}`,
-    text(run.objective),
+    `Run : ${text(run.id)}`,
+    `Objectif : ${text(run.objective)}`,
     `Tâches : ${tasks.length} | Sessions connues : ${sessions.length} | Capacité configurée : ${text(run.max_active_agents)}`,
     `Tours actifs : ${text(activeTurns)} | Tours en file : ${text(queuedTurns)} (distincts des sessions et tâches)`,
   ];

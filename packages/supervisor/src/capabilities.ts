@@ -113,7 +113,7 @@ export class CapabilityRegistry {
         'FORBIDDEN',
         'Agent capability requires an assigned role and attempt',
       );
-    const task = this.store.getTask(actor.task_id),
+    const task = this.store.getTask(actor.run_id, actor.task_id),
       attempt = this.store.getAttempt(actor.attempt_id);
     if (
       task.run_id !== run.id ||

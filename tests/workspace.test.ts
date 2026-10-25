@@ -319,7 +319,7 @@ async function resumedPartialFixture(t: TestContext) {
   );
   writeFileSync(join(resumed.path, 'README.md'), 'Final README\n');
   assert.equal(
-    f.store.getTask(initial.taskId).spec.base_revision,
+    f.store.getTask(f.run.id, initial.taskId).spec.base_revision,
     initial.baseRevision,
   );
   return { f, initial, first, partial, attempt, resumed, submit };
@@ -407,7 +407,10 @@ test('a resumed partial delivery integrates both attempts cumulatively from the 
     readFileSync(join(resumed.path, 'ui/index.html'), 'utf8'),
     '<main>Recovered UI</main>\n',
   );
-  assert.equal(f.store.getTask(initial.taskId).active_attempt_id, attempt.id);
+  assert.equal(
+    f.store.getTask(f.run.id, initial.taskId).active_attempt_id,
+    attempt.id,
+  );
 });
 
 for (const restricted of [
@@ -476,7 +479,7 @@ test('collection refuses an amended task base that is not an ancestor of the res
     f.actor,
     {
       task: {
-        ...f.store.getTask(initial.taskId).spec,
+        ...f.store.getTask(f.run.id, initial.taskId).spec,
         base_revision: nextBase,
       },
       reason:
@@ -486,7 +489,10 @@ test('collection refuses an amended task base that is not an ancestor of the res
     'task:amend-base',
     f.version(),
   );
-  assert.equal(f.store.getTask(initial.taskId).spec.base_revision, nextBase);
+  assert.equal(
+    f.store.getTask(f.run.id, initial.taskId).spec.base_revision,
+    nextBase,
+  );
   await assert.rejects(
     f.manager.collectDelivery(
       resumed.operationId,

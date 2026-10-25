@@ -349,7 +349,7 @@ export class WorkspaceManager {
     },
     key: string,
   ): Promise<WorkspaceHandle> {
-    const task = this.store.getTask(request.taskId),
+    const task = this.store.getTask(this.actor.run_id, request.taskId),
       attempt = this.store.getAttempt(request.attemptId);
     if (
       task.run_id !== this.actor.run_id ||
@@ -513,7 +513,7 @@ export class WorkspaceManager {
         'READ_ONLY_WORKSPACE',
         'Read-only tasks do not create a delivery',
       );
-    const task = this.store.getTask(workspace.taskId).spec;
+    const task = this.store.getTask(this.actor.run_id, workspace.taskId).spec;
     const assigned = task.scope;
     const verifyScope = (paths: readonly string[]) => {
       assertScope(paths, scope);

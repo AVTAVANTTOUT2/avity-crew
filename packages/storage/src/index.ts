@@ -59,6 +59,7 @@ import {
   assertCurrentAttempt,
   assertRunTransition,
   assertRunCompletable,
+  assertLiveVerification,
 } from '../../core/src/index.ts';
 export { identifyProject, defaultConfig } from './project.ts';
 
@@ -71,6 +72,22 @@ const migrations = [
    CREATE TABLE events (run_id TEXT NOT NULL REFERENCES runs(id), seq INTEGER NOT NULL, data TEXT NOT NULL CHECK(json_valid(data)), PRIMARY KEY(run_id, seq)) STRICT;
    CREATE TABLE requests (run_id TEXT NOT NULL REFERENCES runs(id), key TEXT NOT NULL, fingerprint TEXT NOT NULL, response TEXT NOT NULL CHECK(json_valid(response)), PRIMARY KEY(run_id, key)) STRICT;`,
   `CREATE UNIQUE INDEX one_active_attempt ON attempts(task_id) WHERE status IN ('queued','running','unknown');
+   CREATE INDEX tasks_by_run ON tasks(run_id, status);
+   CREATE INDEX records_by_task ON records(run_id, task_id, kind);`,
+  // Task IDs are chosen by the chief: two runs of one project may reuse them.
+  `CREATE TABLE tasks_scoped (id TEXT NOT NULL, run_id TEXT NOT NULL REFERENCES runs(id), status TEXT NOT NULL, generation INTEGER NOT NULL, active_attempt_id TEXT REFERENCES attempts(id) DEFERRABLE INITIALLY DEFERRED, data TEXT NOT NULL CHECK(json_valid(data)), PRIMARY KEY(run_id, id)) STRICT;
+   INSERT INTO tasks_scoped(rowid,id,run_id,status,generation,active_attempt_id,data) SELECT rowid,id,run_id,status,generation,active_attempt_id,data FROM tasks;
+   CREATE TABLE attempts_scoped (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES runs(id), task_id TEXT NOT NULL, status TEXT NOT NULL, generation INTEGER NOT NULL, data TEXT NOT NULL CHECK(json_valid(data)), FOREIGN KEY(run_id, task_id) REFERENCES tasks(run_id, id)) STRICT;
+   INSERT INTO attempts_scoped(rowid,id,run_id,task_id,status,generation,data) SELECT rowid,id,run_id,task_id,status,generation,data FROM attempts;
+   CREATE TABLE records_scoped (run_id TEXT NOT NULL REFERENCES runs(id), kind TEXT NOT NULL, id TEXT NOT NULL, task_id TEXT, actor_id TEXT NOT NULL, data TEXT NOT NULL CHECK(json_valid(data)), PRIMARY KEY(run_id, kind, id), FOREIGN KEY(run_id, task_id) REFERENCES tasks(run_id, id)) STRICT;
+   INSERT INTO records_scoped(rowid,run_id,kind,id,task_id,actor_id,data) SELECT rowid,run_id,kind,id,task_id,actor_id,data FROM records;
+   DROP TABLE records;
+   DROP TABLE attempts;
+   DROP TABLE tasks;
+   ALTER TABLE tasks_scoped RENAME TO tasks;
+   ALTER TABLE attempts_scoped RENAME TO attempts;
+   ALTER TABLE records_scoped RENAME TO records;
+   CREATE UNIQUE INDEX one_active_attempt ON attempts(run_id, task_id) WHERE status IN ('queued','running','unknown');
    CREATE INDEX tasks_by_run ON tasks(run_id, status);
    CREATE INDEX records_by_task ON records(run_id, task_id, kind);`,
 ];
@@ -217,24 +234,39 @@ export class Store {
   }
 
   private migrate(): void {
-    this.transaction(() => {
-      const version = Number(
-        this.db.prepare('PRAGMA user_version').get()?.['user_version'],
-      );
-      if (
-        !Number.isSafeInteger(version) ||
-        version < 0 ||
-        version > migrations.length
-      )
-        throw new CrewError(
-          'INCOMPATIBLE_DATABASE',
-          `Unsupported database version ${version}`,
+    // Rebuilding a referenced table requires foreign keys off outside the
+    // transaction; foreign_key_check proves the copy before it is committed.
+    this.db.exec('PRAGMA foreign_keys=OFF');
+    try {
+      this.transaction(() => {
+        const version = Number(
+          this.db.prepare('PRAGMA user_version').get()?.['user_version'],
         );
-      for (let index = version; index < migrations.length; index++) {
-        this.db.exec(migrations[index]!);
-        this.db.exec(`PRAGMA user_version=${index + 1}`);
-      }
-    });
+        if (
+          !Number.isSafeInteger(version) ||
+          version < 0 ||
+          version > migrations.length
+        )
+          throw new CrewError(
+            'INCOMPATIBLE_DATABASE',
+            `Unsupported database version ${version}`,
+          );
+        for (let index = version; index < migrations.length; index++) {
+          this.db.exec(migrations[index]!);
+          this.db.exec(`PRAGMA user_version=${index + 1}`);
+        }
+        if (
+          version < migrations.length &&
+          this.db.prepare('PRAGMA foreign_key_check').all().length
+        )
+          throw new CrewError(
+            'INCOMPATIBLE_DATABASE',
+            'Migration would leave dangling references',
+          );
+      });
+    } finally {
+      this.db.exec('PRAGMA foreign_keys=ON');
+    }
   }
 
   private transaction<T>(action: () => T): T {
@@ -271,11 +303,23 @@ export class Store {
       .all(this.project.id, limit)
       .map((row) => this.decode<Run>(row, 'Run'));
   }
-  getTask(id: string): TaskState {
-    return this.decode<TaskState>(
-      this.db.prepare('SELECT data FROM tasks WHERE id=?').get(id),
-      'Task',
-    );
+  /** The run without a terminal status created last, otherwise the last run. */
+  currentRun(): Run | null {
+    const row = this.db
+      .prepare(
+        "SELECT data FROM runs WHERE project_id=? ORDER BY status IN ('completed','failed','cancelled'), rowid DESC LIMIT 1",
+      )
+      .get(this.project.id);
+    return row ? this.decode<Run>(row, 'Run') : null;
+  }
+  /** Task IDs are scoped by run; another run's task is never returned. */
+  getTask(runId: string, id: string): TaskState {
+    const row = this.db
+      .prepare('SELECT data FROM tasks WHERE run_id=? AND id=?')
+      .get(runId, id);
+    if (!row && this.db.prepare('SELECT 1 FROM tasks WHERE id=?').get(id))
+      throw new CrewError('WRONG_RUN', 'Task belongs to another run');
+    return this.decode<TaskState>(row, 'Task');
   }
   tasks(runId: string): TaskState[] {
     this.getRun(runId);
@@ -364,7 +408,7 @@ export class Store {
     taskId: string | null = null,
   ): void {
     validate('Identifier', value.id);
-    if (taskId && this.getTask(taskId).run_id !== actor.run_id)
+    if (taskId && this.getTask(actor.run_id, taskId).run_id !== actor.run_id)
       throw new CrewError('WRONG_RUN', 'Record task belongs to another run');
     this.db
       .prepare(
@@ -400,7 +444,7 @@ export class Store {
         'Worker identity requires an assigned attempt',
       );
     if (actor.task_id) {
-      const task = this.getTask(actor.task_id);
+      const task = this.getTask(actor.run_id, actor.task_id);
       if (
         task.run_id !== run.id ||
         task.active_attempt_id !== actor.attempt_id ||
@@ -453,7 +497,7 @@ export class Store {
     ]);
     if (!taskId || taskId !== actor.task_id || !actor.attempt_id)
       throw new CrewError('FORBIDDEN', 'Worker action belongs to its own task');
-    const task = this.getTask(taskId),
+    const task = this.getTask(actor.run_id, taskId),
       attempt = this.getAttempt(actor.attempt_id);
     if (
       task.spec.role !== actor.role ||
@@ -721,7 +765,7 @@ export class Store {
     validate('AcceptDeliveryArgs', args);
     const run = this.openRun(actor, ['user', 'chief']);
     const handoff = this.getRecord<Handoff>(run.id, 'handoff', args.handoff_id),
-      task = this.getTask(handoff.task_id),
+      task = this.getTask(actor.run_id, handoff.task_id),
       attempt = this.getAttempt(handoff.attempt_id);
     const existing = this.allRecords<DeliveryAcceptance>(
       run.id,
@@ -1152,6 +1196,11 @@ export class Store {
         if (spec.run_id !== actor.run_id)
           throw new CrewError('WRONG_RUN', 'Task belongs to another run');
         const tasks = this.tasks(actor.run_id);
+        if (tasks.some((task) => task.id === spec.id))
+          throw new CrewError(
+            'TASK_EXISTS',
+            `Task ${spec.id} already exists in this run; amend it or choose another ID`,
+          );
         assertAcyclic(
           new Map([
             ...tasks.map((task) => [task.id, task.spec.depends_on] as const),
@@ -1159,7 +1208,7 @@ export class Store {
           ]),
         );
         const ready = spec.depends_on.every(
-          (id) => this.getTask(id).status === 'accepted',
+          (id) => this.getTask(actor.run_id, id).status === 'accepted',
         );
         const task: TaskState = {
           id: spec.id,
@@ -1208,7 +1257,7 @@ export class Store {
             'INVALID_INPUT',
             'Plan amendment requires its reason',
           );
-        const task = this.getTask(args.task.id);
+        const task = this.getTask(actor.run_id, args.task.id);
         if (task.run_id !== actor.run_id || args.task.run_id !== task.run_id)
           throw new CrewError(
             'WRONG_RUN',
@@ -1334,7 +1383,7 @@ export class Store {
           this.moveTask(
             task,
             next.depends_on.every(
-              (id) => this.getTask(id).status === 'accepted',
+              (id) => this.getTask(actor.run_id, id).status === 'accepted',
             )
               ? 'ready'
               : 'waiting_dependency',
@@ -1370,7 +1419,7 @@ export class Store {
       expectedVersion,
       () => {
         this.openRun(actor, ['user', 'chief']);
-        const task = this.getTask(taskId);
+        const task = this.getTask(actor.run_id, taskId);
         if (
           task.run_id !== actor.run_id ||
           session.run_id !== task.run_id ||
@@ -1385,7 +1434,7 @@ export class Store {
           task.active_attempt_id ||
           task.status !== 'ready' ||
           task.spec.depends_on.some(
-            (id) => this.getTask(id).status !== 'accepted',
+            (id) => this.getTask(actor.run_id, id).status !== 'accepted',
           )
         )
           throw new CrewError(
@@ -1504,7 +1553,7 @@ export class Store {
       expectedVersion,
       () => {
         this.openRun(actor, ['user', 'chief']);
-        const task = this.getTask(taskId);
+        const task = this.getTask(actor.run_id, taskId);
         if (
           task.run_id !== actor.run_id ||
           task.status === 'accepted' ||
@@ -1527,7 +1576,7 @@ export class Store {
         task.generation++;
         task.active_attempt_id = null;
         task.status = task.spec.depends_on.every(
-          (id) => this.getTask(id).status === 'accepted',
+          (id) => this.getTask(actor.run_id, id).status === 'accepted',
         )
           ? 'ready'
           : 'waiting_dependency';
@@ -1562,7 +1611,7 @@ export class Store {
           'refactorer',
           'ci',
         ]);
-        const task = this.getTask(handoff.task_id),
+        const task = this.getTask(actor.run_id, handoff.task_id),
           attempt = this.getAttempt(handoff.attempt_id);
         if (
           actor.task_id !== task.id ||
@@ -1577,6 +1626,9 @@ export class Store {
         const artifactIds = new Set(
           handoff.artifacts.map((artifact) => artifact.id),
         );
+        // A proof declared live must come from a real provider, never a simulation.
+        for (const proof of handoff.verifications)
+          if (proof.mode === 'live') assertLiveVerification(proof);
         if (
           handoff.criteria_claimed.some((id) => !criteria.has(id)) ||
           handoff.verifications.some(
@@ -1668,7 +1720,7 @@ export class Store {
             'Approval must identify its authenticated author',
           );
         for (const id of decision.affects_task_ids)
-          if (this.getTask(id).run_id !== actor.run_id)
+          if (this.getTask(actor.run_id, id).run_id !== actor.run_id)
             throw new CrewError('WRONG_RUN', 'Decision affects another run');
         if (decision.supersedes) {
           const previous = this.getRecord<Decision>(
@@ -1695,7 +1747,7 @@ export class Store {
         }
         const stored = { ...decision, provenance };
         this.writeRecord(actor, 'decision', stored);
-        return decision;
+        return stored;
       },
     );
   }
@@ -1749,7 +1801,7 @@ export class Store {
       expectedVersion,
       () => {
         this.openRun(actor, ['user', 'chief']);
-        const task = this.getTask(args.task_id);
+        const task = this.getTask(actor.run_id, args.task_id);
         if (task.run_id !== actor.run_id)
           throw new CrewError('WRONG_RUN', 'Delegation belongs to another run');
         const reassignable =
@@ -1847,7 +1899,7 @@ export class Store {
           actor,
           review.review_task_id,
         );
-        const target = this.getTask(review.review_of_task_id);
+        const target = this.getTask(actor.run_id, review.review_of_task_id);
         const handoff = this.getRecord<Handoff>(
           actor.run_id,
           'handoff',
@@ -2048,7 +2100,7 @@ export class Store {
             if (
               dependent.status === 'waiting_dependency' &&
               dependent.spec.depends_on.every(
-                (id) => this.getTask(id).status === 'accepted',
+                (id) => this.getTask(actor.run_id, id).status === 'accepted',
               )
             )
               this.moveTask(dependent, 'ready');
@@ -2131,7 +2183,7 @@ export class Store {
             'review',
             control.review_id,
           );
-          const task = this.getTask(control.task_id),
+          const task = this.getTask(actor.run_id, control.task_id),
             attempt = this.getAttempt(control.attempt_id);
           if (
             review.outcome !== 'approved' ||
@@ -2298,7 +2350,9 @@ export class Store {
       expectedVersion,
       () => {
         this.openRun(actor, ['user', 'chief']);
-        const tasks = args.affects_task_ids.map((id) => this.getTask(id));
+        const tasks = args.affects_task_ids.map((id) =>
+          this.getTask(actor.run_id, id),
+        );
         if (
           tasks.some(
             (task) =>
@@ -2397,7 +2451,7 @@ export class Store {
         this.replaceRecord(actor.run_id, 'question', question);
         if (question.blocking)
           for (const taskId of question.affects_task_ids) {
-            const task = this.getTask(taskId);
+            const task = this.getTask(actor.run_id, taskId);
             if (!this.blockingQuestions(actor.run_id, task.id).length) {
               if (task.status === 'waiting_user')
                 this.moveTask(
@@ -2436,7 +2490,7 @@ export class Store {
         );
       if (
         correlation.task_id &&
-        this.getTask(correlation.task_id).run_id !== actor.run_id
+        this.getTask(actor.run_id, correlation.task_id).run_id !== actor.run_id
       )
         throw new CrewError(
           'WRONG_RUN',
@@ -2489,7 +2543,7 @@ export class Store {
             'INVALID_WAIT',
             'Task wait requires an explicit status and reason',
           );
-        const task = this.getTask(taskId);
+        const task = this.getTask(actor.run_id, taskId);
         if (task.run_id !== actor.run_id)
           throw new CrewError('WRONG_RUN', 'Task belongs to another run');
         this.moveTask(task, status);
@@ -2565,7 +2619,8 @@ export class Store {
           );
         if (
           message.recipient_kind === 'task' &&
-          this.getTask(message.recipient_id).run_id !== actor.run_id
+          this.getTask(actor.run_id, message.recipient_id).run_id !==
+            actor.run_id
         )
           throw new CrewError(
             'WRONG_RUN',
@@ -2740,6 +2795,7 @@ export class Store {
     artifacts: ArtifactRef[] = [],
   ): Verification {
     validate('Verification', verification);
+    if (verification.mode === 'live') assertLiveVerification(verification);
     return this.mutate(
       actor,
       key,
@@ -2748,7 +2804,7 @@ export class Store {
       expectedVersion,
       () => {
         this.authority(actor, ['user']);
-        const task = this.getTask(taskId);
+        const task = this.getTask(actor.run_id, taskId);
         if (task.run_id !== actor.run_id)
           throw new CrewError(
             'WRONG_RUN',

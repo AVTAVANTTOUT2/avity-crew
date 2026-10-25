@@ -73,13 +73,33 @@ async function stdinText(): Promise<string> {
     throw new CrewError('CLI_USAGE', 'Entrée stdin UTF-8 incomplète.');
   }
 }
+async function promptBytes(file: string, cwd: string): Promise<Buffer> {
+  try {
+    const path = resolve(cwd, file);
+    const info = await stat(path);
+    if (!info.isFile())
+      throw new CrewError(
+        'CLI_USAGE',
+        `Le fichier objectif n'est pas un fichier : ${file}`,
+      );
+    if (info.size > MAX_JSON_BYTES)
+      throw new CrewError('CLI_USAGE', 'Le fichier objectif dépasse 1 MiB.');
+    return await readFile(path);
+  } catch (failure) {
+    if (failure instanceof CrewError) throw failure;
+    const code = (failure as NodeJS.ErrnoException).code;
+    throw new CrewError(
+      'CLI_USAGE',
+      code === 'ENOENT'
+        ? `Fichier objectif introuvable : ${file}`
+        : `Fichier objectif illisible (${code ?? 'erreur de lecture'}) : ${file}`,
+    );
+  }
+}
 async function objective(command: CliCommand, cwd: string): Promise<string> {
   let value = command.text ?? '';
   if (command.promptFile) {
-    const path = resolve(cwd, command.promptFile);
-    if ((await stat(path)).size > MAX_JSON_BYTES)
-      throw new CrewError('CLI_USAGE', 'Le fichier objectif dépasse 1 MiB.');
-    const bytes = await readFile(path);
+    const bytes = await promptBytes(command.promptFile, cwd);
     if (bytes.length > MAX_JSON_BYTES)
       throw new CrewError('CLI_USAGE', 'Le fichier objectif dépasse 1 MiB.');
     try {
@@ -227,14 +247,13 @@ async function execute(command: CliCommand, cwd: string): Promise<number> {
       subject_id: command.subject ?? command.task,
     });
   else if (command.name === 'export') {
-    result = await admin('export', {
-      run_id: command.run,
-      format: command.format ?? 'markdown',
-    });
+    // --json alone asks for the structured report, not Markdown in an envelope.
+    const format = command.format ?? (command.json ? 'json' : 'markdown');
+    result = await admin('export', { run_id: command.run, format });
     // JSON events are paged by size; gather every page so the export is complete.
     type Page = { events: unknown[]; next_seq: number; has_more: boolean };
     const report = result as Page;
-    while (command.format === 'json' && report.has_more) {
+    while (format === 'json' && report.has_more) {
       const page = (await admin('export', {
         run_id: command.run,
         format: 'json',
@@ -275,6 +294,14 @@ async function execute(command: CliCommand, cwd: string): Promise<number> {
   return 0;
 }
 
+/** Refusals that need their corrective action here as well as in the TUI. */
+const GUIDANCE: Record<string, string> = {
+  GIT_INITIALIZATION_REQUIRED:
+    "Ce dossier n'a pas de révision Git : ajouter --init-git (mode code) ou utiliser --mode documentation.",
+  CONTROL_IN_PROGRESS:
+    "Un contrôle attend la fin observée des tours arrêtés et s'appliquera ensuite ; relire status avant une nouvelle action.",
+};
+
 export async function main(args = process.argv.slice(2)): Promise<number> {
   const json = args.includes('--json');
   try {
@@ -283,7 +310,7 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
     const code = failure instanceof CrewError ? failure.code : 'CLI_ERROR';
     const message =
       failure instanceof CrewError
-        ? cleanText(failure.message)
+        ? cleanText(GUIDANCE[failure.code] ?? failure.message)
         : 'Commande non exécutée ; vérifier le projet et les prérequis avec doctor.';
     if (json)
       process.stdout.write(
@@ -294,7 +321,11 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
         }) + '\n',
       );
     else process.stderr.write(`${code} : ${message}\n`);
-    return code === 'CLI_USAGE' || code === 'INVALID_INPUT'
+    return [
+      'CLI_USAGE',
+      'INVALID_INPUT',
+      'GIT_INITIALIZATION_REQUIRED',
+    ].includes(code)
       ? 2
       : code === 'CLI_INTERRUPTED'
         ? 130

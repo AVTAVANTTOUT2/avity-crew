@@ -9,6 +9,7 @@ import { request as httpRequest } from 'node:http';
 import { CrewError, validate } from '../../contracts/src/index.ts';
 import type { ToolCall } from '../../contracts/src/index.ts';
 import {
+  CONTROL_TIMEOUT_MS,
   LOCAL_PROTOCOL,
   MAX_JSON_BYTES,
   REQUEST_TIMEOUT_MS,
@@ -70,6 +71,8 @@ function endpointFrom(path: string): Endpoint {
   }
 }
 
+const CONTROLS = ['pause', 'stop', 'replace_chief', 'reassign'];
+
 export class SupervisorClient {
   constructor(private readonly options: ClientOptions) {
     if (
@@ -84,7 +87,11 @@ export class SupervisorClient {
         'Invalid local client configuration',
       );
   }
-  private async invoke(route: string, body?: unknown): Promise<unknown> {
+  private async invoke(
+    route: string,
+    body?: unknown,
+    timeout_ms = this.options.timeout_ms ?? REQUEST_TIMEOUT_MS,
+  ): Promise<unknown> {
     const endpoint = endpointFrom(this.options.endpointFile);
     const url = new URL(route, endpoint.url);
     let serialized: string | undefined;
@@ -181,7 +188,7 @@ export class SupervisorClient {
       timer = setTimeout(() => {
         fail();
         request.destroy();
-      }, this.options.timeout_ms ?? REQUEST_TIMEOUT_MS);
+      }, timeout_ms);
       request.on('error', fail);
       request.end(serialized);
     });
@@ -212,6 +219,13 @@ export class SupervisorClient {
     return this.invoke('call', call);
   }
   admin(request: AdminRequest): Promise<unknown> {
-    return this.invoke('admin', request);
+    const timeout = this.options.timeout_ms ?? REQUEST_TIMEOUT_MS;
+    return this.invoke(
+      'admin',
+      request,
+      CONTROLS.includes(request.method)
+        ? Math.max(timeout, CONTROL_TIMEOUT_MS)
+        : timeout,
+    );
   }
 }
